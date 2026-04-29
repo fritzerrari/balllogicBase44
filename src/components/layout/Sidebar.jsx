@@ -1,21 +1,58 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
-  FileText, Settings, Zap, ChevronRight
+  FileText, Settings, Zap, ChevronRight, Bot,
+  Search, Dumbbell, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'Spiele', icon: Video, path: '/matches' },
   { label: 'Live-Analyse', icon: Radio, path: '/live', badge: 'LIVE' },
-  { label: 'Taktik-Board', icon: BarChart3, path: '/tactics' },
+  { label: 'Taktik-Board', icon: BarChart3, path: '/tactics', hideOnSidebar: true },
   { label: 'Reports', icon: FileText, path: '/reports' },
+];
+
+const toolsItems = [
+  { label: 'KI-Assistent', icon: Bot, path: '/assistant' },
+  { label: 'Scouting', icon: Search, path: '/scouting' },
+  { label: 'Trainingsplan', icon: Dumbbell, path: '/training' },
+  { label: 'Spielvorbereitung', icon: Zap, path: '/matchprep' },
+];
+
+const bottomItems = [
   { label: 'Einstellungen', icon: Settings, path: '/settings' },
 ];
 
-export default function Sidebar() {
+function NavLink({ label, icon: Icon, path, badge }) {
   const location = useLocation();
+  const active = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
+  return (
+    <Link
+      to={path}
+      className={cn(
+        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
+        active
+          ? 'bg-primary/15 text-primary border border-primary/20'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+      )}
+    >
+      <Icon className={cn('w-4 h-4 flex-shrink-0', active && 'text-primary')} />
+      <span className="flex-1">{label}</span>
+      {badge && (
+        <span className="text-[9px] font-bold tracking-widest px-1.5 py-0.5 rounded bg-destructive text-white animate-pulse">
+          {badge}
+        </span>
+      )}
+      {active && <ChevronRight className="w-3 h-3 text-primary" />}
+    </Link>
+  );
+}
+
+export default function Sidebar() {
+  const [toolsOpen, setToolsOpen] = useState(true);
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50">
@@ -33,31 +70,29 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ label, icon: Icon, path, badge }) => {
-          const active = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
-          return (
-            <Link
-              key={path}
-              to={path}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
-                active
-                  ? 'bg-primary/15 text-primary border border-primary/20'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Icon className={cn('w-4 h-4 flex-shrink-0', active && 'text-primary')} />
-              <span className="flex-1">{label}</span>
-              {badge && (
-                <span className="text-[9px] font-bold tracking-widest px-1.5 py-0.5 rounded bg-destructive text-white animate-pulse">
-                  {badge}
-                </span>
-              )}
-              {active && <ChevronRight className="w-3 h-3 text-primary" />}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {navItems.filter(n => !n.hideOnSidebar).map((item) => (
+          <NavLink key={item.path} {...item} />
+        ))}
+
+        {/* Tools Section */}
+        <div className="pt-3 pb-1">
+          <button
+            onClick={() => setToolsOpen(o => !o)}
+            className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground font-bold uppercase tracking-widest hover:text-foreground transition-colors"
+          >
+            <span>KI-Tools</span>
+            {toolsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+        {toolsOpen && toolsItems.map((item) => (
+          <NavLink key={item.path} {...item} />
+        ))}
+
+        <div className="pt-2" />
+        {bottomItems.map((item) => (
+          <NavLink key={item.path} {...item} />
+        ))}
       </nav>
 
       {/* Footer */}

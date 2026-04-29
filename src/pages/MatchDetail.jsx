@@ -229,11 +229,23 @@ Die Analyse soll für einen Profi-Trainer nützlich sein.`;
         {/* Actions */}
         <div className="grid sm:grid-cols-2 gap-4">
           {match.status === 'analyzed' ? (
-            <Link to={`/tactics/${match.id}`} className="sm:col-span-2">
-              <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 neon-glow gap-2 h-12 text-base">
-                <BarChart3 className="w-5 h-5" /> Taktische Analyse ansehen →
-              </Button>
-            </Link>
+            <>
+              <Link to={`/tactics/${match.id}`} className="sm:col-span-2">
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 neon-glow gap-2 h-12 text-base">
+                  <BarChart3 className="w-5 h-5" /> Taktische Analyse ansehen →
+                </Button>
+              </Link>
+              <Link to={`/halftime/${match.id}`}>
+                <Button variant="outline" className="w-full border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 gap-2">
+                  <Clock className="w-4 h-4" /> Halbzeit-Analyse
+                </Button>
+              </Link>
+              <Link to={`/matchprep`}>
+                <Button variant="outline" className="w-full border-border text-muted-foreground hover:text-foreground gap-2">
+                  <Zap className="w-4 h-4" /> Nächstes Spiel vorbereiten
+                </Button>
+              </Link>
+            </>
           ) : match.status === 'processing' && analyzing ? (
             <div className="sm:col-span-2 glass rounded-xl p-6 text-center">
               <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />

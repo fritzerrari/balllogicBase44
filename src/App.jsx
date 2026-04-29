@@ -15,6 +15,11 @@ import TacticsAnalysis from './pages/TacticsAnalysis';
 import LiveSession from './pages/LiveSession';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import HalftimeReport from './pages/HalftimeReport';
+import AIAssistant from './pages/AIAssistant';
+import ScoutingReport from './pages/ScoutingReport';
+import TrainingPlan from './pages/TrainingPlan';
+import MatchPrep from './pages/MatchPrep';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -48,6 +53,11 @@ const AuthenticatedApp = () => {
         <Route path="/live" element={<LiveSession />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/halftime/:id" element={<HalftimeReport />} />
+        <Route path="/assistant" element={<AIAssistant />} />
+        <Route path="/scouting" element={<ScoutingReport />} />
+        <Route path="/training" element={<TrainingPlan />} />
+        <Route path="/matchprep" element={<MatchPrep />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
