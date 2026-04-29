@@ -1,0 +1,52 @@
+{
+  "name": "LiveSession",
+  "type": "object",
+  "properties": {
+    "match_id": {
+      "type": "string"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "ended"
+      ],
+      "default": "active"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "camera_streams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "camera_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "stream_url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "match_title"
+  ]
+}

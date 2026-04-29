@@ -1,0 +1,69 @@
+{
+  "name": "Match",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Match title, e.g. FC Bayern vs BVB"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "home_team": {
+      "type": "string"
+    },
+    "away_team": {
+      "type": "string"
+    },
+    "venue": {
+      "type": "string"
+    },
+    "competition": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "uploading",
+        "processing",
+        "analyzed",
+        "live",
+        "failed"
+      ],
+      "default": "uploading"
+    },
+    "video_urls": {
+      "type": "array",
+      "description": "URLs of uploaded camera videos",
+      "items": {
+        "type": "string"
+      }
+    },
+    "camera_count": {
+      "type": "number",
+      "default": 1
+    },
+    "duration_seconds": {
+      "type": "number"
+    },
+    "score_home": {
+      "type": "number"
+    },
+    "score_away": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "thumbnail_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "date",
+    "home_team",
+    "away_team"
+  ]
+}

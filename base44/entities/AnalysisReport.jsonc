@@ -1,0 +1,155 @@
+{
+  "name": "AnalysisReport",
+  "type": "object",
+  "properties": {
+    "match_id": {
+      "type": "string"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "possession_home": {
+      "type": "number",
+      "description": "Possession % home team"
+    },
+    "possession_away": {
+      "type": "number"
+    },
+    "pressing_index_home": {
+      "type": "number",
+      "description": "0-100 pressing intensity"
+    },
+    "pressing_index_away": {
+      "type": "number"
+    },
+    "pressing_height_home": {
+      "type": "number",
+      "description": "Average pressing line in meters from own goal"
+    },
+    "pressing_height_away": {
+      "type": "number"
+    },
+    "compactness_home": {
+      "type": "number"
+    },
+    "compactness_away": {
+      "type": "number"
+    },
+    "formation_home": {
+      "type": "string",
+      "description": "e.g. 4-3-3"
+    },
+    "formation_away": {
+      "type": "string"
+    },
+    "formation_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "minute": {
+            "type": "number"
+          },
+          "team": {
+            "type": "string"
+          },
+          "from_formation": {
+            "type": "string"
+          },
+          "to_formation": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ball_recoveries_home": {
+      "type": "number"
+    },
+    "ball_recoveries_away": {
+      "type": "number"
+    },
+    "transitions_home": {
+      "type": "number"
+    },
+    "transitions_away": {
+      "type": "number"
+    },
+    "sprint_data": {
+      "type": "array",
+      "description": "Sprint intensity per 15min interval",
+      "items": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "string"
+          },
+          "home_intensity": {
+            "type": "number"
+          },
+          "away_intensity": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "danger_zones": {
+      "type": "array",
+      "description": "Areas with high danger moments",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "intensity": {
+            "type": "number"
+          },
+          "team": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "key_moments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "minute": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "team": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ai_summary": {
+      "type": "string",
+      "description": "AI-generated tactical summary"
+    },
+    "ai_recommendations": {
+      "type": "string",
+      "description": "AI tactical recommendations"
+    }
+  },
+  "required": [
+    "match_id"
+  ]
+}
