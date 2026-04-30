@@ -1,17 +1,22 @@
 /**
- * CoachingCockpit — Trainer-Haupt-Dashboard während der Live-Session
- * Zeigt alle Kamera-Feeds, ermöglicht Kommunikation mit Assistenten,
- * RF-DETR Tracking-Simulation & Live-Event-Log
+ * CoachingCockpit — Trainer-Dashboard mit echtem Roboflow-Tracking
+ *
+ * Tracking-Modi:
+ *  1. ROBOFLOW LIVE — nimmt Frames vom <video>, sendet an Roboflow RF-DETR API
+ *     → Erkennt Spieler (Heim/Gäste), Torwart, Schiedsrichter, Ball
+ *     → Trikotfarben-Clustering per Canvas-Pixel → Team-Zuordnung
+ *     → Regelbasierte Event-Erkennung: Tor, Ecke, Foul, Konter
+ *  2. SIMULATION — Physics-basiert als Demo/Fallback
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Radio, Camera, Mic, MicOff, MessageSquare, Send,
-  Zap, Users, Circle, Target, Shield, ChevronUp,
-  Maximize2, Volume2, VolumeX, PhoneCall, Copy, Check,
-  Smartphone, QrCode, Share2, X
+  Zap, Users, Circle, Target, Shield,
+  Copy, Check, Smartphone, Share2, Settings, Play, Pause,
+  Eye, EyeOff, Wifi, WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,47 +25,56 @@ import FootballPitch from '@/components/pitch/FootballPitch';
 import TrackingOverlay from '@/components/live/TrackingOverlay';
 import CameraFeedCard from '@/components/live/CameraFeedCard';
 import ShareCameraLink from '@/components/live/ShareCameraLink';
+import EventLog from '@/components/live/EventLog';
+import LiveStats from '@/components/live/LiveStats';
+import {
+  detectFrame,
+  assignTeamsByColor,
+  detectEvents,
+  smoothDetections,
+  simulateDetections,
+  computeStats,
+} from '@/lib/footballTracker';
 
-const POSITIONS = ['Tribüne Mitte', 'Tor-Linie Heim', 'Tor-Linie Gäste', 'Tribüne Links', 'Tribüne Rechts', 'Erhöht Mitte'];
-
-// Simulated tracking data (RF-DETR output would replace this via backend)
-const generateTracking = (t) => {
-  const seed = (n) => Math.sin(t * 0.03 + n) * 0.5 + 0.5;
-  const players = [];
-  // Home team (11 players)
-  for (let i = 0; i < 11; i++) {
-    players.push({ x: 15 + seed(i) * 45, y: 10 + seed(i * 3) * 80, number: i + 1, team: 'home', speed: (seed(i * 7) * 28).toFixed(1) });
-  }
-  // Away team (11 players)
-  for (let i = 0; i < 11; i++) {
-    players.push({ x: 50 + seed(i * 2) * 40, y: 10 + seed(i * 5) * 80, number: i + 1, team: 'away', speed: (seed(i * 11) * 28).toFixed(1) });
-  }
-  // Ball
-  const ball = { x: 30 + seed(99) * 50, y: 20 + seed(88) * 60 };
-  return { players, ball };
+// ─── Simulation fallback ─────────────────────────────────────────────────────
+const buildSimFrame = (tick) => {
+  const { players } = simulateDetections(tick);
+  return players;
 };
 
 export default function CoachingCockpit() {
-  const queryClient = useQueryClient();
+  // UI state
   const [selectedCam, setSelectedCam] = useState(null);
   const [messages, setMessages] = useState({});
   const [inputMsg, setInputMsg] = useState({});
   const [micActive, setMicActive] = useState({});
-  const [trackTick, setTrackTick] = useState(0);
-  const [showShare, setShowShare] = useState(null); // camera object
+  const [showShare, setShowShare] = useState(null);
   const [showTracking, setShowTracking] = useState(true);
   const [copiedCode, setCopiedCode] = useState(null);
+  const [showApiSetup, setShowApiSetup] = useState(false);
 
-  // Live tracking animation
-  useEffect(() => {
-    const id = setInterval(() => setTrackTick(t => t + 1), 500);
-    return () => clearInterval(id);
-  }, []);
+  // Tracking state
+  const [trackingMode, setTrackingMode] = useState('simulation'); // 'simulation' | 'roboflow'
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [detections, setDetections] = useState([]);
+  const [prevDetections, setPrevDetections] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [statsHistory, setStatsHistory] = useState([]);
+  const [trackTick, setTrackTick] = useState(0);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
+  const videoRef = useRef(null);
+  const hiddenCanvasRef = useRef(null);
+  const detectionIntervalRef = useRef(null);
+  const simIntervalRef = useRef(null);
+
+  // ── Load sessions ──────────────────────────────────────────────────────────
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
-    refetchInterval: 5000,
+    refetchInterval: 8000,
   });
 
   const activeSession = sessions[0];
@@ -70,8 +84,133 @@ export default function CoachingCockpit() {
     { camera_id: '3', label: 'Torlinie Gäste', code: '571039', status: 'waiting' },
   ];
 
-  const tracking = generateTracking(trackTick);
+  const liveUrl = `${window.location.origin}/cam`;
 
+  // ── Simulation mode ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (trackingMode !== 'simulation') return;
+    simIntervalRef.current = setInterval(() => {
+      setTrackTick(t => {
+        const newTick = t + 1;
+        const frame = buildSimFrame(newTick);
+        setPrevDetections(detections);
+        setDetections(frame);
+        // Simulate auto events occasionally
+        if (newTick % 40 === 0) {
+          const ball = frame.find(d => d.class === 'ball');
+          const simEvents = detectEvents(frame, [], { left: 2, right: 98, top: 2, bottom: 98 });
+          if (simEvents.length > 0) {
+            setEvents(prev => [
+              ...simEvents.map(e => ({ ...e, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })),
+              ...prev
+            ].slice(0, 50));
+          }
+        }
+        return newTick;
+      });
+    }, 500);
+    return () => clearInterval(simIntervalRef.current);
+  }, [trackingMode]);
+
+  // ── Roboflow mode ──────────────────────────────────────────────────────────
+  const startRoboflowTracking = useCallback(async (key) => {
+    setApiError(null);
+    setIsDetecting(true);
+
+    // Start camera capture
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (e) {
+      setApiError('Kamera-Zugriff verweigert. Nutze Simulation.');
+      setTrackingMode('simulation');
+      setIsDetecting(false);
+      return;
+    }
+
+    // Detection loop — 1 frame per 2 seconds (API rate limit)
+    detectionIntervalRef.current = setInterval(async () => {
+      const video = videoRef.current;
+      const canvas = hiddenCanvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 360;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+
+      try {
+        let raw = await detectFrame(canvas, key);
+        raw = assignTeamsByColor(canvas, raw);
+        const smoothed = smoothDetections(raw);
+
+        const newEvents = detectEvents(smoothed, detections, { left: 2, right: 98, top: 2, bottom: 98 });
+        if (newEvents.length > 0) {
+          setEvents(prev => [
+            ...newEvents.map(e => ({
+              ...e,
+              id: Date.now() + Math.random(),
+              time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            })),
+            ...prev,
+          ].slice(0, 50));
+        }
+
+        setPrevDetections(detections);
+        setDetections(smoothed);
+        setStatsHistory(prev => [...prev.slice(-30), smoothed]);
+        setApiError(null);
+      } catch (e) {
+        setApiError(`API-Fehler: ${e.message}`);
+      }
+    }, 2000);
+  }, [detections]);
+
+  const stopRoboflowTracking = () => {
+    clearInterval(detectionIntervalRef.current);
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsDetecting(false);
+  };
+
+  const handleActivateRoboflow = () => {
+    if (!apiKeyInput.trim()) return;
+    setApiKey(apiKeyInput.trim());
+    setTrackingMode('roboflow');
+    setShowApiSetup(false);
+    clearInterval(simIntervalRef.current);
+    startRoboflowTracking(apiKeyInput.trim());
+  };
+
+  const handleSwitchToSim = () => {
+    stopRoboflowTracking();
+    setTrackingMode('simulation');
+    setApiError(null);
+  };
+
+  // Cleanup
+  useEffect(() => () => {
+    clearInterval(detectionIntervalRef.current);
+    clearInterval(simIntervalRef.current);
+    stopRoboflowTracking();
+  }, []);
+
+  // ── Derived data ───────────────────────────────────────────────────────────
+  const ball = detections.find(d => d.class === 'ball') || null;
+  const playerList = detections.filter(d => d.class !== 'ball');
+  const stats = computeStats(statsHistory);
+  const playerCounts = {
+    home: detections.filter(d => d.team === 'home').length,
+    away: detections.filter(d => d.team === 'away').length,
+    referee: detections.filter(d => d.class === 'referee').length,
+  };
+
+  // ── Chat ───────────────────────────────────────────────────────────────────
   const sendMessage = (camId) => {
     const msg = inputMsg[camId]?.trim();
     if (!msg) return;
@@ -88,12 +227,14 @@ export default function CoachingCockpit() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const liveUrl = `${window.location.origin}/cam`;
-
   return (
     <div className="p-4 lg:p-6 min-h-screen">
+      {/* Hidden elements for Roboflow capture */}
+      <video ref={videoRef} className="hidden" muted playsInline />
+      <canvas ref={hiddenCanvasRef} className="hidden" />
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
@@ -104,25 +245,101 @@ export default function CoachingCockpit() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowTracking(s => !s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${showTracking ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-muted border-border text-muted-foreground'}`}>
-            <Users className="w-3.5 h-3.5 inline mr-1" /> Tracking {showTracking ? 'AN' : 'AUS'}
+          {/* Tracking mode toggle */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            <button
+              onClick={handleSwitchToSim}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${trackingMode === 'simulation' ? 'bg-background text-foreground shadow' : 'text-muted-foreground'}`}
+            >
+              Simulation
+            </button>
+            <button
+              onClick={() => setShowApiSetup(s => !s)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${trackingMode === 'roboflow' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground'}`}
+            >
+              <Wifi className="w-3 h-3" /> Roboflow Live
+            </button>
+          </div>
+          <button
+            onClick={() => setShowTracking(s => !s)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${showTracking ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-muted border-border text-muted-foreground'}`}
+          >
+            {showTracking ? <Eye className="w-3.5 h-3.5 inline mr-1" /> : <EyeOff className="w-3.5 h-3.5 inline mr-1" />}
+            Overlay
           </button>
         </div>
       </div>
 
-      {/* No active session */}
+      {/* Roboflow API Setup Panel */}
+      <AnimatePresence>
+        {showApiSetup && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="glass rounded-xl p-4 mb-4 border border-primary/20"
+          >
+            <div className="text-sm font-grotesk font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" />
+              Roboflow RF-DETR Live-Tracking aktivieren
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Kostenlos registrieren auf{' '}
+              <a href="https://roboflow.com" target="_blank" rel="noopener" className="text-primary hover:underline">roboflow.com</a>
+              {' '}→ API Key kopieren → hier einfügen.
+              Das Modell erkennt Spieler, Torwart, Schiedsrichter & Ball automatisch mit RF-DETR/YOLOv11.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                value={apiKeyInput}
+                onChange={e => setApiKeyInput(e.target.value)}
+                placeholder="rf_xxxxxxxxxxxxxxxxxxxxxxxx"
+                className="bg-muted border-border font-mono text-sm flex-1"
+                onKeyDown={e => e.key === 'Enter' && handleActivateRoboflow()}
+              />
+              <Button
+                onClick={handleActivateRoboflow}
+                disabled={!apiKeyInput.trim()}
+                className="bg-primary text-primary-foreground gap-2"
+              >
+                <Play className="w-4 h-4" /> Aktivieren
+              </Button>
+            </div>
+            {apiError && (
+              <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
+                <WifiOff className="w-3.5 h-3.5" /> {apiError}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Roboflow active banner */}
+      {trackingMode === 'roboflow' && (
+        <div className="glass rounded-xl p-3 mb-4 border border-primary/30 flex items-center gap-3 text-xs">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-primary font-bold">RF-DETR LIVE</span>
+          <span className="text-muted-foreground">Erkennt: Spieler · Torwart · Schiedsrichter · Ball · Trikotfarben</span>
+          <button onClick={handleSwitchToSim} className="ml-auto text-muted-foreground hover:text-foreground text-xs underline">
+            Stoppen
+          </button>
+        </div>
+      )}
+
+      {/* No session warning */}
       {!activeSession && (
-        <div className="glass rounded-xl p-6 mb-4 border border-yellow-500/20 bg-yellow-500/5 text-sm text-yellow-400 flex items-center gap-2">
-          <Radio className="w-4 h-4" /> Keine aktive Live-Session — starte eine Session unter "Live-Analyse"
-          <span className="text-muted-foreground text-xs ml-2">(Demo-Daten werden angezeigt)</span>
+        <div className="glass rounded-xl p-3 mb-4 border border-yellow-500/20 bg-yellow-500/5 text-xs text-yellow-400 flex items-center gap-2">
+          <Radio className="w-3.5 h-3.5" />
+          Keine aktive Live-Session — Demo-Daten werden angezeigt
         </div>
       )}
 
       <div className="grid lg:grid-cols-12 gap-4">
 
-        {/* === LEFT: Camera Grid === */}
+        {/* ── LEFT: Camera Grid + Pitch ── */}
         <div className="lg:col-span-7 space-y-4">
+
           {/* Camera grid */}
           <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
             {cameras.map((cam) => (
@@ -143,88 +360,79 @@ export default function CoachingCockpit() {
                 onMicToggle={() => setMicActive(prev => ({ ...prev, [cam.camera_id]: !prev[cam.camera_id] }))}
               />
             ))}
-            {/* Add camera slot */}
-            <div className="aspect-video rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/30 cursor-pointer transition-all group"
-              onClick={() => setShowShare({ camera_id: 'new', label: 'Neue Kamera', code: Math.floor(100000 + Math.random() * 900000).toString() })}>
+            <div
+              className="aspect-video rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/30 cursor-pointer transition-all group"
+              onClick={() => setShowShare({ camera_id: 'new', label: 'Neue Kamera', code: Math.floor(100000 + Math.random() * 900000).toString() })}
+            >
               <Camera className="w-6 h-6 group-hover:text-primary transition-colors" />
-              <span className="text-xs">+ Kamera hinzufügen</span>
+              <span className="text-xs">+ Kamera</span>
             </div>
           </div>
 
-          {/* Pitch with tracking overlay */}
+          {/* Live Pitch + Tracking */}
           <div className="glass rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <span className="text-sm font-grotesk font-semibold text-foreground flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" /> Live-Tracking
-                <span className="text-xs text-muted-foreground font-normal">(RF-DETR Spieler-, Ball- & Torerkennung)</span>
+                <Target className="w-4 h-4 text-primary" />
+                Live-Tracking
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${trackingMode === 'roboflow' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                  {trackingMode === 'roboflow' ? '🔴 RF-DETR LIVE' : '⚪ Simulation'}
+                </span>
               </span>
               <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1 text-primary"><Circle className="w-2 h-2 fill-current" /> Heim ({tracking.players.filter(p => p.team === 'home').length})</span>
-                <span className="flex items-center gap-1 text-red-400"><Circle className="w-2 h-2 fill-current" /> Gäste ({tracking.players.filter(p => p.team === 'away').length})</span>
+                <span className="flex items-center gap-1 text-primary"><Circle className="w-2 h-2 fill-current" /> Heim ({playerCounts.home})</span>
+                <span className="flex items-center gap-1 text-red-400"><Circle className="w-2 h-2 fill-current" /> Gäste ({playerCounts.away})</span>
+                <span className="flex items-center gap-1 text-orange-400"><Circle className="w-2 h-2 fill-current" /> SR ({playerCounts.referee})</span>
                 <span className="flex items-center gap-1 text-yellow-400"><Circle className="w-2 h-2 fill-current" /> Ball</span>
               </div>
             </div>
             <div className="relative aspect-[3/2] max-h-[300px]">
               <FootballPitch
-                players={showTracking ? tracking.players : []}
-                dangerZones={[
-                  { x: tracking.ball.x, y: tracking.ball.y, intensity: 0.9, team: 'home' }
-                ]}
+                players={showTracking ? playerList : []}
+                dangerZones={ball ? [{ x: ball.x, y: ball.y, intensity: 0.8, team: 'home' }] : []}
                 showGrid
               />
-              {showTracking && <TrackingOverlay players={tracking.players} ball={tracking.ball} />}
+              {showTracking && (
+                <TrackingOverlay
+                  players={playerList}
+                  ball={ball}
+                  events={events.slice(0, 3)}
+                />
+              )}
             </div>
-            <div className="mt-2 px-1 flex items-center gap-4 text-xs text-muted-foreground">
-              <span>🤖 RF-DETR: Spieler erkannt · Ball getrackt · Formationslinie automatisch</span>
-              <span className="ml-auto text-yellow-500/70">⚠ Echtzeit-Tracking benötigt Python-Backend (Builder+ Feature)</span>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
+              <span>🟢 Heim-Spieler · 🔴 Gäste-Spieler · 🟠 Schiedsrichter · 🟡 Ball</span>
+              <span className="ml-auto">Pressing-Linie · Formationslinien · Event-Highlights</span>
             </div>
           </div>
         </div>
 
-        {/* === RIGHT: Team Chat & Stats === */}
+        {/* ── RIGHT: Stats + Events + Chat ── */}
         <div className="lg:col-span-5 space-y-4">
 
-          {/* RF-DETR Status */}
-          <div className="glass rounded-xl p-4">
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">KI-Erkennungs-Status</div>
-            <div className="space-y-2">
-              {[
-                { label: 'Spieler-Tracking', icon: Users, status: 'aktiv', color: 'text-primary' },
-                { label: 'Ball-Tracking', icon: Circle, status: 'aktiv', color: 'text-yellow-400' },
-                { label: 'Tore erkannt', icon: Target, status: 'aktiv', color: 'text-primary' },
-                { label: 'Schiedsrichter', icon: Shield, status: 'aktiv', color: 'text-orange-400' },
-                { label: 'RF-DETR Modell', icon: Zap, status: 'simuliert*', color: 'text-muted-foreground' },
-              ].map(({ label, icon: Icon, status, color }) => (
-                <div key={label} className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-2 text-sm text-foreground">
-                    <Icon className={`w-3.5 h-3.5 ${color}`} />
-                    {label}
-                  </div>
-                  <span className={`text-xs font-medium ${color}`}>{status}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 text-[10px] text-muted-foreground border-t border-border pt-2">
-              *RF-DETR (roboflow/rf-detr) ist ein Python/PyTorch-Modell. Echtzeit-Integration erfordert einen separaten Analyse-Server. Die Visualisierung zeigt simulierte Tracking-Daten.
-            </div>
-          </div>
+          {/* Live Stats */}
+          <LiveStats stats={stats} playerCounts={playerCounts} />
+
+          {/* Auto Event Log */}
+          <EventLog events={events} />
 
           {/* Team Broadcast */}
           <div className="glass rounded-xl p-4">
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
               <MessageSquare className="w-3.5 h-3.5" /> Team-Broadcast
             </div>
-            <div className="bg-muted rounded-lg p-3 mb-3 max-h-32 overflow-y-auto space-y-2">
-              <div className="text-xs text-muted-foreground text-center">Nachrichten an alle Assistenten</div>
-              {(messages['broadcast'] || []).map((m, i) => (
-                <div key={i} className="bg-primary/10 rounded-lg px-3 py-1.5 text-xs text-foreground flex justify-between">
-                  <span>{m.text}</span><span className="text-muted-foreground">{m.time}</span>
-                </div>
-              ))}
+            <div className="bg-muted rounded-lg p-3 mb-3 max-h-28 overflow-y-auto space-y-1.5">
+              {(messages['broadcast'] || []).length === 0
+                ? <div className="text-xs text-muted-foreground text-center">Nachrichten an alle Assistenten</div>
+                : (messages['broadcast'] || []).map((m, i) => (
+                  <div key={i} className="bg-primary/10 rounded-lg px-3 py-1.5 text-xs text-foreground flex justify-between">
+                    <span>{m.text}</span><span className="text-muted-foreground">{m.time}</span>
+                  </div>
+                ))}
             </div>
             <div className="flex gap-2">
               <Input
-                placeholder="Nachricht an alle Assistenten..."
+                placeholder="Nachricht an alle..."
                 value={inputMsg['broadcast'] || ''}
                 onChange={e => setInputMsg(prev => ({ ...prev, broadcast: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && sendMessage('broadcast')}
@@ -236,7 +444,7 @@ export default function CoachingCockpit() {
             </div>
           </div>
 
-          {/* Camera codes & share */}
+          {/* Camera codes */}
           <div className="glass rounded-xl p-4">
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
               <Smartphone className="w-3.5 h-3.5" /> Kameras einladen
@@ -247,9 +455,9 @@ export default function CoachingCockpit() {
                 const camUrl = `${liveUrl}?code=${code}`;
                 return (
                   <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-medium text-foreground">{cam.label}</span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-primary' : 'bg-yellow-400'} animate-pulse`} />
                         <span className={`text-[10px] ${cam.status === 'connected' ? 'text-primary' : 'text-yellow-400'}`}>
                           {cam.status === 'connected' ? 'Verbunden' : 'Wartet'}
@@ -257,22 +465,20 @@ export default function CoachingCockpit() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-xl font-grotesk font-bold text-primary tracking-[0.2em] flex-1">{code}</div>
-                      <button onClick={() => copyCode(code)}
-                        className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
+                      <div className="text-lg font-grotesk font-bold text-primary tracking-[0.2em] flex-1">{code}</div>
+                      <button onClick={() => copyCode(code)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
                         {copiedCode === code ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
-                      <button onClick={() => setShowShare(cam)}
-                        className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
+                      <button onClick={() => setShowShare(cam)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
                         <Share2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="mt-1 text-[10px] text-muted-foreground truncate">{camUrl}</div>
                   </div>
                 );
               })}
             </div>
           </div>
+
         </div>
       </div>
 
