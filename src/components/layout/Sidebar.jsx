@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, Clock, ChevronDown, ChevronUp
+  Search, Dumbbell, Clock, ChevronDown, ChevronUp, Tv2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'Spiele', icon: Video, path: '/matches' },
   { label: 'Live-Analyse', icon: Radio, path: '/live', badge: 'LIVE' },
+  { label: 'Coaching Cockpit', icon: Tv2, path: '/cockpit' },
   { label: 'Taktik-Board', icon: BarChart3, path: '/tactics', hideOnSidebar: true },
   { label: 'Reports', icon: FileText, path: '/reports' },
 ];
