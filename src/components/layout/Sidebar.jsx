@@ -2,10 +2,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, Clock, ChevronDown, ChevronUp, Tv2
+  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -25,6 +27,7 @@ const toolsItems = [
 
 const bottomItems = [
   { label: 'Einstellungen', icon: Settings, path: '/settings' },
+  { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
 ];
 
 function NavLink({ label, icon: Icon, path, badge }) {
@@ -54,6 +57,10 @@ function NavLink({ label, icon: Icon, path, badge }) {
 
 export default function Sidebar() {
   const [toolsOpen, setToolsOpen] = useState(true);
+  const { data: user } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => base44.auth.me(),
+  });
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50">
@@ -91,20 +98,30 @@ export default function Sidebar() {
         ))}
 
         <div className="pt-2" />
-        {bottomItems.map((item) => (
-          <NavLink key={item.path} {...item} />
-        ))}
+        {bottomItems
+          .filter(item => !item.adminOnly || user?.role === 'admin')
+          .map((item) => (
+            <NavLink key={item.path} {...item} />
+          ))}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — User Info */}
       <div className="px-4 py-4 border-t border-sidebar-border">
         <div className="flex items-center gap-2.5 px-2">
-          <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-            <span className="text-xs font-bold text-primary">A</span>
+          <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-primary">
+              {user?.full_name?.[0]?.toUpperCase() || 'T'}
+            </span>
           </div>
-          <div>
-            <div className="text-xs font-medium text-foreground">Analyst</div>
-            <div className="text-[10px] text-muted-foreground">FC TactIQ</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium text-foreground truncate">
+              {user?.full_name || 'Trainer'}
+            </div>
+            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+              {user?.role === 'admin'
+                ? <><span className="text-primary font-bold">Admin</span></>
+                : <span>Trainer</span>}
+            </div>
           </div>
         </div>
       </div>

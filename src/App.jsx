@@ -20,8 +20,9 @@ import AIAssistant from './pages/AIAssistant';
 import ScoutingReport from './pages/ScoutingReport';
 import TrainingPlan from './pages/TrainingPlan';
 import MatchPrep from './pages/MatchPrep';
-import CoachingCockpit from './pages/CoachingCockpit';
+import CoachingCockpit from './pages/CoachingCockpit.jsx';
 import CameraView from './pages/CameraView';
+import AdminDocs from './pages/AdminDocs.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -61,6 +62,7 @@ const AuthenticatedApp = () => {
         <Route path="/training" element={<TrainingPlan />} />
         <Route path="/matchprep" element={<MatchPrep />} />
         <Route path="/cockpit" element={<CoachingCockpit />} />
+        <Route path="/admin/docs" element={<AdminDocs />} />
       </Route>
       {/* Public camera page — no login required */}
       <Route path="/cam" element={<CameraView />} />
