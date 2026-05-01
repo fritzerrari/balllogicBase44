@@ -1,0 +1,37 @@
+{
+  "name": "Changelog",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "z.B. 1.0.0"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "added",
+        "improved",
+        "fixed",
+        "removed"
+      ],
+      "default": "added"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "title"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "name": "Player",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Spielername"
+    },
+    "number": {
+      "type": "number",
+      "description": "Trikotnummer"
+    },
+    "position": {
+      "type": "string",
+      "enum": [
+        "Torwart",
+        "Innenverteidiger",
+        "Au\u00dfenverteidiger",
+        "Defensives Mittelfeld",
+        "Zentrales Mittelfeld",
+        "Offensives Mittelfeld",
+        "Linksau\u00dfen",
+        "Rechtsau\u00dfen",
+        "Mittelst\u00fcrmer"
+      ],
+      "description": "Spielposition"
+    },
+    "team": {
+      "type": "string",
+      "description": "Vereins- oder Teamname"
+    },
+    "age": {
+      "type": "number"
+    },
+    "dominant_foot": {
+      "type": "string",
+      "enum": [
+        "links",
+        "rechts",
+        "beidf\u00fc\u00dfig"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "avatar_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

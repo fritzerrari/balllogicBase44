@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen
+  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -23,10 +23,13 @@ const toolsItems = [
   { label: 'Scouting', icon: Search, path: '/scouting' },
   { label: 'Trainingsplan', icon: Dumbbell, path: '/training' },
   { label: 'Spielvorbereitung', icon: Zap, path: '/matchprep' },
+  { label: 'Kader & Performance', icon: Users, path: '/players' },
 ];
 
 const bottomItems = [
   { label: 'Einstellungen', icon: Settings, path: '/settings' },
+  { label: 'Changelog', icon: BookOpen, path: '/changelog' },
+  { label: 'Admin-Dashboard', icon: Shield, path: '/admin', adminOnly: true },
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
 ];
 

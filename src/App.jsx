@@ -23,6 +23,9 @@ import MatchPrep from './pages/MatchPrep';
 import CoachingCockpit from './pages/CoachingCockpit.jsx';
 import CameraView from './pages/CameraView';
 import AdminDocs from './pages/AdminDocs.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import Players from './pages/Players.jsx';
+import ChangelogPage from './pages/ChangelogPage.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -62,6 +65,9 @@ const AuthenticatedApp = () => {
         <Route path="/training" element={<TrainingPlan />} />
         <Route path="/matchprep" element={<MatchPrep />} />
         <Route path="/cockpit" element={<CoachingCockpit />} />
+        <Route path="/players" element={<Players />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/docs" element={<AdminDocs />} />
       </Route>
       {/* Public camera page — no login required */}

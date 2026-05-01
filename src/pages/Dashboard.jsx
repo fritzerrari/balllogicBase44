@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { 
   Video, TrendingUp, Activity, Zap, 
   ArrowRight, Radio, Clock, ChevronRight,
-  BarChart3, Target, Bot, Search, Dumbbell, Shield
+  BarChart3, Target, Bot, Search, Dumbbell, Shield, Users, Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -78,6 +78,25 @@ export default function Dashboard() {
         <h1 className="text-3xl lg:text-4xl font-grotesk font-bold text-foreground">Taktisches Dashboard</h1>
         <p className="text-muted-foreground mt-1">Überblick über alle Spiele und Analysen</p>
       </motion.div>
+
+      {/* Demo-Banner für neue Nutzer */}
+      {matches.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-xl p-5 mb-6 border border-primary/30 bg-primary/5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="font-grotesk font-semibold text-foreground mb-1">Willkommen bei TactIQ 👋</div>
+            <p className="text-sm text-muted-foreground mb-3">Lade dein erstes Spielvideo hoch oder starte eine Live-Session — TactIQ analysiert Formation, Pressing, Tore und vieles mehr automatisch mit KI.</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {['⚽ KI-Taktikanalyse', '📹 Multi-Kamera-Live', '🧠 KI-Co-Trainer', '👤 Spieler-Performance', '📋 Halbzeit-Ansprache'].map(f => (
+                <span key={f} className="bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{f}</span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -189,6 +208,7 @@ export default function Dashboard() {
             <ToolCard label="Scouting" desc="Gegner-Profil" icon={Search} path="/scouting" color="border-blue-500/20 hover:border-blue-500/40" iconBg="bg-blue-500/15 text-blue-400" />
             <ToolCard label="Trainingsplan" desc="KI-generiert" icon={Dumbbell} path="/training" color="border-orange-500/20 hover:border-orange-500/40" iconBg="bg-orange-500/15 text-orange-400" />
             <ToolCard label="Matchplan" desc="Vorbereitung" icon={Shield} path="/matchprep" color="border-purple-500/20 hover:border-purple-500/40" iconBg="bg-purple-500/15 text-purple-400" />
+            <ToolCard label="Kader" desc="Spieler-Profile" icon={Users} path="/players" color="border-teal-500/20 hover:border-teal-500/40 col-span-2" iconBg="bg-teal-500/15 text-teal-400" />
           </div>
         </div>
       </div>
