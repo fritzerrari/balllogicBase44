@@ -437,13 +437,13 @@ export default function LiveSession() {
               </div>
             </div>
 
-            {/* Camera status grid — labels inline-editierbar */}
+            {/* Camera status grid */}
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-grotesk font-semibold text-foreground flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-primary" /> Kamera-Merge
+                  <Camera className="w-4 h-4 text-primary" /> Verbundene Kameras
                 </span>
-                <span className="text-xs text-primary font-medium">KI kombiniert automatisch</span>
+                <span className="text-xs text-muted-foreground">{liveCameraStreams.filter(s => s.status === 'connected').length}/{cameraCount} online</span>
               </div>
               <div className={`grid gap-2 ${cameraCount > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {cameras.map((cam) => {
