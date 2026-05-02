@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import CameraFunkPanel from '@/components/live/CameraFunkPanel';
 
 const DIGITS = 6;
-const POLL_INTERVAL_MS = 5000; // Reduziert von 3s auf 5s
-const HEARTBEAT_INTERVAL_MS = 15000; // Reduziert von 10s auf 15s
+const POLL_INTERVAL_MS = 8000; // Reduziert von 3s auf 8s — weniger API-Calls
+const HEARTBEAT_INTERVAL_MS = 20000; // Erhöht auf 20s — Stabilität
 
 const QUICK_EVENTS = [
   { key: 'goal',        label: 'TOR',     icon: '⚽', color: 'bg-primary/90 text-primary-foreground' },
@@ -128,11 +128,16 @@ export default function CameraView() {
   };
 
   const stopStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.pause();
+      }
+    } catch (_) {}
   };
 
   const stopAudio = () => {
@@ -188,7 +193,15 @@ export default function CameraView() {
         try {
           const ctx = canvas.getContext('2d');
           if (!ctx) return;
-          ctx.drawImage(video, 0, 0, 320, 180);
+          // CORS-safe Canvas-draw
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, 320, 180); // fallback black
+          try {
+            ctx.drawImage(video, 0, 0, 320, 180);
+          } catch (drawErr) {
+            // drawImage kann fehlschlagen bei Cross-Origin — einfach black thumbnail verwenden
+            console.debug('Canvas drawImage blocked (CORS)', drawErr.name);
+          }
           thumbnail = canvas.toDataURL('image/jpeg', 0.6); // 0.6 für bessere Qualität
         } catch (canvasErr) {
           // Canvas-Fehler? Ignorieren, nächster Versuch
@@ -334,9 +347,7 @@ export default function CameraView() {
             setUptime(t => t + 1);
           }, 1000);
           startHeartbeat(matched, codeStr);
-          // Audio-Detection deaktiviert (verursacht Rate-Limiting)
-          // const src = cam?.label ? `camera_${cam.label}` : 'camera_1';
-          // startAudioDetection(matched.id, matched.match_title, src);
+          // Audio-Detection DEAKTIVIERT (zu instabil, verursacht Rate-Limiting)
           startThumbnailPush(matched.id, codeStr);
           return;
         }
