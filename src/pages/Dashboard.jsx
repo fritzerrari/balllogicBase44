@@ -6,8 +6,10 @@ import { motion } from 'framer-motion';
 import { 
   Video, TrendingUp, Activity, Zap, 
   ArrowRight, Radio, Clock, ChevronRight,
-  BarChart3, Target, Bot, Search, Dumbbell, Shield, Users, Sparkles
+  BarChart3, Target, Bot, Search, Dumbbell, Shield, Users, Sparkles,
+  FileText, Layers
 } from 'lucide-react';
+import SessionReportCard from '@/components/reports/SessionReportCard';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -57,6 +59,10 @@ export default function Dashboard() {
   const { data: reports = [] } = useQuery({
     queryKey: ['reports'],
     queryFn: () => base44.entities.AnalysisReport.list('-created_date', 8),
+  });
+  const { data: sessionReports = [] } = useQuery({
+    queryKey: ['session-reports'],
+    queryFn: () => base44.entities.SessionReport.list('-generated_at', 3),
   });
 
   const analyzedCount = matches.filter(m => m.status === 'analyzed').length;
@@ -208,8 +214,26 @@ export default function Dashboard() {
             <ToolCard label="Scouting" desc="Gegner-Profil" icon={Search} path="/scouting" color="border-blue-500/20 hover:border-blue-500/40" iconBg="bg-blue-500/15 text-blue-400" />
             <ToolCard label="Trainingsplan" desc="KI-generiert" icon={Dumbbell} path="/training" color="border-orange-500/20 hover:border-orange-500/40" iconBg="bg-orange-500/15 text-orange-400" />
             <ToolCard label="Matchplan" desc="Vorbereitung" icon={Shield} path="/matchprep" color="border-purple-500/20 hover:border-purple-500/40" iconBg="bg-purple-500/15 text-purple-400" />
-            <ToolCard label="Kader" desc="Spieler-Profile" icon={Users} path="/players" color="border-teal-500/20 hover:border-teal-500/40 col-span-2" iconBg="bg-teal-500/15 text-teal-400" />
+            <ToolCard label="Kader" desc="Spieler-Profile" icon={Users} path="/players" color="border-teal-500/20 hover:border-teal-500/40" iconBg="bg-teal-500/15 text-teal-400" />
+            <ToolCard label="Taktik-Board" desc="Aufstellungen" icon={Layers} path="/tactics-board" color="border-yellow-500/20 hover:border-yellow-500/40" iconBg="bg-yellow-500/15 text-yellow-400" />
           </div>
+
+          {/* Recent session reports */}
+          {sessionReports.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-primary" /> Letzte Berichte
+                </div>
+                <Link to="/session-reports" className="text-xs text-primary hover:text-primary/80">Alle →</Link>
+              </div>
+              <div className="space-y-2">
+                {sessionReports.map(r => (
+                  <SessionReportCard key={r.id} report={r} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

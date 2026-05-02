@@ -1,0 +1,63 @@
+{
+  "name": "SessionReport",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "post_session",
+        "matchday",
+        "pre_match"
+      ],
+      "default": "post_session"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "string",
+      "description": "KI-generierter Zusammenfassungstext"
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "cards": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "substitutions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "key_events": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "event_count": {
+      "type": "number"
+    },
+    "match_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "match_title",
+    "report_type"
+  ]
+}

@@ -27,6 +27,8 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import Players from './pages/Players.jsx';
 import ChangelogPage from './pages/ChangelogPage.jsx';
 import EventReview from './pages/EventReview.jsx';
+import TacticsBoard from './pages/TacticsBoard.jsx';
+import SessionReports from './pages/SessionReports.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -69,6 +71,8 @@ const AuthenticatedApp = () => {
         <Route path="/players" element={<Players />} />
         <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/events" element={<EventReview />} />
+        <Route path="/tactics-board" element={<TacticsBoard />} />
+        <Route path="/session-reports" element={<SessionReports />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/docs" element={<AdminDocs />} />
       </Route>

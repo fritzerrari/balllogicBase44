@@ -2,7 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield, ClipboardList
+  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield, ClipboardList,
+  Clipboard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -24,6 +25,8 @@ const toolsItems = [
   { label: 'Trainingsplan', icon: Dumbbell, path: '/training' },
   { label: 'Spielvorbereitung', icon: Zap, path: '/matchprep' },
   { label: 'Kader & Performance', icon: Users, path: '/players' },
+  { label: 'Taktik-Board', icon: BarChart3, path: '/tactics-board' },
+  { label: 'Berichte', icon: FileText, path: '/session-reports' },
 ];
 
 const bottomItems = [

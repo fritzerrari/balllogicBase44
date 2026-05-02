@@ -1,0 +1,63 @@
+{
+  "name": "TacticsBoard",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name der Formation / des Boards"
+    },
+    "match_id": {
+      "type": "string",
+      "description": "Optional: verkn\u00fcpftes Spiel"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "formation": {
+      "type": "string",
+      "description": "z.B. 4-3-3"
+    },
+    "positions": {
+      "type": "array",
+      "description": "Spieler-Positionen auf dem Feld",
+      "items": {
+        "type": "object",
+        "properties": {
+          "player_id": {
+            "type": "string"
+          },
+          "player_name": {
+            "type": "string"
+          },
+          "player_number": {
+            "type": "string"
+          },
+          "position_label": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number",
+            "description": "0-100 (% vom Feld)"
+          },
+          "y": {
+            "type": "number",
+            "description": "0-100 (% vom Feld)"
+          },
+          "team": {
+            "type": "string",
+            "enum": [
+              "home",
+              "away"
+            ]
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
