@@ -133,7 +133,7 @@ export default function CoachingCockpit() {
 
   // ── Roboflow mode ──────────────────────────────────────────────────────────
   // Frame capture hook — sendet alle 2s Frames an processFrame
-  const { frameCount } = useFrameCapture(
+  const { frameCount, trackingStatus } = useFrameCapture(
     hiddenCanvasRef,
     activeSession?.id,
     'home',
@@ -379,12 +379,26 @@ export default function CoachingCockpit() {
         )}
       </AnimatePresence>
 
-      {/* Roboflow active banner */}
+      {/* Roboflow active banner + Tracking Status */}
       {trackingMode === 'roboflow' && (
-        <div className="glass rounded-xl p-3 mb-4 border border-primary/30 flex items-center gap-3 text-xs">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-primary font-bold">RF-DETR LIVE</span>
-          <span className="text-muted-foreground">Erkennt: Spieler · Torwart · Schiedsrichter · Ball · Trikotfarben</span>
+        <div className={`glass rounded-xl p-3 mb-4 border flex items-center gap-3 text-xs ${
+          trackingStatus === 'error' 
+            ? 'border-destructive/30 bg-destructive/5'
+            : 'border-primary/30'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${
+            trackingStatus === 'error' ? 'bg-destructive' : 'bg-primary'
+          } ${trackingStatus === 'capturing' ? 'animate-pulse' : ''}`} />
+          <span className={trackingStatus === 'error' ? 'text-destructive font-bold' : 'text-primary font-bold'}>
+            {trackingStatus === 'capturing' ? '🔴 RF-DETR CAPTURING' : trackingStatus === 'error' ? '❌ TRACKING ERROR' : 'RF-DETR LIVE'}
+          </span>
+          <span className="text-muted-foreground">
+            {trackingStatus === 'capturing' 
+              ? `Frames: ${frameCount} · Erkennt: Spieler · Torwart · Ball`
+              : trackingStatus === 'error'
+              ? 'processFrame-Fehler — versuche neu zu starten'
+              : 'Erkennt: Spieler · Torwart · Schiedsrichter · Ball · Trikotfarben'}
+          </span>
           <button onClick={handleSwitchToSim} className="ml-auto text-muted-foreground hover:text-foreground text-xs underline">
             Stoppen
           </button>
