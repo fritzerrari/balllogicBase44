@@ -19,7 +19,12 @@ Deno.serve(async (req) => {
     // Assume session is ended (automation triggered by status update)
     // No need for redundant refetch
 
-    console.log(`🔥 Session ${sessionId} ended, generating heatmaps...`);
+    console.log(`🔥 Session ${sessionId} ended, generating heatmaps + AI analysis...`);
+
+    // Get session + match for AI analysis trigger
+    const sessions = await base44.asServiceRole.entities.LiveSession.filter({ id: sessionId });
+    const session = sessions[0];
+    const matchId = session?.match_id;
 
     // Beide Teams, alle Heatmap-Typen
     const teams = ['home', 'away'];
@@ -103,7 +108,20 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Generated ${generated.length} heatmaps:`, generated);
 
-    return Response.json({ success: true, generated });
+    // Trigger AI analysis if match exists
+    if (matchId) {
+      try {
+        const aiResult = await base44.asServiceRole.functions.invoke('generateAIAnalysis', {
+          session_id: sessionId,
+          match_id: matchId,
+        });
+        console.log(`✅ AI Analysis triggered:`, aiResult);
+      } catch (aiErr) {
+        console.warn(`⚠️ AI Analysis failed (non-critical):`, aiErr.message);
+      }
+    }
+
+    return Response.json({ success: true, generated, ai_analysis_triggered: !!matchId });
   } catch (error) {
     console.error('❌ onSessionEnd failed:', error);
     return Response.json({ error: error.message }, { status: 500 });
