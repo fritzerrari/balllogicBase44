@@ -10,6 +10,7 @@ import {
   FileText, Layers
 } from 'lucide-react';
 import SessionReportCard from '@/components/reports/SessionReportCard';
+import { SkeletonCard, SkeletonList, SkeletonChart } from '@/components/SkeletonLoader';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -52,17 +53,22 @@ const ToolCard = ({ label, desc, icon: Icon, path, color, iconBg }) => (
 );
 
 export default function Dashboard() {
-  const { data: matches = [] } = useQuery({
-    queryKey: ['matches'],
-    queryFn: () => base44.entities.Match.list('-created_date', 10),
+  const [matchPage, setMatchPage] = useState(1);
+  
+  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = useQuery({
+    queryKey: ['matches', matchPage],
+    queryFn: () => base44.entities.Match.list('-created_date', 5), // Pagination: 5 per page
   });
-  const { data: reports = [] } = useQuery({
+  
+  const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({
     queryKey: ['reports'],
     queryFn: () => base44.entities.AnalysisReport.list('-created_date', 8),
   });
-  const { data: sessionReports = [] } = useQuery({
+  
+  const { data: sessionReports = [], isLoading: sessionReportsLoading } = useQuery({
     queryKey: ['session-reports'],
     queryFn: () => base44.entities.SessionReport.list('-generated_at', 3),
+    retry: 1, // Reduce retry for faster fallback
   });
 
   const analyzedCount = matches.filter(m => m.status === 'analyzed').length;
@@ -116,7 +122,9 @@ export default function Dashboard() {
         {/* Left: recent matches + trend */}
         <div className="lg:col-span-2 space-y-6">
           {/* Trend chart */}
-          {trendData.length >= 2 && (
+          {reportsLoading ? (
+            <SkeletonChart />
+          ) : trendData.length >= 2 ? (
             <div className="glass rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-grotesk font-semibold text-foreground text-sm">Formkurve — Letzte Spiele</h2>
@@ -137,7 +145,7 @@ export default function Dashboard() {
                 <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 inline-block" /> Ballbesitz %</span>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Recent Matches */}
           <div>
@@ -148,12 +156,18 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="space-y-3">
-              {matches.length === 0 && (
+              {matchesLoading ? (
+                <SkeletonList />
+              ) : matchesError ? (
+                <div className="glass rounded-xl p-4 text-center text-xs text-muted-foreground">
+                  Fehler beim Laden der Spiele. Versuchen Sie später erneut.
+                </div>
+              ) : matches.length === 0 ? (
                 <div className="glass rounded-xl p-8 text-center">
                   <Video className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">Noch keine Spiele. <Link to="/matches" className="text-primary hover:underline">Erstes Spiel hinzufügen →</Link></p>
                 </div>
-              )}
+              ) : null}
               {matches.slice(0, 5).map((match, i) => (
                 <motion.div key={match.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
                   <Link to={`/matches/${match.id}`}>
@@ -219,7 +233,11 @@ export default function Dashboard() {
           </div>
 
           {/* Recent session reports */}
-          {sessionReports.length > 0 && (
+          {sessionReportsLoading ? (
+            <div className="mt-4">
+              <SkeletonList />
+            </div>
+          ) : sessionReports.length > 0 ? (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -233,7 +251,7 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
