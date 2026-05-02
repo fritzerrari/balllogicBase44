@@ -24,32 +24,41 @@ function createEmptyGrid() {
 }
 
 /**
- * Gaussian Blur auf Grid anwenden
+ * Gaussian Blur auf Grid anwenden (optimiert — nur lokale Nachbarn)
  */
 function applyGaussianBlur(grid) {
-  const blurred = grid.map(cell => ({ ...cell }));
+   const blurred = grid.map(cell => ({ ...cell }));
+   const gridMap = Object.fromEntries(grid.map(c => [`${c.x}_${c.y}`, c]));
 
-  for (let cell of grid) {
-    let sum = 0;
-    let weightSum = 0;
+   for (let cell of grid) {
+     let sum = 0;
+     let weightSum = 0;
 
-    for (let other of grid) {
-      const dx = cell.x - other.x;
-      const dy = cell.y - other.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const weight = Math.exp(-(distance * distance) / (2 * GAUSSIAN_RADIUS * GAUSSIAN_RADIUS));
+     // Nur nahe Nachbarn (radius 2)
+     for (let dx = -2; dx <= 2; dx++) {
+       for (let dy = -2; dy <= 2; dy++) {
+         const nx = cell.x + dx;
+         const ny = cell.y + dy;
+         if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) continue;
 
-      sum += other.intensity * weight;
-      weightSum += weight;
-    }
+         const other = gridMap[`${nx}_${ny}`];
+         if (!other) continue;
 
-    const blurredCell = blurred.find(c => c.x === cell.x && c.y === cell.y);
-    if (blurredCell) {
-      blurredCell.intensity = weightSum > 0 ? Math.round(sum / weightSum) : 0;
-    }
-  }
+         const distance = Math.sqrt(dx * dx + dy * dy);
+         const weight = Math.exp(-(distance * distance) / (2 * GAUSSIAN_RADIUS * GAUSSIAN_RADIUS));
 
-  return blurred;
+         sum += other.intensity * weight;
+         weightSum += weight;
+       }
+     }
+
+     const blurredCell = blurred.find(c => c.x === cell.x && c.y === cell.y);
+     if (blurredCell) {
+       blurredCell.intensity = weightSum > 0 ? Math.round(sum / weightSum) : 0;
+     }
+   }
+
+   return blurred;
 }
 
 /**
@@ -68,7 +77,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
-    if (!user?.role === 'admin') {
+    if (user?.role !== 'admin') {
       return Response.json({ error: 'Admin only' }, { status: 403 });
     }
 

@@ -70,8 +70,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing session_id' }, { status: 400 });
     }
 
-    // Hole letzte 20 TrackingData entries
-    const recentTracking = await base44.entities.TrackingData.list('-timestamp_ms', 20);
+    // Hole letzte 20 TrackingData entries für diese Session
+    const recentTracking = await base44.entities.TrackingData.filter({ session_id }, '-timestamp_ms', 20);
 
     if (recentTracking.length === 0) {
       return Response.json({ formations: {} });

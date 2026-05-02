@@ -46,8 +46,9 @@ export default function AnalyticsCockpit() {
   });
 
   const { data: playerAnalyses = [] } = useQuery({
-    queryKey: ['team-analyses-player'],
-    queryFn: () => base44.entities.TeamAnalysis.filter({ analysis_type: 'player' }),
+    queryKey: ['team-analyses-player', matchId],
+    queryFn: () => base44.entities.TeamAnalysis.filter({ analysis_type: 'player', match_id: matchId }),
+    enabled: !!matchId,
   });
 
   return (
