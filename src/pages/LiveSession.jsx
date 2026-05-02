@@ -223,7 +223,12 @@ export default function LiveSession() {
     setFinishing(false);
     queryClient.invalidateQueries({ queryKey: ['liveSessions'] });
     queryClient.invalidateQueries({ queryKey: ['session-reports'] });
-    navigate('/session-reports');
+    // Navigiere zur Analyse wenn match_id vorhanden, sonst zu Reports
+    if (session?.match_id) {
+      navigate(`/analytics?match=${session.match_id}`);
+    } else {
+      navigate('/session-reports');
+    }
   };
 
   // Live camera status — efficient single lookup instead of .list()
