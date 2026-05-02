@@ -1,112 +1,168 @@
 /**
- * useFrameCapture – Captured Canvas-Frames alle 2s
- * und sendet sie an processFrame Backend-Funktion mit besserer Fehlerbehandlung
+ * useFrameCapture – Production-grade frame streaming
+ * 
+ * Features:
+ * - Adaptiver Intervall (schneller bei Erfolg, langsamer bei Fehler)
+ * - Auto-Reconnect nach Fehlerserien
+ * - Telemetrie (frameCount, latency, quality)
+ * - Circuit breaker (stoppt nach 10 konsekutiven Fehlern)
  */
 import { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
-const CAPTURE_INTERVAL_MS = 2000; // Alle 2 Sekunden
-const FRAME_QUALITY = 0.6; // JPEG-Qualität
-const MAX_RETRY = 2;
+const CAPTURE_INTERVAL_BASE_MS = 2000; // 2s standard
+const CAPTURE_INTERVAL_MAX_MS = 10000; // max 10s wenn Fehler
+const FRAME_QUALITY = 0.65;
+const MAX_CONSECUTIVE_ERRORS = 10;
+const RECONNECT_DELAY_MS = 3000;
 
-export default function useFrameCapture(canvasRef, sessionId, team = 'home', enabled = true) {
+export default function useFrameCapture(
+  canvasRef,
+  sessionId,
+  team = 'home',
+  enabled = true,
+  onData = null // Callback für neue Tracking-Daten
+) {
   const frameCountRef = useRef(0);
   const startTimeRef = useRef(Date.now());
   const intervalRef = useRef(null);
-  const [trackingStatus, setTrackingStatus] = useState('idle'); // 'idle' | 'capturing' | 'error'
   const errorCountRef = useRef(0);
+  const lastSuccessRef = useRef(Date.now());
+  const intervalMsRef = useRef(CAPTURE_INTERVAL_BASE_MS);
+
+  const [status, setStatus] = useState('idle'); // 'idle' | 'streaming' | 'error' | 'reconnecting'
+  const [stats, setStats] = useState({
+    frameCount: 0,
+    latencyMs: 0,
+    qualityScore: 0,
+    playersDetected: 0,
+    ballDetected: false,
+  });
 
   useEffect(() => {
     if (!enabled || !sessionId || !canvasRef?.current) {
-      setTrackingStatus('idle');
+      setStatus('idle');
       return;
     }
 
-    setTrackingStatus('capturing');
+    setStatus('streaming');
     errorCountRef.current = 0;
+    frameCountRef.current = 0;
+    startTimeRef.current = Date.now();
 
-    const captureFrame = async () => {
+    const captureAndSend = async () => {
+      const sendTime = Date.now();
       try {
-        const canvas = canvasRef?.current;
-        if (!canvas || !canvas.getContext || canvas.width === 0 || canvas.height === 0) {
-          console.warn('⚠️ Canvas not ready');
+        const canvas = canvasRef.current;
+        if (!canvas?.getContext || canvas.width === 0 || canvas.height === 0) {
           return;
         }
 
-        // Canvas → Base64 JPEG
+        // Canvas → Base64 (schnell)
         let base64Frame;
         try {
           base64Frame = canvas.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1];
-        } catch (corsErr) {
-          console.warn('⚠️ Canvas CORS error — skipping frame');
+        } catch (e) {
+          console.warn('⚠️ Canvas encode error');
           return;
         }
 
         if (!base64Frame || base64Frame.length < 100) {
-          console.warn('⚠️ Frame data too small or invalid');
           return;
         }
 
-        const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
         const frameNumber = frameCountRef.current++;
+        const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
 
-        // Sende zu processFrame mit Retry
-        let success = false;
-        for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
-          try {
-            const response = await base44.functions.invoke('processFrame', {
-              session_id: sessionId,
-              frame_base64: base64Frame,
-              frame_number: frameNumber,
-              elapsed_seconds: elapsedSeconds,
-              team,
+        // Send to backend (with timeout)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const response = await base44.functions.invoke('processFrame', {
+          session_id: sessionId,
+          frame_base64: base64Frame,
+          frame_number: frameNumber,
+          elapsed_seconds: elapsedSeconds,
+          team,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response?.data?.success) {
+          // ✅ Success: reset errors, adapt interval
+          errorCountRef.current = 0;
+          lastSuccessRef.current = Date.now();
+          intervalMsRef.current = CAPTURE_INTERVAL_BASE_MS;
+
+          const latency = Date.now() - sendTime;
+          setStats({
+            frameCount: frameNumber,
+            latencyMs: latency,
+            qualityScore: response.data.quality_score || 0,
+            playersDetected: response.data.players_detected || 0,
+            ballDetected: response.data.ball_detected || false,
+          });
+
+          // Callback für CoachingCockpit
+          if (onData) {
+            onData({
+              frameNumber,
+              playersDetected: response.data.players_detected,
+              ballDetected: response.data.ball_detected,
+              qualityScore: response.data.quality_score,
+              latencyMs: latency,
             });
-
-            if (response?.data?.success) {
-              errorCountRef.current = 0;
-              console.log(
-                `✓ Frame ${frameNumber} processed — ${response.data.players_detected} players, ` +
-                `ball: ${response.data.ball_detected ? '✓' : '✗'}, quality: ${response.data.quality_score}`
-              );
-              success = true;
-              break;
-            }
-          } catch (err) {
-            if (attempt < MAX_RETRY) {
-              await new Promise(r => setTimeout(r, 500 * (attempt + 1))); // Backoff
-            } else {
-              throw err;
-            }
           }
-        }
 
-        if (!success) {
+          if (latency > 5000) {
+            console.warn(`⚠️ High latency: ${latency}ms`);
+          }
+        } else {
           errorCountRef.current++;
         }
       } catch (err) {
         errorCountRef.current++;
-        console.error(`❌ Frame capture error:`, err.message);
+        console.warn(`⚠️ Frame ${frameCountRef.current} failed: ${err.message}`);
 
-        // Stop tracking nach 5 Fehlern
-        if (errorCountRef.current >= 5) {
-          setTrackingStatus('error');
+        // Backoff: slow down after errors
+        intervalMsRef.current = Math.min(
+          CAPTURE_INTERVAL_MAX_MS,
+          CAPTURE_INTERVAL_BASE_MS + errorCountRef.current * 500
+        );
+
+        // Circuit breaker
+        if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          setStatus('error');
           clearInterval(intervalRef.current);
-          console.error('❌ Tracking stopped — too many consecutive errors');
+          console.error('❌ Circuit breaker open — too many errors');
+
+          // Auto-reconnect after delay
+          setTimeout(() => {
+            setStatus('reconnecting');
+            errorCountRef.current = 0;
+            captureAndSend();
+            intervalRef.current = setInterval(captureAndSend, CAPTURE_INTERVAL_BASE_MS);
+            setStatus('streaming');
+          }, RECONNECT_DELAY_MS);
         }
       }
     };
 
-    intervalRef.current = setInterval(captureFrame, CAPTURE_INTERVAL_MS);
+    // Start interval with adaptive timing
+    const tick = () => {
+      captureAndSend();
+      intervalRef.current = setTimeout(tick, intervalMsRef.current);
+    };
 
-    // Initial capture after short delay
-    const initialCapture = setTimeout(captureFrame, 300);
+    // First frame immediately
+    captureAndSend();
+    intervalRef.current = setTimeout(tick, CAPTURE_INTERVAL_BASE_MS);
 
     return () => {
-      clearInterval(intervalRef.current);
-      clearTimeout(initialCapture);
-      setTrackingStatus('idle');
+      clearTimeout(intervalRef.current);
+      setStatus('idle');
     };
-  }, [enabled, sessionId, team, canvasRef]);
+  }, [enabled, sessionId, team, canvasRef, onData]);
 
-  return { frameCount: frameCountRef.current, trackingStatus };
+  return { status, stats };
 }

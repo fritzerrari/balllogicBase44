@@ -8,8 +8,9 @@
  *     → Regelbasierte Event-Erkennung: Tor, Ecke, Foul, Konter
  *  2. SIMULATION — Physics-basiert als Demo/Fallback
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import useFrameCapture from '@/hooks/useFrameCapture';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,7 +41,6 @@ import {
   simulateDetections,
   computeStats,
 } from '@/lib/footballTracker';
-import useFrameCapture from '@/hooks/useFrameCapture';
 import LiveTrackingPanel from '@/components/tracking/LiveTrackingPanel';
 
 // removed buildSimFrame wrapper — simulateDetections used directly now
@@ -145,7 +145,7 @@ export default function CoachingCockpit() {
 
   // ── Roboflow mode ──────────────────────────────────────────────────────────
   // Frame capture hook — sendet alle 2s Frames an processFrame
-  const { frameCount, trackingStatus } = useFrameCapture(
+  const { status: trackingStreamStatus, stats: trackingStats } = useFrameCapture(
     hiddenCanvasRef,
     activeSession?.id,
     'home',
@@ -182,31 +182,31 @@ export default function CoachingCockpit() {
    };
 
   const handleDsgvoConfirm = () => {
-     setTrackingUnlocked(true);
-     setShowDsgvo(false);
-     if (apiKeyInput.trim()) {
-       clearInterval(simIntervalRef.current);
-       setTrackTick(0);
-       setEvents([]);
-       setDetections([]);
+    setTrackingUnlocked(true);
+    setShowDsgvo(false);
+    if (apiKeyInput.trim()) {
+      clearInterval(simIntervalRef.current);
+      setTrackTick(0);
+      setEvents([]);
+      setDetections([]);
 
-       setApiKey(apiKeyInput.trim());
-       setTrackingMode('roboflow');
-       setShowApiSetup(false);
-       setIsDetecting(true); // Trigger useFrameCapture
-     }
-   };
+      setApiKey(apiKeyInput.trim());
+      setTrackingMode('roboflow');
+      setShowApiSetup(false);
+      setIsDetecting(true);
+    }
+  };
 
   const handleSwitchToSim = () => {
-     setIsDetecting(false); // Stop useFrameCapture
-     setTrackingMode('simulation');
-     setApiError(null);
-     setApiKey('');
-     setApiKeyInput('');
-     setEvents([]);
-     setDetections([]);
-     setTrackTick(0);
-   };
+    setIsDetecting(false); // Stop useFrameCapture
+    setTrackingMode('simulation');
+    setApiError(null);
+    setApiKey('');
+    setApiKeyInput('');
+    setEvents([]);
+    setDetections([]);
+    setTrackTick(0);
+  };
 
   // Cleanup — only on unmount
    useEffect(() => {
@@ -345,30 +345,29 @@ export default function CoachingCockpit() {
         )}
       </AnimatePresence>
 
-      {/* Roboflow active banner + Tracking Status */}
+      {/* Roboflow Live Status */}
       {trackingMode === 'roboflow' && (
-        <div className={`glass rounded-xl p-3 mb-4 border flex items-center gap-3 text-xs ${
-          trackingStatus === 'error' 
-            ? 'border-destructive/30 bg-destructive/5'
-            : 'border-primary/30'
-        }`}>
-          <div className={`w-2 h-2 rounded-full ${
-            trackingStatus === 'error' ? 'bg-destructive' : 'bg-primary'
-          } ${trackingStatus === 'capturing' ? 'animate-pulse' : ''}`} />
-          <span className={trackingStatus === 'error' ? 'text-destructive font-bold' : 'text-primary font-bold'}>
-            {trackingStatus === 'capturing' ? '🔴 RF-DETR CAPTURING' : trackingStatus === 'error' ? '❌ TRACKING ERROR' : 'RF-DETR LIVE'}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`glass rounded-xl p-3 mb-4 border flex items-center gap-3 text-xs ${
+            trackingStreamStatus === 'error' ? 'border-destructive/30' : 'border-primary/30'
+          }`}
+        >
+          <div className={`w-2.5 h-2.5 rounded-full ${
+            trackingStreamStatus === 'streaming' ? 'bg-primary animate-pulse' : 'bg-destructive'
+          }`} />
+          <span className={`font-bold ${trackingStreamStatus === 'streaming' ? 'text-primary' : 'text-destructive'}`}>
+            {trackingStreamStatus === 'streaming' ? '🔴 LIVE TRACKING' : '⚠️ CONNECTION LOST'}
           </span>
-          <span className="text-muted-foreground">
-            {trackingStatus === 'capturing' 
-              ? `Frames: ${frameCount} · Erkennt: Spieler · Torwart · Ball`
-              : trackingStatus === 'error'
-              ? 'processFrame-Fehler — versuche neu zu starten'
-              : 'Erkennt: Spieler · Torwart · Schiedsrichter · Ball · Trikotfarben'}
+          <span className="text-muted-foreground flex-1">
+            Frame {trackingStats.frameCount} · {trackingStats.playersDetected}👥 · 
+            {trackingStats.ballDetected ? '⚽' : '○'} · Latency {trackingStats.latencyMs}ms
           </span>
-          <button onClick={handleSwitchToSim} className="ml-auto text-muted-foreground hover:text-foreground text-xs underline">
-            Stoppen
-          </button>
-        </div>
+          <Button size="sm" variant="outline" onClick={handleSwitchToSim} className="text-xs">
+            Stop
+          </Button>
+        </motion.div>
       )}
 
       {/* Session Health Check */}
