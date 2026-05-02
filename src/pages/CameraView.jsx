@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
+import useDeviceOrientation from '@/hooks/useDeviceOrientation';
 import {
   Camera, Zap, CheckCircle2, Loader2, RotateCcw,
   Clock, Wifi, WifiOff, Battery, BatteryLow,
@@ -62,6 +63,9 @@ export default function CameraView() {
   const [flashEvent, setFlashEvent] = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [recentEvents, setRecentEvents] = useState([]);
+
+  // Orientation detection
+  const { orientation, isPortrait } = useDeviceOrientation(videoRef);
 
   // Refs — use refs for values used inside intervals/callbacks to avoid stale closures
   const videoRef         = useRef(null);
@@ -436,9 +440,10 @@ export default function CameraView() {
 
   // ── LIVE ──────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
+    <div className="fixed inset-0 bg-black overflow-hidden" data-orientation={orientation}>
       <video ref={videoRef} autoPlay muted playsInline
-        className="absolute inset-0 w-full h-full object-cover" />
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ transform: isPortrait ? 'none' : 'none' }} />
 
       {/* Grid lines */}
       <div className="absolute inset-0 pointer-events-none">
