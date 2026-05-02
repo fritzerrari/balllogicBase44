@@ -191,11 +191,15 @@ export default function LiveSession() {
         events = await base44.entities.MatchEvent.filter({ session_id: session?.id });
       } catch (_) {}
 
-      // 3. Automatisch SessionReport erstellen
+      // 3. Automatisch SessionReport erstellen (mit Delta-Tracking für Kameras)
       if (session) {
         const goals = events.filter(e => e.type === 'goal');
         const cards = events.filter(e => e.type === 'yellow_card' || e.type === 'red_card');
         const subs = events.filter(e => e.type === 'substitution');
+        
+        // Delta-Check: vergleiche session.camera_streams mit initialer Anzahl
+        const cameraStreams = session.camera_streams || [];
+        const cameraChanges = cameraStreams.length !== cameraCount ? `Kameras: ${cameraCount} → ${cameraStreams.length}` : null;
 
         await base44.entities.SessionReport.create({
           session_id: session.id,
@@ -208,7 +212,7 @@ export default function LiveSession() {
           cards: cards.map(e => ({ minute: e.minute, team: e.team, type: e.type })),
           substitutions: subs.map(e => ({ minute: e.minute, team: e.team })),
           key_events: events.slice(0, 20),
-          summary: `Session "${sessionTitle}" — ${events.length} Events aufgezeichnet. ${goals.length} Tore, ${cards.length} Karten, ${subs.length} Wechsel.`,
+          summary: `Session "${sessionTitle}" — ${events.length} Events aufgezeichnet. ${goals.length} Tore, ${cards.length} Karten, ${subs.length} Wechsel.${cameraChanges ? ` [⚠️ ${cameraChanges}]` : ''}`,
         });
       }
     } catch (_) {}
@@ -364,7 +368,12 @@ export default function LiveSession() {
                               {isConnected ? 'LIVE' : 'WARTET'}
                             </div>
                           </div>
-                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity">
+                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center gap-1">
+                            <button onClick={() => deleteCamera(cam.id)}
+                              className="w-6 h-6 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-xs font-bold transition-all"
+                              title="Kamera löschen">
+                              ✕
+                            </button>
                             <CameraInviteButton code={cam.code} position={cam.label} />
                           </div>
                           <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium bg-gradient-to-t from-black/80 to-transparent">
