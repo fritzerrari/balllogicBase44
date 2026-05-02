@@ -20,8 +20,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Admin only' }, { status: 403 });
     }
 
-    // Last 100 TrackingData entries
-    const recentTracking = await base44.entities.TrackingData.list('-timestamp_ms', 100);
+    // Last 100 TrackingData entries — SAFE: limit by timestamp (last 30min)
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    const recentTracking = await base44.entities.TrackingData.filter(
+      {},
+      '-timestamp_ms',
+      100
+    ).then(frames => frames.filter(f => f.timestamp_ms > thirtyMinutesAgo));
 
     // Berechne Health-Metriken
     const health = {

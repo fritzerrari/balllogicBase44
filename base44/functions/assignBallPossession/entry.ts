@@ -26,11 +26,13 @@ function findBallOwner(ballPos, playerPositions, lastOwner = null) {
     // Spieler sollte Ball-Nähe sein (<5m)
     if (dist < 5 && dist < minDist) {
       minDist = dist;
+      // Confidence: höher wenn näher dran, aber nie negativ
+      const proximityConfidence = Math.max(30, 100 - (dist * 10));
       closest = {
         player_id: player.player_id,
         team: player.team,
         distance_m: Math.round(dist * 100) / 100,
-        confidence: Math.min(100, player.confidence - (dist * 5)),
+        confidence: Math.round(Math.min(100, Math.max(0, proximityConfidence)) * (player.confidence / 100)) || 50,
       };
     }
   });

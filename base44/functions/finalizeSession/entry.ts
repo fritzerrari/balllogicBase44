@@ -52,8 +52,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Sammle Events
-    const events = await base44.entities.MatchEvent.filter({ session_id: session.id });
+    // 3. Sammle Events (mit error handling)
+    let events = [];
+    try {
+      events = await base44.entities.MatchEvent.filter({ session_id: session.id }).catch(() => []);
+    } catch (_) {
+      console.warn('⚠️ Event collection failed, continuing with empty list');
+    }
     const goals = events.filter(e => e.type === 'goal');
     const cards = events.filter(e => e.type === 'yellow_card' || e.type === 'red_card');
     const subs = events.filter(e => e.type === 'substitution');

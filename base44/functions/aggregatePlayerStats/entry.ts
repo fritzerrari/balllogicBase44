@@ -99,7 +99,11 @@ Deno.serve(async (req) => {
         const timeDiff = (p2.timestamp - p1.timestamp) / 1000; // seconds
 
         distance += dist;
-        if (dist > 10 && timeDiff < 1) sprints++;
+        // Sprint: > 5m/s (18 km/h) in realistic timeframe
+        if (timeDiff > 0) {
+          const speed = dist / timeDiff;
+          if (speed > 5 && timeDiff < 2) sprints++;
+        }
         sumX += p2.x;
         sumY += p2.y;
       }
