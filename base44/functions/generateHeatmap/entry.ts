@@ -108,16 +108,21 @@ Deno.serve(async (req) => {
     // 3. BUILD GRID BASED ON TYPE
     let grid = createEmptyGrid();
 
+    // Build grid map for O(1) lookup (not O(n) per access)
+    const gridMap = Object.fromEntries(grid.map(c => [`${c.x}_${c.y}`, c]));
+
     if (heatmap_type === 'player_density') {
-      // Akkumuliere Player-Positionen
+      // Akkumuliere Player-Positionen — FILTER BY TEAM
       for (const tracking of filtered) {
         for (const player of tracking.player_positions || []) {
+          // DSGVO: skip anonymized players
+          if (player.tracking_anonymize || player.team !== team) continue;
+
           const gridX = Math.floor((player.x / 100) * GRID_SIZE);
           const gridY = Math.floor((player.y / 100) * GRID_SIZE);
-
-          const cell = grid.find(c => c.x === gridX && c.y === gridY);
+          const cell = gridMap[`${gridX}_${gridY}`];
           if (cell) {
-            cell.intensity += player.confidence / 100; // Gewichte nach confidence
+            cell.intensity += player.confidence / 100;
           }
         }
       }
@@ -127,8 +132,7 @@ Deno.serve(async (req) => {
         if (tracking.ball_position && tracking.ball_position.confidence > 60) {
           const gridX = Math.floor((tracking.ball_position.x / 100) * GRID_SIZE);
           const gridY = Math.floor((tracking.ball_position.y / 100) * GRID_SIZE);
-
-          const cell = grid.find(c => c.x === gridX && c.y === gridY);
+          const cell = gridMap[`${gridX}_${gridY}`];
           if (cell) {
             cell.intensity += tracking.ball_position.confidence / 100;
           }
@@ -136,16 +140,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. APPLY GAUSSIAN BLUR
-    grid = applyGaussianBlur(grid);
+     // 4. APPLY GAUSSIAN BLUR
+     grid = applyGaussianBlur(grid);
 
-    // 5. NORMALIZE
-    grid = normalizeIntensities(grid);
+     // 5. NORMALIZE
+     grid = normalizeIntensities(grid);
 
-    // 6. QUALITY SCORE
-    const avgQuality = Math.round(
-      filtered.reduce((sum, t) => sum + (t.detection_quality || 0), 0) / filtered.length
-    );
+     // 6. QUALITY SCORE (safety: avoid division by zero)
+     const avgQuality = filtered.length > 0
+       ? Math.round(filtered.reduce((sum, t) => sum + (t.detection_quality || 0), 0) / filtered.length)
+       : 0;
 
     // 7. SAVE HEATMAP CACHE
     const heatmap = await base44.entities.HeatmapCache.create({

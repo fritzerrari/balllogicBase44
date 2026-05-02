@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
     }
 
     const session = sessions[0];
-    const sessionDuration = session.ended_at
+    // Safety: ensure both timestamps exist
+    const sessionDuration = (session.ended_at && session.started_at)
       ? Math.round((new Date(session.ended_at) - new Date(session.started_at)) / 1000)
       : 0;
 

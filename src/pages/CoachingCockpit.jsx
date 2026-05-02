@@ -154,7 +154,8 @@ export default function CoachingCockpit() {
       return;
     }
 
-    // Detection loop — 1 frame per 2 seconds (API rate limit)
+    // Detection loop — use refs to avoid stale closures
+    let prevDets = [];
     detectionIntervalRef.current = setInterval(async () => {
       const video = videoRef.current;
       const canvas = hiddenCanvasRef.current;
@@ -166,11 +167,11 @@ export default function CoachingCockpit() {
       ctx.drawImage(video, 0, 0);
 
       try {
-        let raw = await detectFrame(canvas, key);
+        let raw = await detectFrame(canvas, key); // key is stable from closure
         raw = assignTeamsByColor(canvas, raw);
-        const smoothed = smoothDetections(raw);
+        const smoothed = smoothDetections(raw, 0.6, activeSession?.id); // Session-scoped smoothing
 
-        const newEvents = detectEvents(smoothed, detections, { left: 2, right: 98, top: 2, bottom: 98 });
+        const newEvents = detectEvents(smoothed, prevDets, { left: 2, right: 98, top: 2, bottom: 98 });
         if (newEvents.length > 0) {
           setEvents(prev => [
             ...newEvents.map(e => ({
@@ -182,7 +183,7 @@ export default function CoachingCockpit() {
           ].slice(0, 50));
         }
 
-        setPrevDetections(detections);
+        prevDets = smoothed; // Keep local ref, not state
         setDetections(smoothed);
         setStatsHistory(prev => [...prev.slice(-30), smoothed]);
         setApiError(null);
@@ -190,7 +191,7 @@ export default function CoachingCockpit() {
         setApiError(`API-Fehler: ${e.message}`);
       }
     }, 2000);
-  }, [detections]);
+  }, [activeSession?.id]);
 
   const stopRoboflowTracking = () => {
     clearInterval(detectionIntervalRef.current);
