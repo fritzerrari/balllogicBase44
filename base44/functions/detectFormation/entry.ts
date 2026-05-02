@@ -112,21 +112,29 @@ Deno.serve(async (req) => {
       away: formations.away,
     };
 
-    // Speichere in TrackingData als Metadaten statt Session
-    const session = await base44.entities.LiveSession.filter({ id: session_id });
-    if (session[0]) {
-      // Aktualisiere nur wenn Formation sich changed
-      const prevFormation = {
-        home: session[0].formation_home,
-        away: session[0].formation_away,
-      };
-      if (JSON.stringify(prevFormation) !== JSON.stringify({ home: formations.home?.formation, away: formations.away?.formation })) {
-        await base44.entities.LiveSession.update(session[0].id, {
-          formation_home: formations.home?.formation || 'unknown',
-          formation_away: formations.away?.formation || 'unknown',
-          last_formation_change: timestamp,
-        }).catch(() => {});
+    // Update Session wenn Formation existiert
+    try {
+      const sessionList = await base44.entities.LiveSession.filter({ id: session_id });
+      if (sessionList[0]) {
+        const prevFormation = {
+          home: sessionList[0].formation_home,
+          away: sessionList[0].formation_away,
+        };
+        const newFormation = {
+          home: formations.home?.formation,
+          away: formations.away?.formation,
+        };
+        // Only update if formation actually changed
+        if (JSON.stringify(prevFormation) !== JSON.stringify(newFormation)) {
+          await base44.entities.LiveSession.update(sessionList[0].id, {
+            formation_home: newFormation.home || 'unknown',
+            formation_away: newFormation.away || 'unknown',
+            last_formation_change: timestamp,
+          });
+        }
       }
+    } catch (e) {
+      console.warn(`⚠️ Could not update session formation: ${e.message}`);
     }
 
     return Response.json({

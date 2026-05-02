@@ -30,10 +30,17 @@ Deno.serve(async (req) => {
     for (const team of teams) {
       for (const type of types) {
         try {
-          // Fetch tracking data for heatmap generation
-          const trackingData = await base44.asServiceRole.entities.TrackingData.filter({ session_id: sessionId });
+          // Fetch tracking data for heatmap generation (safe: may not exist)
+          let trackingData = [];
+          try {
+            trackingData = await base44.asServiceRole.entities.TrackingData.filter({ session_id: sessionId });
+          } catch (e) {
+            console.warn(`Failed to fetch tracking data for ${team}/${type}: ${e.message}`);
+            continue;
+          }
+
           if (trackingData.length === 0) {
-            console.warn(`No tracking data for ${team}/${type}`);
+            console.warn(`⚠️ No tracking data available for session ${sessionId}/${team}/${type}`);
             continue;
           }
 
