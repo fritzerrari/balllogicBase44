@@ -76,24 +76,27 @@ export default function CameraView() {
   }, [activeSession?.id, activeSession?.camera_streams]);
 
   // Video-Stream starten
+  const [cameraError, setCameraError] = useState(null);
   useEffect(() => {
     const startStream = async () => {
       try {
+        setCameraError(null);
         const constraints = {
           video: {
             width: { ideal: 1280 },
             height: { ideal: 720 },
             facingMode: 'environment',
           },
-          audio: true,
+          audio: false, // Audio nur wenn User es erlaubt
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          await videoRef.current.play().catch(e => console.warn('Play failed:', e));
         }
       } catch (err) {
-        console.error('Camera access failed:', err);
+        console.error('❌ Kamera-Fehler:', err);
+        setCameraError(err.message || 'Kamera-Zugriff verweigert. Prüfe Browser-Rechte.');
       }
     };
     startStream();
@@ -206,7 +209,17 @@ export default function CameraView() {
       <div className="flex-1 grid lg:grid-cols-3 gap-3 min-h-0">
         {/* Video */}
         <div className="lg:col-span-2 flex flex-col gap-3 min-h-0">
-          <div className="glass rounded-xl p-2 flex-1 overflow-hidden">
+          <div className="glass rounded-xl p-2 flex-1 overflow-hidden relative">
+            {cameraError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 rounded-lg z-10">
+                <div className="text-center space-y-3">
+                  <div className="text-4xl">📹</div>
+                  <p className="text-sm font-bold text-foreground">Kamera nicht verfügbar</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">{cameraError}</p>
+                  <p className="text-[10px] text-yellow-400 mt-3">✓ Prüfe: Browser-Berechtigung, HTTPS, nicht im Inkognito</p>
+                </div>
+              </div>
+            )}
             <video
               ref={videoRef}
               autoPlay

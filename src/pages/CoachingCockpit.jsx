@@ -59,8 +59,8 @@ export default function CoachingCockpit() {
   // DSGVO-Gate: Tracking nur starten wenn Einwilligung geprüft oder bestätigt
   const [trackingUnlocked, setTrackingUnlocked] = useState(false);
 
-  // Tracking state — START IN SIMULATION FOR IMMEDIATE FEEDBACK
-  const [trackingMode, setTrackingMode] = useState('simulation'); // 'simulation' | 'roboflow'
+  // Tracking state — start with simulation, user can switch to Roboflow
+   const [trackingMode, setTrackingMode] = useState('simulation'); // 'simulation' | 'roboflow'
   const [apiKey, setApiKey] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [detections, setDetections] = useState([]);
@@ -315,13 +315,13 @@ export default function CoachingCockpit() {
               onClick={handleSwitchToSim}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${trackingMode === 'simulation' ? 'bg-background text-foreground shadow' : 'text-muted-foreground'}`}
             >
-              Simulation
+              Demo
             </button>
             <button
               onClick={() => setShowApiSetup(s => !s)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${trackingMode === 'roboflow' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground'}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${trackingMode === 'roboflow' ? 'bg-primary text-primary-foreground shadow animate-pulse' : 'text-muted-foreground'}`}
             >
-              <Wifi className="w-3 h-3" /> Roboflow Live
+              <Wifi className="w-3 h-3" /> {isDetecting ? 'LIVE' : 'Echt'}
             </button>
           </div>
           <button
