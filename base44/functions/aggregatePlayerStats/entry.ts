@@ -38,10 +38,13 @@ Deno.serve(async (req) => {
     const playerStats = {};
 
     allTracking.forEach(tracking => {
-      if (!tracking.player_positions) return;
+       if (!tracking.player_positions) return;
+       // DSGVO-Safety: skip data with anonymize flag
+       if (tracking.player_positions.some(p => p.tracking_anonymize)) return;
 
-      tracking.player_positions.forEach(player => {
-        const playerId = player.player_id || `player_${player.x}_${player.y}`;
+       tracking.player_positions.forEach(player => {
+         // Use explicit player_id, fallback: number + team combo (not x/y which changes)
+         const playerId = player.player_id || `player_${player.team || 'unknown'}_${player.number || 'unknown'}`;
 
         if (!playerStats[playerId]) {
           playerStats[playerId] = {
@@ -69,45 +72,37 @@ Deno.serve(async (req) => {
       });
     });
 
-    // Berechne abgeleitete Metriken
+    // Berechne abgeleitete Metriken — OPTIMIERT: Single Pass wo möglich
     Object.values(playerStats).forEach(player => {
       if (player.positions.length < 2) return;
 
-      // Distanz
+      // Distance + Sprints + Avg Position: Single Loop (O(n) statt O(3n))
       let distance = 0;
-      for (let i = 1; i < player.positions.length; i++) {
-        const p1 = player.positions[i - 1];
-        const p2 = player.positions[i];
-        const dx = ((p2.x - p1.x) / 100) * 105; // ~105m Feldlänge
-        const dy = ((p2.y - p1.y) / 100) * 68; // ~68m Feldbreite
-        distance += Math.sqrt(dx * dx + dy * dy);
-      }
-      player.total_distance_km = Math.round(distance / 1000 * 100) / 100;
-
-      // Sprints (Distanz > 10m in < 1s)
       let sprints = 0;
+      let sumX = 0, sumY = 0;
+
       for (let i = 1; i < player.positions.length; i++) {
         const p1 = player.positions[i - 1];
         const p2 = player.positions[i];
-        const timeDiff = (p2.timestamp - p1.timestamp) / 1000;
         const dx = ((p2.x - p1.x) / 100) * 105;
         const dy = ((p2.y - p1.y) / 100) * 68;
         const dist = Math.sqrt(dx * dx + dy * dy);
+        const timeDiff = (p2.timestamp - p1.timestamp) / 1000;
+
+        distance += dist;
         if (dist > 10 && timeDiff < 1) sprints++;
+        sumX += p2.x;
+        sumY += p2.y;
       }
+
+      player.total_distance_km = Math.round(distance / 1000 * 100) / 100;
       player.sprint_count = sprints;
+      player.avg_x = Math.round(sumX / player.positions.length);
+      player.avg_y = Math.round(sumY / player.positions.length);
 
-      // Durchschnittliche Position
-      const avgX = player.positions.reduce((sum, p) => sum + p.x, 0) / player.positions.length;
-      const avgY = player.positions.reduce((sum, p) => sum + p.y, 0) / player.positions.length;
-      player.avg_x = Math.round(avgX);
-      player.avg_y = Math.round(avgY);
-
-      // Normalize Heatmap
-      const maxHeat = Math.max(...player.heatmap_grid);
-      if (maxHeat > 0) {
-        player.heatmap_grid = player.heatmap_grid.map(v => Math.round((v / maxHeat) * 100));
-      }
+      // Normalize Heatmap — Safety: avoid division by zero
+      const maxHeat = Math.max(...player.heatmap_grid) || 1;
+      player.heatmap_grid = player.heatmap_grid.map(v => Math.round((v / maxHeat) * 100));
     });
 
     return Response.json({

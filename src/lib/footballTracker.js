@@ -206,11 +206,17 @@ export function detectEvents(detections, prevDetections, pitchBounds = { left: 2
   return events;
 }
 
-// ─── Kalman-style Smoother ───────────────────────────────────────────────────
-let smoothState = {};
-const MAX_SMOOTH_STATE_SIZE = 150; // Limit to prevent unbounded growth
+// ─── Kalman-style Smoother — SESSION-SCOPED (no global state leakage) ────────
+const SMOOTH_STATE_BY_SESSION = new Map(); // Key: sessionId, Value: smoothState object
+const MAX_SMOOTH_STATE_SIZE = 150;
 
-export function smoothDetections(detections, alpha = 0.6) {
+export function smoothDetections(detections, alpha = 0.6, sessionId = 'default') {
+  if (!SMOOTH_STATE_BY_SESSION.has(sessionId)) {
+    SMOOTH_STATE_BY_SESSION.set(sessionId, {});
+  }
+  
+  let smoothState = SMOOTH_STATE_BY_SESSION.get(sessionId);
+  
   // Cleanup old entries if too large (FIFO eviction)
   if (Object.keys(smoothState).length > MAX_SMOOTH_STATE_SIZE) {
     const keys = Object.keys(smoothState);
@@ -220,7 +226,7 @@ export function smoothDetections(detections, alpha = 0.6) {
   }
 
   return detections.map(d => {
-    const key = d.id || d.class;
+    const key = d.id || `${d.class}-${d.team}`;
     const prev = smoothState[key];
     if (!prev) {
       smoothState[key] = { x: d.x, y: d.y };
@@ -231,6 +237,11 @@ export function smoothDetections(detections, alpha = 0.6) {
     smoothState[key] = { x: sx, y: sy };
     return { ...d, x: sx, y: sy };
   });
+}
+
+// Cleanup session state when done
+export function clearSessionSmoothing(sessionId) {
+  SMOOTH_STATE_BY_SESSION.delete(sessionId);
 }
 
 // ─── Simulation Mode (fallback / demo) ───────────────────────────────────────
