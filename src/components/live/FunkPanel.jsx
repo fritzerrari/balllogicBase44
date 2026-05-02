@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Radio, Send, Mic, MicOff, X } from 'lucide-react';
+import AudioWaveform from './AudioWaveform';
 
 const POLL_MS = 2000;
 const MAX_MSGS = 30;
@@ -141,6 +142,9 @@ export default function FunkPanel({ sessionId, onClose }) {
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Waveform während PTT */}
+        {pttActive && <AudioWaveform isActive={pttActive} />}
 
         {/* PTT Button */}
         <button
