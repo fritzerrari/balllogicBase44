@@ -90,7 +90,9 @@ export default function CoachingCockpit() {
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
-    refetchInterval: 15000, // Reduced from 8s to prevent rate-limit spikes
+    refetchInterval: 8000,
+    staleTime: 5000,
+    gcTime: 60000,
   });
 
   const activeSession = sessions[0];
@@ -404,6 +406,15 @@ export default function CoachingCockpit() {
 
         {/* ── LEFT: Camera Grid + Pitch ── */}
         <div className="lg:col-span-7 space-y-4">
+          {/* TOP STATUS BAR */}
+          <div className="glass rounded-xl p-4 border border-primary/20 bg-gradient-to-r from-primary/10 to-transparent">
+            <div className="grid grid-cols-4 gap-3 text-center">
+              <div><div className="text-sm font-grotesk font-bold text-foreground">{playerCounts.home}</div><div className="text-[10px] text-muted-foreground">🏠 Heim</div></div>
+              <div><div className="text-sm font-grotesk font-bold text-foreground">{playerCounts.away}</div><div className="text-[10px] text-muted-foreground">✈️ Gäste</div></div>
+              <div><div className="text-sm font-grotesk font-bold text-primary">{trackingMode === 'roboflow' ? '🔴' : '⚪'}</div><div className="text-[10px] text-muted-foreground">Tracking</div></div>
+              <div><div className="text-sm font-grotesk font-bold text-yellow-400">●</div><div className="text-[10px] text-muted-foreground">Ball</div></div>
+            </div>
+          </div>
 
           {/* Camera grid */}
           <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
