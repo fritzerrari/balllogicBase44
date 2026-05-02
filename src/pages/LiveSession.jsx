@@ -15,22 +15,7 @@ import FootballPitch from '@/components/pitch/FootballPitch';
 import EventButtons from '@/components/live/EventButtons';
 import CameraInviteButton from '@/components/live/CameraInviteButton';
 
-const CAMERA_POSITIONS = [
-  '— Position wählen —',
-  'Tribüne Mitte (Übersicht)',
-  'Tribüne Links',
-  'Tribüne Rechts',
-  'Torlinie Heim',
-  'Torlinie Gäste',
-  'Seitenlinie Hälfte Heim',
-  'Seitenlinie Hälfte Gäste',
-  'Seitenlinie Mitte',
-  'Erhöht Mitte',
-  'Ecke vorne links',
-  'Ecke vorne rechts',
-  'Ecke hinten links',
-  'Ecke hinten rechts',
-];
+
 
 export default function LiveSession() {
   const navigate = useNavigate();
@@ -38,8 +23,7 @@ export default function LiveSession() {
   const [sessionTitle, setSessionTitle] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0);
   const [cameraCount, setCameraCount] = useState(1);
-  const [cameras, setCameras] = useState([{ id: 1, position: CAMERA_POSITIONS[0], code: Math.floor(100000 + Math.random() * 900000).toString(), status: 'ready' }]);
-  // CAMERA_POSITIONS[0] = "— Position wählen —" (kein Vorausfüllen)
+  const [cameras, setCameras] = useState([{ id: 1, label: 'Kamera 1', code: Math.floor(100000 + Math.random() * 900000).toString(), status: 'ready' }]);
   const [events, setEvents] = useState([]);
   const [session, setSession] = useState(null);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -66,7 +50,7 @@ export default function LiveSession() {
     setCameraCount(count);
     setCameras(Array.from({ length: count }, (_, i) => ({
       id: i + 1,
-      position: CAMERA_POSITIONS[0], // leer / "Position wählen"
+      label: `Kamera ${i + 1}`,
       code: Math.floor(100000 + Math.random() * 900000).toString(),
       status: 'ready'
     })));
@@ -78,7 +62,7 @@ export default function LiveSession() {
       match_title: sessionTitle,
       status: 'active',
       started_at: new Date().toISOString(),
-      camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.position, stream_url: '' }))
+      camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code }))
     });
     setSession(s);
     setSessionActive(true);
@@ -146,19 +130,14 @@ export default function LiveSession() {
                     <Camera className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <select
-                      value={cam.position}
-                      onChange={e => setCameras(prev => prev.map((c, idx) => idx === i ? { ...c, position: e.target.value } : c))}
-                      className="text-xs text-foreground bg-transparent border-none outline-none w-full cursor-pointer"
-                    >
-                      {CAMERA_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                    <div className="text-sm font-medium text-foreground">{cam.label}</div>
+                    <div className="text-[10px] text-muted-foreground">Position wird automatisch erkannt</div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-lg font-grotesk font-bold text-primary tracking-widest">{cam.code}</div>
                     <div className="text-[10px] text-muted-foreground">6-stelliger Code</div>
                   </div>
-                  <CameraInviteButton code={cam.code} position={cam.position} />
+                  <CameraInviteButton code={cam.code} position={cam.label} />
                 </div>
               ))}
             </div>
