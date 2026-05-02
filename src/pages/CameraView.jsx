@@ -18,7 +18,8 @@ import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Zap, CheckCircle2, AlertCircle, Loader2,
-  RotateCcw, Lock, AlertTriangle, Maximize2, RotateCw
+  RotateCcw, Lock, AlertTriangle, Maximize2, RotateCw,
+  Wifi, WifiOff, Battery, BatteryLow, ScanLine, RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import EventButtons from '@/components/live/EventButtons';
@@ -70,10 +71,15 @@ export default function CameraView() {
   const [errorMsg, setErrorMsg] = useState('');
   const [retryCount, setRetryCount] = useState(0);
   const [facingMode, setFacingMode] = useState('environment');
+  const [wideAngle, setWideAngle] = useState(true);
   const [uptime, setUptime] = useState(0);
   const [isPortrait, setIsPortrait] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [connectionQuality, setConnectionQuality] = useState('good'); // good | degraded
+  const [batteryLevel, setBatteryLevel] = useState(null);
+  const [batteryCharging, setBatteryCharging] = useState(false);
+  const [networkType, setNetworkType] = useState(null);
+  const [autoRetrying, setAutoRetrying] = useState(false);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -81,6 +87,26 @@ export default function CameraView() {
   const uptimeRef = useRef(null);
   const retryTimerRef = useRef(null);
   const sessionCodeRef = useRef('');
+
+  // Batterie-Status
+  useEffect(() => {
+    if (!navigator.getBattery) return;
+    navigator.getBattery().then(bat => {
+      setBatteryLevel(Math.round(bat.level * 100));
+      setBatteryCharging(bat.charging);
+      bat.addEventListener('levelchange', () => setBatteryLevel(Math.round(bat.level * 100)));
+      bat.addEventListener('chargingchange', () => setBatteryCharging(bat.charging));
+    }).catch(() => {});
+  }, []);
+
+  // Netzwerk-Typ
+  useEffect(() => {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      setNetworkType(conn.effectiveType || conn.type || null);
+      conn.addEventListener('change', () => setNetworkType(conn.effectiveType || conn.type || null));
+    }
+  }, []);
 
   // Portrait-Detektion
   useEffect(() => {
@@ -120,16 +146,19 @@ export default function CameraView() {
     }
   };
 
-  const startCamera = async (facing = facingMode) => {
+  const startCamera = async (facing = facingMode, wide = wideAngle) => {
     stopStream();
     setCameraError(null);
 
-    // Versuche zuerst mit Weitwinkel + hoher Auflösung
+    const wideConstraints = wide
+      ? { zoom: { ideal: 0.5 }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, aspectRatio: { ideal: 16/9 }, frameRate: { ideal: 30, min: 15 } }
+      : { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16/9 } };
+
     const constraints = [
-      { video: { ...VIDEO_CONSTRAINTS, facingMode: facing } },
+      { video: { ...wideConstraints, facingMode: facing } },
       { video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } },
       { video: { facingMode: facing } },
-      { video: true }, // letzter Fallback
+      { video: true },
     ];
 
     let stream = null;
@@ -177,15 +206,18 @@ export default function CameraView() {
 
     if (!matched) {
       if (attempt < MAX_RETRIES) {
+        setAutoRetrying(true);
         setErrorMsg(`Suche aktive Session... (Versuch ${attempt}/${MAX_RETRIES})`);
         retryTimerRef.current = setTimeout(() => handleConnect(c, attempt + 1), RETRY_DELAY_MS);
         return;
       }
+      setAutoRetrying(false);
       setErrorMsg('Kein aktives Spiel gefunden. Der Trainer muss zuerst eine Live-Session starten.');
       setStep('error');
       setRetryCount(0);
       return;
     }
+    setAutoRetrying(false);
 
     // Kamera-Label aus Session holen
     const matchedCam = matched.camera_streams?.find(cam =>
@@ -207,15 +239,26 @@ export default function CameraView() {
     // Uptime-Zähler
     uptimeRef.current = setInterval(() => setUptime(t => t + 1), 1000);
 
-    // Heartbeat — robust, Fehler werden ignoriert
+    // Heartbeat — robust, bei Verbindungsverlust auto-retry
+    let degradedCount = 0;
     heartbeatRef.current = setInterval(async () => {
       try {
         const freshSessions = await base44.entities.LiveSession.filter({ status: 'active' });
         const fresh = freshSessions.find(s => s.id === matched.id);
         if (!fresh) {
+          degradedCount++;
           setConnectionQuality('degraded');
+          // Nach 3 fehlgeschlagenen Heartbeats: Auto-Reconnect
+          if (degradedCount >= 3) {
+            degradedCount = 0;
+            clearInterval(heartbeatRef.current);
+            clearInterval(uptimeRef.current);
+            setStep('connecting');
+            setTimeout(() => handleConnect(c), 1000);
+          }
           return;
         }
+        degradedCount = 0;
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
           (cam.code === c || cam.camera_id === c || cam.stream_url === c)
             ? { ...cam, status: 'connected', last_seen: new Date().toISOString() }
@@ -226,6 +269,7 @@ export default function CameraView() {
         }
         setConnectionQuality('good');
       } catch (e) {
+        degradedCount++;
         setConnectionQuality('degraded');
       }
     }, HEARTBEAT_INTERVAL_MS);
@@ -234,7 +278,13 @@ export default function CameraView() {
   const flipCamera = async () => {
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
-    await startCamera(next);
+    await startCamera(next, wideAngle);
+  };
+
+  const toggleWideAngle = async () => {
+    const next = !wideAngle;
+    setWideAngle(next);
+    await startCamera(facingMode, next);
   };
 
   const handleStop = () => {
@@ -347,8 +397,22 @@ export default function CameraView() {
             className="min-h-screen flex items-center justify-center">
             <div className="glass rounded-2xl p-10 text-center max-w-xs w-full mx-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-              <div className="font-grotesk font-semibold text-foreground mb-1">Verbinde...</div>
-              {errorMsg && <div className="text-xs text-muted-foreground mt-2">{errorMsg}</div>}
+              <div className="font-grotesk font-semibold text-foreground mb-1">
+                {autoRetrying ? 'Erneut verbinden...' : 'Verbinde...'}
+              </div>
+              {errorMsg && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-muted-foreground">{errorMsg}</div>
+                  <div className="flex justify-center gap-1">
+                    {Array.from({ length: MAX_RETRIES }).map((_, i) => (
+                      <div key={i} className={`w-2 h-2 rounded-full transition-all ${
+                        errorMsg.includes(`${i + 1}/`) ? 'bg-primary scale-125' : 
+                        parseInt(errorMsg.match(/Versuch (\d)/)?.[1]) > i + 1 ? 'bg-primary/40' : 'bg-muted'
+                      }`} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -397,21 +461,32 @@ export default function CameraView() {
                 className="w-full h-full object-cover"
               />
 
-              {/* REC + Status Overlay */}
-              <div className="absolute top-2 left-2 flex items-center gap-2">
-                <div className="bg-black/70 rounded-lg px-2 py-1 text-[11px] text-white font-bold flex items-center gap-1.5">
+              {/* REC + Status Overlay — Top Left */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
+                <div className="bg-black/75 rounded-lg px-2 py-1 text-[11px] text-white font-bold flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> REC
                 </div>
-                <div className={`bg-black/70 rounded-lg px-2 py-1 text-[11px] font-bold flex items-center gap-1 ${
+                <div className={`bg-black/75 rounded-lg px-2 py-1 text-[11px] font-bold flex items-center gap-1 ${
                   connectionQuality === 'good' ? 'text-primary' : 'text-yellow-400'
                 }`}>
-                  {connectionQuality === 'good' ? '● Online' : '⚠ Schwach'}
+                  {connectionQuality === 'good'
+                    ? <><Wifi className="w-3 h-3" /> {networkType ? networkType.toUpperCase() : 'Online'}</>
+                    : <><WifiOff className="w-3 h-3" /> Schwach</>}
                 </div>
+                {batteryLevel !== null && (
+                  <div className={`bg-black/75 rounded-lg px-2 py-1 text-[11px] font-bold flex items-center gap-1 ${
+                    batteryLevel <= 20 ? 'text-red-400' : batteryCharging ? 'text-primary' : 'text-white'
+                  }`}>
+                    {batteryLevel <= 20 ? <BatteryLow className="w-3 h-3" /> : <Battery className="w-3 h-3" />}
+                    {batteryLevel}%{batteryCharging ? '⚡' : ''}
+                  </div>
+                )}
               </div>
 
-              {/* Uptime + Label */}
-              <div className="absolute top-2 right-2 bg-black/70 rounded-lg px-2 py-1 text-[11px] text-white font-mono">
-                {formatUptime(uptime)}{camLabel ? ` · ${camLabel}` : ''}
+              {/* Uptime + Label — Top Right */}
+              <div className="absolute top-2 right-2 bg-black/75 rounded-lg px-2 py-1 text-[11px] text-white font-mono flex items-center gap-1.5">
+                <span className="font-bold tabular-nums">{formatUptime(uptime)}</span>
+                {camLabel && <span className="text-white/60">· {camLabel}</span>}
               </div>
 
               {/* Kamera-Fehler Overlay */}
@@ -428,13 +503,37 @@ export default function CameraView() {
                 </div>
               )}
 
-              {/* Flip Kamera Button */}
-              <button
-                onClick={flipCamera}
-                className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all active:scale-90"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+              {/* Kamera-Steuerung Bottom Right */}
+              <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                {/* Weitwinkel Toggle */}
+                <button
+                  onClick={toggleWideAngle}
+                  title={wideAngle ? 'Weitwinkel AN' : 'Weitwinkel AUS'}
+                  className={`h-9 px-2.5 rounded-full border flex items-center gap-1.5 text-[11px] font-bold transition-all active:scale-90 ${
+                    wideAngle
+                      ? 'bg-primary/80 border-primary text-primary-foreground'
+                      : 'bg-black/60 border-white/20 text-white/70'
+                  }`}
+                >
+                  <ScanLine className="w-3.5 h-3.5" />
+                  {wideAngle ? 'WW' : 'Normal'}
+                </button>
+                {/* Flip */}
+                <button
+                  onClick={flipCamera}
+                  className="w-9 h-9 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all active:scale-90"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Landscape guide lines — visual framing helper */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-1/3 left-0 right-0 border-t border-white/10" />
+                <div className="absolute top-2/3 left-0 right-0 border-t border-white/10" />
+                <div className="absolute left-1/3 top-0 bottom-0 border-l border-white/10" />
+                <div className="absolute left-2/3 top-0 bottom-0 border-l border-white/10" />
+              </div>
             </div>
 
             {/* ── KAMERA FIXIERT WARNUNG ── */}
