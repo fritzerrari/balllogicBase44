@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Radio, Send, Mic, MicOff, X } from 'lucide-react';
 import AudioWaveform from './AudioWaveform';
 
-const POLL_MS = 2000;
+const POLL_MS = 6000; // Erhöht von 2s auf 6s — Rate-Limiting vermeiden
 const MAX_MSGS = 30;
 
 export default function FunkPanel({ sessionId, onClose }) {

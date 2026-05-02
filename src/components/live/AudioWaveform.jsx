@@ -22,7 +22,10 @@ export default function AudioWaveform({ isActive }) {
         analyserRef.current = analyser;
         dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
         drawWave();
-      } catch (_) {}
+      } catch (err) {
+        // Audio-Permission verweigert oder nicht verfügbar — stille Fallback
+        console.debug('AudioWaveform: Keine Audio-Permission', err.name);
+      }
     };
 
     const drawWave = () => {
