@@ -25,7 +25,11 @@ export default function SessionReports() {
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['session-reports'],
-    queryFn: () => base44.entities.SessionReport.list('-generated_at', 50),
+    queryFn: async () => {
+      const allReports = await base44.entities.SessionReport.list('-generated_at', 50);
+      // Filter: nur Reports mit match_id (Rest sind inkomplett)
+      return allReports.filter(r => r.match_id);
+    },
   });
 
   const { data: sessions = [] } = useQuery({

@@ -163,12 +163,16 @@ export default function LiveSession() {
   const handleStop = async () => {
     setFinishing(true);
     try {
-      // 1. Session als beendet markieren
+      // 1. Session als beendet markieren + Match.status updaten
       if (session) {
         await updateSession.mutateAsync({
           id: session.id,
           data: { status: 'ended', ended_at: new Date().toISOString() },
         });
+        // Update Match.status → 'analyzed' (damit Dashboard "LIVE" verschwindet)
+        if (session.match_id) {
+          base44.entities.Match.update(session.match_id, { status: 'analyzed' }).catch(() => {});
+        }
         // FunkMessages der Session aufräumen
         try {
           const funkMsgs = await base44.entities.FunkMessage.filter({ session_id: session.id });

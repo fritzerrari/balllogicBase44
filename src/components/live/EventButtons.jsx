@@ -80,8 +80,9 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
     const localEntry = { ...eventData, id: localId, time: formatTime(elapsedSeconds) };
     setLocalEvents(prev => [localEntry, ...prev].slice(0, 50));
 
-    setFlash({ key: evt.key, isDuplicate });
-    setTimeout(() => setFlash(null), 800);
+    // Flash zeigt Duplikat-Warnung an
+    setFlash({ key: evt.key, isDuplicate, message: isDuplicate ? '⚠️ Duplikat erkannt' : '✓ Gespeichert' });
+    setTimeout(() => setFlash(null), isDuplicate ? 1200 : 800);
 
     // In DB speichern (non-blocking)
     if (sessionId) {
@@ -167,9 +168,11 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
                 ? 'bg-yellow-500/15 border border-yellow-500/30 text-yellow-400'
                 : 'bg-primary/15 border border-primary/30 text-primary'
             }`}>
-            {flash.isDuplicate
-              ? '⚠ Duplikat erkannt — trotzdem gespeichert'
-              : <><Check className="w-4 h-4" /> Event gespeichert</>}
+            {flash.isDuplicate ? (
+              <>⚠️ {flash.message}</>
+            ) : (
+              <><Check className="w-4 h-4" /> {flash.message}</>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
