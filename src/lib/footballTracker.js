@@ -20,12 +20,18 @@ const ROBOFLOW_MODEL = 'football-players-detection-3zvbc-4bgah/2';
 const ROBOFLOW_URL = `https://detect.roboflow.com/${ROBOFLOW_MODEL}`;
 
 /**
- * Run RF-DETR / YOLO detection on a canvas frame.
+ * ⚠️ DEPRECATED: Run this ONLY in processFrame backend function, NOT in frontend!
+ * Frontend MUST send frames via useFrameCapture → processFrame backend endpoint.
  * @param {HTMLCanvasElement} canvas
  * @param {string} apiKey
  * @returns {Promise<Detection[]>}
  */
 export async function detectFrame(canvas, apiKey) {
+  if (typeof window !== 'undefined') {
+    console.error('❌ detectFrame() called from browser — INVALID! Use useFrameCapture + processFrame backend instead');
+    return [];
+  }
+  
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
   const base64 = await blobToBase64(blob);
   const dataOnly = base64.split(',')[1];
@@ -38,15 +44,15 @@ export async function detectFrame(canvas, apiKey) {
   const data = await res.json();
 
   return (data.predictions || []).map((p, idx) => ({
-    id: `${p.class}-${p.class === 'player' || p.class === 'goalkeeper' ? 'temp' : 'static'}-${idx}`, // Stable across frames
-    class: p.class, // 'player' | 'goalkeeper' | 'referee' | 'ball'
+    id: `${p.class}-${p.class === 'player' || p.class === 'goalkeeper' ? 'temp' : 'static'}-${idx}`,
+    class: p.class,
     x: p.x / data.image.width * 100,
     y: p.y / data.image.height * 100,
     width: p.width / data.image.width * 100,
     height: p.height / data.image.height * 100,
     confidence: p.confidence,
-    number: null, // assigned later via tracking
-    team: null, // assigned later by color clustering
+    number: null,
+    team: null,
   }));
 }
 
@@ -324,9 +330,15 @@ export function simulateDetections(tick, options = {}) {
 export function computeStats(history) {
   if (!history || history.length < 2) return null;
 
-  const home = history.flatMap(f => f.filter(d => d.team === 'home'));
-  const away = history.flatMap(f => f.filter(d => d.team === 'away'));
-  const balls = history.flatMap(f => f.filter(d => d.class === 'ball'));
+  // GUARD: history must be Array<Array<Detection>>
+  if (!Array.isArray(history[0])) {
+    console.warn('⚠️ computeStats: history structure invalid, expected Array<Array<Detection>>');
+    return null;
+  }
+
+  const home = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.team === 'home'));
+  const away = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.team === 'away'));
+  const balls = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.class === 'ball'));
 
   // Ball possession by proximity
   let homePoss = 0, awayPoss = 0;

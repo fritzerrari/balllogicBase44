@@ -152,130 +152,69 @@ export default function CoachingCockpit() {
     trackingMode === 'roboflow' && isDetecting
   );
 
-  const startRoboflowTracking = useCallback(async (key) => {
-    setApiError(null);
-    setIsDetecting(true);
+  // ❌ REMOVED: Frontend should NOT call detectFrame() or startRoboflowTracking()
+  // useFrameCapture hook handles Roboflow integration via processFrame backend
+  // This prevents double-setup, CORS errors, and keeps tracking logic on server side
 
-    // Start camera capture
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch (e) {
-      setApiError('Kamera-Zugriff verweigert. Nutze Simulation.');
-      setTrackingMode('simulation');
-      setIsDetecting(false);
-      return;
-    }
-
-    // Detection loop — use refs to avoid stale closures
-    let prevDets = [];
-    detectionIntervalRef.current = setInterval(async () => {
-      const video = videoRef.current;
-      const canvas = hiddenCanvasRef.current;
-      if (!video || !canvas || video.readyState < 2) return;
-
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 360;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-
-      try {
-        let raw = await detectFrame(canvas, key); // key is stable from closure
-        raw = assignTeamsByColor(canvas, raw);
-        const smoothed = smoothDetections(raw, 0.6, activeSession?.id); // Session-scoped smoothing
-
-        const newEvents = detectEvents(smoothed, prevDets, { left: 2, right: 98, top: 2, bottom: 98 });
-        if (newEvents.length > 0) {
-          setEvents(prev => [
-            ...newEvents.map(e => ({
-              ...e,
-              id: Date.now() + Math.random(),
-              time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            })),
-            ...prev,
-          ].slice(0, 50));
-        }
-
-        prevDets = smoothed; // Keep local ref, not state
-        setDetections(smoothed);
-        setStatsHistory(prev => [...prev.slice(-30), smoothed]);
-        setApiError(null);
-      } catch (e) {
-        setApiError(`API-Fehler: ${e.message}`);
-      }
-    }, 2000);
-  }, [activeSession?.id]);
-
-  const stopRoboflowTracking = () => {
-    clearInterval(detectionIntervalRef.current);
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsDetecting(false);
-  };
+  // useFrameCapture hook handles tracking lifecycle — no manual video setup needed
 
   const handleActivateRoboflow = () => {
-    if (!apiKeyInput.trim()) return;
-    const pendingConsent = players.filter(p =>
-      !p.tracking_consent || p.tracking_consent === 'pending' || p.tracking_consent === 'guardian_required'
-    );
-    if (pendingConsent.length > 0 && !trackingUnlocked) {
-      setShowDsgvo(true);
-      return;
-    }
+     if (!apiKeyInput.trim()) return;
+     const pendingConsent = players.filter(p =>
+       !p.tracking_consent || p.tracking_consent === 'pending' || p.tracking_consent === 'guardian_required'
+     );
+     if (pendingConsent.length > 0 && !trackingUnlocked) {
+       setShowDsgvo(true);
+       return;
+     }
 
-    // STOP Simulation zuerst
-    clearInterval(simIntervalRef.current);
-    setTrackTick(0);
-    setEvents([]);
+     // STOP Simulation
+     clearInterval(simIntervalRef.current);
+     setTrackTick(0);
+     setEvents([]);
+     setDetections([]);
 
-    // Starte Roboflow
-    setApiKey(apiKeyInput.trim());
-    setTrackingMode('roboflow');
-    setShowApiSetup(false);
-    startRoboflowTracking(apiKeyInput.trim());
-  };
+     // Switch to Roboflow mode (useFrameCapture hook handles streaming via processFrame backend)
+     setApiKey(apiKeyInput.trim());
+     setTrackingMode('roboflow');
+     setShowApiSetup(false);
+     setIsDetecting(true); // Trigger useFrameCapture hook
+   };
 
   const handleDsgvoConfirm = () => {
-    setTrackingUnlocked(true);
-    setShowDsgvo(false);
-    if (apiKeyInput.trim()) {
-      // STOP Simulation zuerst
-      clearInterval(simIntervalRef.current);
-      setTrackTick(0);
-      setEvents([]);
+     setTrackingUnlocked(true);
+     setShowDsgvo(false);
+     if (apiKeyInput.trim()) {
+       clearInterval(simIntervalRef.current);
+       setTrackTick(0);
+       setEvents([]);
+       setDetections([]);
 
-      setApiKey(apiKeyInput.trim());
-      setTrackingMode('roboflow');
-      setShowApiSetup(false);
-      startRoboflowTracking(apiKeyInput.trim());
-    }
-  };
+       setApiKey(apiKeyInput.trim());
+       setTrackingMode('roboflow');
+       setShowApiSetup(false);
+       setIsDetecting(true); // Trigger useFrameCapture
+     }
+   };
 
   const handleSwitchToSim = () => {
-    stopRoboflowTracking();
-    clearInterval(detectionIntervalRef.current);
-    setTrackingMode('simulation');
-    setApiError(null);
-    setApiKey('');
-    setApiKeyInput('');
-    setEvents([]);
-    setDetections([]);
-    setTrackTick(0);
-  };
+     setIsDetecting(false); // Stop useFrameCapture
+     setTrackingMode('simulation');
+     setApiError(null);
+     setApiKey('');
+     setApiKeyInput('');
+     setEvents([]);
+     setDetections([]);
+     setTrackTick(0);
+   };
 
   // Cleanup — only on unmount
-  useEffect(() => {
-    return () => {
-      clearInterval(detectionIntervalRef.current);
-      clearInterval(simIntervalRef.current);
-      stopRoboflowTracking();
-    };
-  }, []);
+   useEffect(() => {
+     return () => {
+       clearInterval(simIntervalRef.current);
+       setIsDetecting(false); // Stop useFrameCapture hook
+     };
+   }, []);
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const ball = detections.find(d => d.class === 'ball') || null;
