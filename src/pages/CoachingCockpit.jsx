@@ -19,6 +19,7 @@ import {
   Eye, EyeOff, Wifi, WifiOff
 } from 'lucide-react';
 import EventButtons from '@/components/live/EventButtons';
+import SessionHealthCheck from '@/components/live/SessionHealthCheck';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -362,6 +363,9 @@ export default function CoachingCockpit() {
           </button>
         </div>
       )}
+
+      {/* Session Health Check */}
+      {activeSession && <SessionHealthCheck session={activeSession} />}
 
       {/* No session warning */}
       {!activeSession && (

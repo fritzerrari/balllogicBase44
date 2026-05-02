@@ -46,16 +46,19 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
 
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  const checkDuplicate = (type) => {
+  const checkDuplicate = (type, team = 'unknown', minute = 0) => {
+    // Key: type + team + minute (robust gegen false positives)
+    const key = `${type}_${team}_${minute}`;
     const now = Date.now();
-    const last = recentRef.current[type];
+    const last = recentRef.current[key];
     if (last && now - last < DEDUP_WINDOW_MS) return true;
-    recentRef.current[type] = now;
+    recentRef.current[key] = now;
     return false;
   };
 
   const tapEvent = async (evt, team = 'unknown') => {
-    const isDuplicate = checkDuplicate(evt.key);
+    const gameMinute = Math.floor(elapsedSeconds / 60);
+    const isDuplicate = checkDuplicate(evt.key, team, gameMinute);
     const now = Date.now();
 
     const eventData = {
@@ -63,7 +66,7 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
       match_title: matchTitle || '',
       type: evt.key,
       team,
-      minute: Math.floor(elapsedSeconds / 60),
+      minute: gameMinute,
       elapsed_seconds: elapsedSeconds,
       description: `${evt.icon} ${evt.label}${team !== 'unknown' ? ` (${team === 'home' ? 'Heim' : 'Gäste'})` : ''}`,
       source,

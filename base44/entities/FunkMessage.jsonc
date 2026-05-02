@@ -16,21 +16,24 @@
     "text": {
       "type": "string"
     },
-    "is_ptt": {
+    "is_ppt": {
       "type": "boolean",
       "default": false,
       "description": "Push-to-Talk Aktivierungs-Signal"
     },
-    "ptt_active": {
+    "ppt_active": {
       "type": "boolean",
       "default": false
     },
     "timestamp_ms": {
-      "type": "number"
+      "type": "number",
+      "description": "Unix-Timestamp f\u00fcr Ordering"
     }
   },
   "required": [
     "session_id",
-    "from"
+    "from",
+    "from_label",
+    "timestamp_ms"
   ]
 }

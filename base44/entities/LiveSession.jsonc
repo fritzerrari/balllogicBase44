@@ -3,7 +3,8 @@
   "type": "object",
   "properties": {
     "match_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Verkn\u00fcpfung zu echtem Match \u2014 optional aber wichtig f\u00fcr Reporting"
     },
     "match_title": {
       "type": "string"
@@ -28,10 +29,12 @@
     "half_time": {
       "type": "number",
       "default": 1,
-      "description": "Aktuelle Halbzeit: 1 oder 2. Wird f\u00fcr Seitenwechsel auf Kamera-Handy angezeigt."
+      "description": "Aktuelle Halbzeit: 1 oder 2"
     },
     "camera_streams": {
       "type": "array",
+      "minItems": 1,
+      "description": "Mindestens 1 Kamera erforderlich",
       "items": {
         "type": "object",
         "properties": {
@@ -48,10 +51,22 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "waiting",
+              "connected",
+              "error",
+              "disconnected"
+            ],
+            "default": "waiting"
           },
           "last_seen": {
-            "type": "string"
+            "type": "string",
+            "format": "date-time"
+          },
+          "thumbnail": {
+            "type": "string",
+            "description": "Thumbnail URL f\u00fcr Live-Vorschau"
           }
         }
       }
@@ -61,6 +76,7 @@
     }
   },
   "required": [
-    "match_title"
+    "match_title",
+    "camera_streams"
   ]
 }

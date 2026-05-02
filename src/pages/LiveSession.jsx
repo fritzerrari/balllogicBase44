@@ -124,9 +124,31 @@ export default function LiveSession() {
 
   // ── Start ─────────────────────────────────────────────────────────────────
   const handleStart = async () => {
+    // Validierungen
     if (!sessionTitle) return;
+    if (cameras.length === 0) {
+      alert('Mindestens 1 Kamera erforderlich');
+      return;
+    }
+
+    // Try: Auto-create Match wenn nicht vorhanden
+    let matchId = null;
+    try {
+      const m = await base44.entities.Match.create({
+        title: sessionTitle,
+        date: new Date().toISOString().split('T')[0],
+        home_team: 'Team A',
+        away_team: 'Team B',
+        status: 'live',
+      });
+      matchId = m.id;
+    } catch (_) {
+      console.warn('⚠️ Auto-Match creation failed, continuing without match_id');
+    }
+
     const s = await createSession.mutateAsync({
       match_title: sessionTitle,
+      match_id: matchId,
       status: 'active',
       half_time: 1,
       started_at: new Date().toISOString(),
@@ -168,6 +190,7 @@ export default function LiveSession() {
 
         await base44.entities.SessionReport.create({
           session_id: session.id,
+          match_id: session.match_id,
           match_title: sessionTitle,
           report_type: 'post_session',
           generated_at: new Date().toISOString(),

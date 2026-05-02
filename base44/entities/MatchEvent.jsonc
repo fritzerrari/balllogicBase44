@@ -6,6 +6,10 @@
       "type": "string",
       "description": "LiveSession ID"
     },
+    "match_id": {
+      "type": "string",
+      "description": "Match ID \u2014 wichtig f\u00fcr Reporting und Analytics"
+    },
     "match_title": {
       "type": "string"
     },
@@ -52,11 +56,12 @@
     },
     "timestamp_ms": {
       "type": "number",
-      "description": "Unix-Timestamp in ms f\u00fcr Deduplizierung"
+      "description": "Unix-Timestamp in ms f\u00fcr Deduplizierung und Ordering"
     },
     "is_duplicate": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Wurden als Duplikat erkannt (basierend auf type+team+minute)"
     },
     "corrected": {
       "type": "boolean",
@@ -69,6 +74,7 @@
   },
   "required": [
     "session_id",
-    "type"
+    "type",
+    "timestamp_ms"
   ]
 }

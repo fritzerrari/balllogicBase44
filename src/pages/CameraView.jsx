@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
 import useDeviceOrientation from '@/hooks/useDeviceOrientation';
+import useCameraHeartbeat from '@/hooks/useCameraHeartbeat';
 import {
   Camera, Zap, CheckCircle2, Loader2, RotateCcw,
   Clock, Wifi, WifiOff, Battery, BatteryLow,
@@ -66,6 +67,9 @@ export default function CameraView() {
 
   // Orientation detection
   const { orientation, isPortrait } = useDeviceOrientation(videoRef);
+
+  // Camera Heartbeat — sendet Status an LiveSession
+  useCameraHeartbeat(sessionInfo?.id, sessionCodeRef.current, camLabel, step === 'live');
 
   // Refs — use refs for values used inside intervals/callbacks to avoid stale closures
   const videoRef         = useRef(null);
