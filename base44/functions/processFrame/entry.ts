@@ -148,55 +148,7 @@ function validateAndNormalize(predictions, imageWidth, imageHeight) {
 }
 
 /**
- * 1. JERSEY COLOR CLUSTERING — assigns team by dominant hue
- */
-function assignTeamsByColor(canvas, players) {
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-
-  const playersWithHue = players
-    .filter(p => p.class === 'player' || p.class === 'goalkeeper')
-    .map(p => {
-      const px = Math.round((p.x / 100) * W);
-      const py = Math.round((p.y / 100) * H);
-      const sw = Math.max(4, Math.round((p.width / 100) * W * 0.4));
-      const sh = Math.max(4, Math.round((p.height / 100) * H * 0.3));
-      let hue = 0;
-      try {
-        const imgData = ctx.getImageData(Math.max(0, px - sw/2), Math.max(0, py - sh/2), sw, sh);
-        let rSum = 0, gSum = 0, bSum = 0, count = 0;
-        for (let i = 0; i < imgData.data.length; i += 4) {
-          rSum += imgData.data[i]; gSum += imgData.data[i+1]; bSum += imgData.data[i+2]; count++;
-        }
-        const r = count ? rSum/count/255 : 0.5, g = count ? gSum/count/255 : 0.5, b = count ? bSum/count/255 : 0.5;
-        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-        hue = d === 0 ? 0 : max === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6 * 360 : max === g ? ((b - r) / d + 2) / 6 * 360 : ((r - g) / d + 4) / 6 * 360;
-      } catch (_) {}
-      return { ...p, hue };
-    });
-
-  if (playersWithHue.length < 2) return players.map(p => ({ ...p, team: p.team || 'home' }));
-
-  const hues = playersWithHue.map(p => p.hue);
-  let c1 = hues[0], c2 = hues[Math.floor(hues.length / 2)];
-  for (let iter = 0; iter < 5; iter++) {
-    const g1 = hues.filter(h => Math.abs(h - c1) < Math.abs(h - c2));
-    const g2 = hues.filter(h => Math.abs(h - c1) >= Math.abs(h - c2));
-    if (g1.length) c1 = g1.reduce((s, v) => s + v, 0) / g1.length;
-    if (g2.length) c2 = g2.reduce((s, v) => s + v, 0) / g2.length;
-  }
-
-  return players.map(p => {
-    if (p.class === 'ball' || p.class === 'referee') return p;
-    const pw = playersWithHue.find(pw => pw.x === p.x && pw.y === p.y);
-    if (!pw) return p;
-    const d1 = Math.abs(pw.hue - c1), d2 = Math.abs(pw.hue - c2);
-    return { ...p, team: Math.abs(d1 - d2) < 30 ? 'mixed' : d1 < d2 ? 'home' : 'away' };
-  });
-}
-
-/**
- * 2. REID TRACKING — multi-frame player tracking by position + confidence
+ * REID TRACKING — multi-frame player tracking by position + confidence
  */
 const REID_STATE_BY_SESSION = new Map(); // { sessionId → { frameN: {playerId → {x,y,team,conf}} } }
 
@@ -343,42 +295,29 @@ Deno.serve(async (req) => {
           error = 'Roboflow unavailable, using last frame';
         }
       } catch (_) {
-        detections = { predictions: [] };
+        detections = { predictions: [], image: { width: 1920, height: 1080 } };
         error = 'Complete API failure — no tracking data';
       }
     }
 
+    // Safety: ensure detections.image exists
+    if (!detections.image) detections.image = { width: 1920, height: 1080 };
+
     // Parse Detections
-    const ballPredictions = detections.predictions.filter(p => p.class === 'ball');
-    const playerPredictions = detections.predictions.filter(p => p.class === 'player' || p.class === 'goalkeeper');
+    const ballPredictions = detections.predictions?.filter(p => p.class === 'ball') || [];
+    const playerPredictions = detections.predictions?.filter(p => p.class === 'player' || p.class === 'goalkeeper') || [];
 
     const ballPos = ballPredictions.length > 0 ? {
-      x: Math.round((ballPredictions[0].x / (detections.image?.width || 1920)) * 100),
-      y: Math.round((ballPredictions[0].y / (detections.image?.height || 1080)) * 100),
+      x: Math.round((ballPredictions[0].x / detections.image.width) * 100),
+      y: Math.round((ballPredictions[0].y / detections.image.height) * 100),
       confidence: Math.round(ballPredictions[0].confidence * 100),
     } : null;
 
     let playerPositions = validateAndNormalize(
       playerPredictions,
-      detections.image?.width || 1920,
-      detections.image?.height || 1080
+      detections.image.width,
+      detections.image.height
     );
-
-    // 1. TEAM ASSIGNMENT BY JERSEY COLOR (wenn Canvas vorhanden)
-    if (frame_base64 && playerPositions.length > 0) {
-      try {
-        const canvas = new OffscreenCanvas(detections.image?.width || 1920, detections.image?.height || 1080);
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0);
-          playerPositions = assignTeamsByColor(canvas, playerPositions);
-        };
-        img.src = `data:image/jpeg;base64,${frame_base64}`;
-      } catch (_) {
-        // Fallback: no color-based team assignment
-      }
-    }
 
     // 2. REID TRACKING — match players across frames by proximity + confidence
     playerPositions = performReIDTracking(playerPositions, session_id, frame_number);
