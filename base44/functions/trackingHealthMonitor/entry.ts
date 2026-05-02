@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
-    if (!user?.role === 'admin') {
+    if (user?.role !== 'admin') {
       return Response.json({ error: 'Admin only' }, { status: 403 });
     }
 
@@ -28,12 +28,12 @@ Deno.serve(async (req) => {
       total_frames: recentTracking.length,
       successful_frames: recentTracking.filter(t => !t.error).length,
       fallback_frames: recentTracking.filter(t => t.source === 'fallback').length,
-      avg_quality: Math.round(
+      avg_quality: recentTracking.length > 0 ? Math.round(
         recentTracking.reduce((sum, t) => sum + (t.detection_quality || 0), 0) / recentTracking.length
-      ),
-      avg_processing_time_ms: Math.round(
+      ) : 0,
+      avg_processing_time_ms: recentTracking.length > 0 ? Math.round(
         recentTracking.reduce((sum, t) => sum + (t.processing_time_ms || 0), 0) / recentTracking.length
-      ),
+      ) : 0,
       success_rate: recentTracking.length > 0
         ? Math.round((recentTracking.filter(t => !t.error).length / recentTracking.length) * 100)
         : 0,

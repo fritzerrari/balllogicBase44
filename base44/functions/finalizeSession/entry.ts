@@ -39,15 +39,17 @@ Deno.serve(async (req) => {
       : 0;
 
     // 2. Update Session + Match Status
-    await Promise.all([
-      base44.entities.LiveSession.update(session.id, {
-        status: 'ended',
-        ended_at: new Date().toISOString(),
-      }),
-      session.match_id
-        ? base44.entities.Match.update(session.match_id, { status: 'analyzed' })
-        : Promise.resolve(),
-    ]);
+    await base44.entities.LiveSession.update(session.id, {
+      status: 'ended',
+      ended_at: new Date().toISOString(),
+    });
+
+    // Update Match status if associated
+    if (session.match_id) {
+      await base44.entities.Match.update(session.match_id, { status: 'analyzed' }).catch(err => {
+        console.warn(`⚠️ Match update failed: ${err.message}`);
+      });
+    }
 
     // 3. Sammle Events
     const events = await base44.entities.MatchEvent.filter({ session_id: session.id });

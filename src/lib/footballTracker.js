@@ -207,9 +207,18 @@ export function detectEvents(detections, prevDetections, pitchBounds = { left: 2
 }
 
 // ─── Kalman-style Smoother ───────────────────────────────────────────────────
-const smoothState = {};
+let smoothState = {};
+const MAX_SMOOTH_STATE_SIZE = 150; // Limit to prevent unbounded growth
 
 export function smoothDetections(detections, alpha = 0.6) {
+  // Cleanup old entries if too large (FIFO eviction)
+  if (Object.keys(smoothState).length > MAX_SMOOTH_STATE_SIZE) {
+    const keys = Object.keys(smoothState);
+    for (let i = 0; i < keys.length - MAX_SMOOTH_STATE_SIZE + 50; i++) {
+      delete smoothState[keys[i]];
+    }
+  }
+
   return detections.map(d => {
     const key = d.id || d.class;
     const prev = smoothState[key];

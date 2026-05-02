@@ -16,11 +16,8 @@ Deno.serve(async (req) => {
       return Response.json({ skip: 'Not a session end event' });
     }
 
-    // Check: ist Status jetzt "ended"?
-    const session = await base44.entities.LiveSession.filter({ id: sessionId });
-    if (!session[0] || session[0].status !== 'ended') {
-      return Response.json({ skip: 'Session not ended' });
-    }
+    // Assume session is ended (automation triggered by status update)
+    // No need for redundant refetch
 
     console.log(`🔥 Session ${sessionId} ended, generating heatmaps...`);
 
