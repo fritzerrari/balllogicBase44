@@ -10,6 +10,27 @@ import { Radio, Send, Mic, MicOff, ChevronDown } from 'lucide-react';
 const POLL_MS = 2000;
 const MAX_MSGS = 20;
 
+const QUICK_REPLIES = ['👍 OK', '🔄 Wiederholen', '⚠️ Problem', '📍 Position?'];
+
+function vibrate() {
+  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (_) {}
+}
+
 export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -32,10 +53,13 @@ export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
       const sorted = all.sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0)).slice(-MAX_MSGS);
       setMessages(sorted);
 
-      // Unread counter (Nachrichten vom Trainer die neu sind)
+      // Unread counter + Vibration/Ton bei neuer Trainer-Nachricht
       const newFromCoach = sorted.filter(m => m.from === 'coach' && !m.is_ptt).length;
       if (newFromCoach > seenCountRef.current && !expanded) {
-        setUnread(newFromCoach - seenCountRef.current);
+        const diff = newFromCoach - seenCountRef.current;
+        setUnread(diff);
+        vibrate();
+        playBeep();
       }
       if (expanded) {
         seenCountRef.current = newFromCoach;
@@ -64,17 +88,18 @@ export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
     }
   }, [expanded, messages]);
 
-  const sendText = async () => {
-    if (!text.trim()) return;
+  const sendText = async (msg) => {
+    const content = msg || text.trim();
+    if (!content) return;
     await base44.entities.FunkMessage.create({
       session_id: sessionId,
       from,
       from_label: fromLabel,
-      text: text.trim(),
+      text: content,
       is_ptt: false,
       timestamp_ms: Date.now(),
     });
-    setText('');
+    if (!msg) setText('');
   };
 
   const handlePTT = async (active) => {
@@ -147,6 +172,15 @@ export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
 
             {/* Input */}
             <div className="px-3 py-2 border-t border-white/10 space-y-2">
+              {/* Schnell-Antworten */}
+              <div className="flex gap-1.5 flex-wrap">
+                {QUICK_REPLIES.map(r => (
+                  <button key={r} onClick={() => sendText(r)}
+                    className="text-[10px] px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-white/70 hover:bg-primary/20 hover:text-primary active:scale-95 transition-all">
+                    {r}
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <input
                   value={text}
@@ -155,7 +189,7 @@ export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
                   placeholder="Nachricht an Trainer..."
                   className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-primary/60"
                 />
-                <button onClick={sendText} disabled={!text.trim()}
+                <button onClick={() => sendText()} disabled={!text.trim()}
                   className="px-3 rounded-lg bg-primary/80 text-white disabled:opacity-40 active:scale-95 transition-all">
                   <Send className="w-3.5 h-3.5" />
                 </button>

@@ -147,6 +147,11 @@ export default function LiveSession() {
           id: session.id,
           data: { status: 'ended', ended_at: new Date().toISOString() },
         });
+        // FunkMessages der Session aufräumen
+        try {
+          const funkMsgs = await base44.entities.FunkMessage.filter({ session_id: session.id });
+          await Promise.all(funkMsgs.map(m => base44.entities.FunkMessage.delete(m.id)));
+        } catch (_) {}
       }
 
       // 2. Events laden
@@ -425,17 +430,19 @@ export default function LiveSession() {
                   : <><Square className="w-3.5 h-3.5" /> Beenden & Report erstellen</>}
               </Button>
 
-              {/* Funk Button */}
-              <button
-                onClick={() => setFunkOpen(o => !o)}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                  funkOpen
-                    ? 'bg-primary/15 border-primary/40 text-primary'
-                    : 'bg-muted border-border text-muted-foreground hover:text-foreground'
-                }`}>
-                <Radio className="w-3.5 h-3.5" />
-                📻 Funk-Kanal {funkOpen ? 'schließen' : 'öffnen'}
-              </button>
+              {/* Funk Button — nur wenn Session aktiv */}
+              {session && (
+                <button
+                  onClick={() => setFunkOpen(o => !o)}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    funkOpen
+                      ? 'bg-primary/15 border-primary/40 text-primary'
+                      : 'bg-muted border-border text-muted-foreground hover:text-foreground'
+                  }`}>
+                  <Radio className="w-3.5 h-3.5" />
+                  📻 Funk-Kanal {funkOpen ? 'schließen' : 'öffnen'}
+                </button>
+              )}
             </div>
 
             {/* Event Buttons */}
