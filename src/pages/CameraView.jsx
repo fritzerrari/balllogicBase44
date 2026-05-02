@@ -43,8 +43,8 @@ function matchCode(session, code) {
 
 export default function CameraView() {
   const urlParams = new URLSearchParams(window.location.search);
-  const prefillCode = urlParams.get('code') || '';
-  const prefillPos  = urlParams.get('pos')  || '';
+  const prefillCode = urlParams.get('code') || sessionStorage.getItem('cam_code') || '';
+  const prefillPos  = urlParams.get('pos')  || sessionStorage.getItem('cam_pos')  || '';
 
   const [code, setCode]           = useState(prefillCode);
   const [step, setStep]           = useState('enter'); // always start at enter, auto-connect via effect
@@ -160,12 +160,13 @@ export default function CameraView() {
     return false;
   }, []);
 
-  // ── Thumbnail push every 30s ──────────────────────────────────────────────
+  // ── Thumbnail push: first after 5s, then every 30s ───────────────────────
   const startThumbnailPush = useCallback((sessionId, codeStr) => {
     clearInterval(thumbIntervalRef.current);
     const canvas = document.createElement('canvas');
     canvas.width = 320; canvas.height = 180;
-    thumbIntervalRef.current = setInterval(() => {
+
+    const pushThumb = () => {
       const video = videoRef.current;
       if (!video || video.readyState < 2) return;
       const ctx = canvas.getContext('2d');
@@ -179,7 +180,12 @@ export default function CameraView() {
         );
         base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams }).catch(() => {});
       }).catch(() => {});
-    }, 30000);
+    };
+
+    // First push after 5s (so the trainer sees something quickly)
+    setTimeout(pushThumb, 5000);
+    // Then every 30s
+    thumbIntervalRef.current = setInterval(pushThumb, 30000);
   }, []);
 
   // ── Simple audio detection (no uptime dep) ────────────────────────────────
@@ -262,6 +268,9 @@ export default function CameraView() {
     const codeStr = String(codeInput || '').trim();
     if (codeStr.length !== DIGITS) return;
     sessionCodeRef.current = codeStr;
+    // Persist so a page refresh auto-reconnects
+    sessionStorage.setItem('cam_code', codeStr);
+    if (prefillPos) sessionStorage.setItem('cam_pos', prefillPos);
     setStep('waiting');
     setWaitMsg('Warte auf Session-Start...');
     clearInterval(pollRef.current);
@@ -347,6 +356,8 @@ export default function CameraView() {
 
   const handleStop = () => {
     clearAllTimers(); stopStream(); stopAudio();
+    sessionStorage.removeItem('cam_code');
+    sessionStorage.removeItem('cam_pos');
     setStep('enter'); setCode(''); setUptime(0);
     uptimeValueRef.current = 0;
     setSessionInfo(null); sessionInfoRef.current = null;
