@@ -26,6 +26,7 @@ import FootballPitch from '@/components/pitch/FootballPitch';
 import EventButtons from '@/components/live/EventButtons';
 import CameraInviteButton from '@/components/live/CameraInviteButton';
 import FunkPanel from '@/components/live/FunkPanel';
+import CameraStreamCard from '@/components/live/CameraStreamCard';
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -682,66 +683,22 @@ export default function LiveSession() {
                   <Plus className="w-3.5 h-3.5" /> Kamera hinzufügen
                 </button>
               </div>
-              <div className={`grid gap-2 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {cameras.map((cam) => {
                   const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
                   const isConnected = liveStream?.status === 'connected';
-                  const isEnabled = cam.enabled !== false;
-                  const lastSeen = liveStream?.last_seen ? Math.round((Date.now() - new Date(liveStream.last_seen).getTime()) / 1000) : null;
-                  const thumbnail = liveStream?.thumbnail;
                   return (
-                    <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${!isEnabled ? 'opacity-50' : ''} ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
-                      {/* Thumbnail wenn vorhanden */}
-                      {thumbnail ? (
-                        <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover opacity-80" />
-                      ) : (
-                        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0d1f0d 0%, #060f06 100%)' }} />
-                      )}
-                      {/* Status Badge oben links */}
-                      <div className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected && isEnabled ? 'bg-primary/80 text-primary-foreground' : !isEnabled ? 'bg-red-500/60 text-white' : 'bg-black/70 text-muted-foreground'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected && isEnabled ? 'bg-white animate-pulse' : !isEnabled ? 'bg-white' : 'bg-muted-foreground'}`} />
-                        {!isEnabled ? 'AUS' : isConnected ? `LIVE${lastSeen !== null && lastSeen < 20 ? ` ${lastSeen}s` : ''}` : 'WARTET'}
-                      </div>
-                      {/* Control Buttons oben rechts */}
-                      <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity">
-                        <button onClick={() => toggleCameraEnabled(cam.id, isEnabled)}
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                            isEnabled
-                              ? 'bg-primary/80 text-primary-foreground hover:bg-primary'
-                              : 'bg-red-500/60 text-white hover:bg-red-500'
-                          }`}
-                          title={isEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}>
-                          {isEnabled ? '●' : '○'}
-                        </button>
-                        <button onClick={() => deleteCamera(cam.id)}
-                          className="w-7 h-7 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-xs font-bold transition-all"
-                          title="Kamera löschen">
-                          ✕
-                        </button>
-                        <CameraInviteButton code={cam.code} position={cam.label} />
-                      </div>
-                      {/* Label + Code unten */}
-                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent px-2 pt-3 pb-1.5">
-                        {editingCamId === cam.id ? (
-                          <div className="flex items-center gap-1">
-                            <input value={editingCamLabel} onChange={e => setEditingCamLabel(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') saveLabel(cam.id); if (e.key === 'Escape') setEditingCamId(null); }}
-                              className="flex-1 bg-black/60 border border-primary/40 rounded px-1 py-0.5 text-[10px] text-white focus:outline-none text-center" autoFocus />
-                            <button onClick={() => saveLabel(cam.id)} className="text-primary"><Check className="w-3 h-3" /></button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between cursor-pointer"
-                            onClick={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}>
-                            <span className="text-[10px] text-white/80 font-medium">{cam.label}</span>
-                            <span className="text-[9px] text-white/40 font-mono">{cam.code}</span>
-                          </div>
-                        )}
-                      </div>
-                      {/* Kein Bild Placeholder */}
-                      {!thumbnail && !isConnected && (
-                        <Video className="w-6 h-6 text-muted-foreground/40 relative z-10" />
-                      )}
-                    </div>
+                    <CameraStreamCard
+                      key={cam.id}
+                      cam={cam}
+                      sessionId={session?.id}
+                      isConnected={isConnected}
+                      onDelete={() => deleteCamera(cam.id)}
+                      onEdit={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}
+                      onShare={() => {}}
+                      onCopyCode={() => {}}
+                      copied={null}
+                    />
                   );
                 })}
               </div>
