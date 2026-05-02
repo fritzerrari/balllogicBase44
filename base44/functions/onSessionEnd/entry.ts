@@ -30,14 +30,62 @@ Deno.serve(async (req) => {
     for (const team of teams) {
       for (const type of types) {
         try {
-          const res = await base44.asServiceRole.functions.invoke('generateHeatmap', {
+          // Fetch tracking data for heatmap generation
+          const trackingData = await base44.asServiceRole.entities.TrackingData.filter({ session_id: sessionId });
+          if (trackingData.length === 0) {
+            console.warn(`No tracking data for ${team}/${type}`);
+            continue;
+          }
+
+          // Generate grid from tracking data
+          const grid = Array(10).fill(0).map(() => Array(10).fill(0));
+          trackingData.forEach(frame => {
+            if (type === 'player_density') {
+              frame.player_positions?.forEach(p => {
+                if (p.team === team) {
+                  const x = Math.floor((p.x / 100) * 10);
+                  const y = Math.floor((p.y / 100) * 10);
+                  if (x >= 0 && x < 10 && y >= 0 && y < 10) {
+                    grid[y][x] += 10;
+                  }
+                }
+              });
+            } else if (type === 'ball_possession') {
+              if (frame.ball_position) {
+                const x = Math.floor((frame.ball_position.x / 100) * 10);
+                const y = Math.floor((frame.ball_position.y / 100) * 10);
+                if (x >= 0 && x < 10 && y >= 0 && y < 10) {
+                  grid[y][x] += 5;
+                }
+              }
+            }
+          });
+
+          // Normalize grid to 0-100
+          const flat = grid.flat();
+          const max = Math.max(...flat, 1);
+          const gridData = [];
+          grid.forEach((row, y) => {
+            row.forEach((intensity, x) => {
+              if (intensity > 0) {
+                gridData.push({ x, y, intensity: Math.round((intensity / max) * 100) });
+              }
+            });
+          });
+
+          // Save heatmap cache
+          const heatmap = await base44.asServiceRole.entities.HeatmapCache.create({
             session_id: sessionId,
             team,
             heatmap_type: type,
+            grid_data: gridData,
             period: 'full_match',
+            generated_at: new Date().toISOString(),
+            total_frames_processed: trackingData.length,
+            quality_score: Math.round((trackingData.filter(t => t.detection_quality > 50).length / trackingData.length) * 100) || 0,
           });
 
-          if (res?.heatmap?.id) {
+          if (heatmap?.id) {
             generated.push(`${team}/${type}`);
           }
         } catch (err) {
