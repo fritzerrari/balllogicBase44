@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { FileText, Loader2, Trash2, Plus, Zap } from 'lucide-react';
+import { FileText, Loader2, Trash2, Plus, Zap, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SessionReportCard from '@/components/reports/SessionReportCard';
+import SessionReportTemplate from '@/components/reports/SessionReportTemplate';
 import GenerateReportButton from '@/components/reports/GenerateReportButton';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -20,6 +21,7 @@ const FILTERS = [
 
 export default function SessionReports() {
   const [filter, setFilter] = useState('all');
+  const [selectedReport, setSelectedReport] = useState(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -61,6 +63,22 @@ export default function SessionReports() {
   const lastSessionEvents = lastSession
     ? events.filter(e => e.session_id === lastSession.id)
     : [];
+
+  // Detail-View
+  if (selectedReport) {
+    return (
+      <div className="p-4 lg:p-8 min-h-screen">
+        <Button
+          variant="outline"
+          onClick={() => setSelectedReport(null)}
+          className="mb-6"
+        >
+          ← Zurück
+        </Button>
+        <SessionReportTemplate report={selectedReport} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-8 min-h-screen max-w-3xl mx-auto">
@@ -116,19 +134,27 @@ export default function SessionReports() {
         </motion.div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((report, i) => (
-            <motion.div key={report.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-              className="relative group">
-              <SessionReportCard report={report} />
-              <button
-                onClick={() => deleteReport.mutate(report.id)}
-                className="absolute top-3 right-10 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </motion.div>
-          ))}
-        </div>
+           {filtered.map((report, i) => (
+             <motion.div key={report.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+               className="relative group">
+               <SessionReportCard report={report} />
+               <div className="absolute top-3 right-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                 <button
+                   onClick={() => setSelectedReport(report)}
+                   className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10"
+                 >
+                   <Eye className="w-3.5 h-3.5" />
+                 </button>
+                 <button
+                   onClick={() => deleteReport.mutate(report.id)}
+                   className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                 >
+                   <Trash2 className="w-3.5 h-3.5" />
+                 </button>
+               </div>
+             </motion.div>
+           ))}
+         </div>
       )}
     </div>
   );

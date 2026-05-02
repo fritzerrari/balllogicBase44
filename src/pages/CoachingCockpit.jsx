@@ -16,7 +16,7 @@ import {
   Radio, Camera, Mic, MicOff, MessageSquare, Send,
   Zap, Users, Circle, Target, Shield,
   Copy, Check, Smartphone, Share2, Settings, Play, Pause,
-  Eye, EyeOff, Wifi, WifiOff
+  Eye, EyeOff, Wifi, WifiOff, Video
 } from 'lucide-react';
 import EventButtons from '@/components/live/EventButtons';
 import SessionHealthCheck from '@/components/live/SessionHealthCheck';
@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import FootballPitch from '@/components/pitch/FootballPitch';
 import TrackingOverlay from '@/components/live/TrackingOverlay';
+import VideoOverlayPlayer from '@/components/tracking/VideoOverlayPlayer';
 import CameraFeedCard from '@/components/live/CameraFeedCard';
 import ShareCameraLink from '@/components/live/ShareCameraLink';
 import EventLog from '@/components/live/EventLog';
@@ -442,6 +443,18 @@ export default function CoachingCockpit() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Video Overlay Player */}
+          <div className="glass rounded-xl p-4">
+            <div className="text-sm font-grotesk font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Video className="w-4 h-4 text-primary" />
+              Video + Overlay
+            </div>
+            <VideoOverlayPlayer
+              detections={playerList}
+              ball={ball}
+            />
           </div>
 
           {/* Live Pitch + Tracking */}
