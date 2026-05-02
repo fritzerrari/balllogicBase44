@@ -179,21 +179,40 @@ export default function CameraView() {
     canvas.width = 320; canvas.height = 180;
 
     const pushThumb = async () => {
-      const video = videoRef.current;
-      if (!video || video.readyState < 3) return; // Warte bis Video frame vorhanden ist
       try {
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, 320, 180);
-        const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
-        // Poll auch während waiting — finde Session unabhängig vom Status
-        const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
-        const fresh = sessions[0];
+        const video = videoRef.current;
+        if (!video || video.readyState < 2) return; // Warte bis Video vorhanden (auch ohne vollständig geladen)
+        
+        // Canvas render — mit Fehlerbehandlung
+        let thumbnail = null;
+        try {
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(video, 0, 0, 320, 180);
+          thumbnail = canvas.toDataURL('image/jpeg', 0.6); // 0.6 für bessere Qualität
+        } catch (canvasErr) {
+          // Canvas-Fehler? Ignorieren, nächster Versuch
+          return;
+        }
+
+        if (!thumbnail) return;
+
+        // Suche Session direkt nach ID — keine Status-Filter!
+        const allSessions = await base44.entities.LiveSession.list('-created_date', 100);
+        const fresh = allSessions.find(s => s.id === sessionId);
         if (!fresh) return;
+
+        // Update Kamera in dieser Session
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
-          String(cam.code).trim() === codeStr ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } : cam
+          String(cam.code).trim() === codeStr 
+            ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } 
+            : cam
         );
+
         await base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
-      } catch (_) {}
+      } catch (err) {
+        // Stiller Fehler — wird beim nächsten Interval versucht
+      }
     };
 
     // First push nach 1s (schnell für Trainer-Feedback)
