@@ -43,40 +43,49 @@ Deno.serve(async (req) => {
        if (tracking.player_positions.some(p => p.tracking_anonymize)) return;
 
        tracking.player_positions.forEach(player => {
-         // Use explicit player_id, fallback: number + team combo (not x/y which changes)
-         const playerId = player.player_id || `player_${player.team || 'unknown'}_${player.number || 'unknown'}`;
+          // Use explicit player_id, fallback: number + team combo (not x/y which changes)
+          const playerId = player.player_id || `player_${player.team || 'unknown'}_${player.number || 'unknown'}`;
 
-        if (!playerStats[playerId]) {
-          playerStats[playerId] = {
-            player_id: playerId,
-            positions: [],
-            total_distance_km: 0,
-            sprint_count: 0,
-            avg_x: 0,
-            avg_y: 0,
-            heatmap_grid: Array(100).fill(0),
-          };
-        }
+         if (!playerStats[playerId]) {
+           playerStats[playerId] = {
+             player_id: playerId,
+             team: player.team || 'unknown',
+             number: player.number,
+             positions: [],
+             speeds: [], // NEW: speed tracking
+             total_distance_km: 0,
+             total_distance_m: 0, // NEW: detailed distance
+             max_speed_kmh: 0, // NEW: peak speed
+             avg_speed_kmh: 0, // NEW: average speed
+             sprint_count: 0,
+             avg_x: 0,
+             avg_y: 0,
+             heatmap_grid: Array(100).fill(0),
+           };
+         }
 
-        playerStats[playerId].positions.push({
-          x: player.x,
-          y: player.y,
-          timestamp: tracking.timestamp_ms,
-        });
+         playerStats[playerId].positions.push({
+           x: player.x,
+           y: player.y,
+           timestamp: tracking.timestamp_ms,
+           speed: player.speed || 0, // NEW: from ReID tracking
+         });
 
-        // Heatmap-Grid update (10x10)
-        const gridX = Math.floor((player.x / 100) * 10);
-        const gridY = Math.floor((player.y / 100) * 10);
-        const gridIndex = gridY * 10 + gridX;
-        playerStats[playerId].heatmap_grid[gridIndex]++;
-      });
+         if (player.speed) playerStats[playerId].speeds.push(player.speed);
+
+         // Heatmap-Grid update (10x10)
+         const gridX = Math.floor((player.x / 100) * 10);
+         const gridY = Math.floor((player.y / 100) * 10);
+         const gridIndex = gridY * 10 + gridX;
+         playerStats[playerId].heatmap_grid[gridIndex]++;
+       });
     });
 
     // Berechne abgeleitete Metriken — OPTIMIERT: Single Pass wo möglich
     Object.values(playerStats).forEach(player => {
       if (player.positions.length < 2) return;
 
-      // Distance + Sprints + Avg Position: Single Loop (O(n) statt O(3n))
+      // Distance + Sprints + Avg Position + Speed: Single Loop (O(n))
       let distance = 0;
       let sprints = 0;
       let sumX = 0, sumY = 0;
@@ -84,10 +93,10 @@ Deno.serve(async (req) => {
       for (let i = 1; i < player.positions.length; i++) {
         const p1 = player.positions[i - 1];
         const p2 = player.positions[i];
-        const dx = ((p2.x - p1.x) / 100) * 105;
-        const dy = ((p2.y - p1.y) / 100) * 68;
+        const dx = ((p2.x - p1.x) / 100) * 105; // meters
+        const dy = ((p2.y - p1.y) / 100) * 68;  // meters
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const timeDiff = (p2.timestamp - p1.timestamp) / 1000;
+        const timeDiff = (p2.timestamp - p1.timestamp) / 1000; // seconds
 
         distance += dist;
         if (dist > 10 && timeDiff < 1) sprints++;
@@ -95,10 +104,17 @@ Deno.serve(async (req) => {
         sumY += p2.y;
       }
 
+      player.total_distance_m = Math.round(distance);
       player.total_distance_km = Math.round(distance / 1000 * 100) / 100;
       player.sprint_count = sprints;
       player.avg_x = Math.round(sumX / player.positions.length);
       player.avg_y = Math.round(sumY / player.positions.length);
+
+      // Speed metrics — from ReID tracking (speed in m/frame, convert to km/h)
+      if (player.speeds.length > 0) {
+        player.max_speed_kmh = Math.round(Math.max(...player.speeds) * 30 * 3.6 * 10) / 10; // 30fps framerate, m/frame → m/s → km/h
+        player.avg_speed_kmh = Math.round((player.speeds.reduce((a, b) => a + b, 0) / player.speeds.length) * 30 * 3.6 * 10) / 10;
+      }
 
       // Normalize Heatmap — Safety: avoid division by zero
       const maxHeat = Math.max(...player.heatmap_grid) || 1;
