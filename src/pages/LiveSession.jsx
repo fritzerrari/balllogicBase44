@@ -149,12 +149,17 @@ export default function LiveSession() {
     const s = await createSession.mutateAsync({
       match_title: sessionTitle,
       match_id: matchId,
-      status: 'active',
+      status: 'ready',
       half_time: 1,
       started_at: new Date().toISOString(),
       camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting', enabled: c.enabled !== false })),
     });
     setSession(s);
+  };
+
+  const handleLiveStart = async () => {
+    if (!session) return;
+    await updateSession.mutateAsync({ id: session.id, data: { status: 'active' } });
     setSessionActive(true);
     setElapsedTime(0);
   };
@@ -324,6 +329,67 @@ export default function LiveSession() {
       {/* ── SETUP PHASE ── */}
       {!sessionActive && (
         <div className="max-w-lg mx-auto space-y-3">
+          {/* Wenn Session bereit: Kameras + Funk + Live-Bilder anzeigen */}
+          {session && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur z-40 flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
+                <h2 className="font-grotesk font-bold text-lg text-foreground mb-4">Bereit zum starten</h2>
+                
+                {/* Kamera-Status + Live-Bilder Grid */}
+                <div className="mb-4 space-y-2">
+                  <div className="text-xs text-muted-foreground font-bold uppercase">Kameras bereit</div>
+                  <div className={`grid gap-2 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    {cameras.map(cam => {
+                      const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
+                      const isConnected = liveStream?.status === 'connected';
+                      const thumbnail = liveStream?.thumbnail;
+                      return (
+                        <div key={cam.id} className={`aspect-video rounded-lg border overflow-hidden relative flex flex-col items-center justify-center bg-black ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
+                          {thumbnail ? (
+                            <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover" />
+                          ) : (
+                            <div className="text-muted-foreground/50 text-xs text-center px-1">
+                              {isConnected ? 'Wird geladen...' : 'Wartet...'}
+                            </div>
+                          )}
+                          <div className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected ? 'bg-primary/80 text-primary-foreground' : 'bg-black/70 text-muted-foreground'}`}>
+                            <div className="flex items-center gap-1">
+                              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
+                              {isConnected ? 'LIVE' : 'WARTET'}
+                            </div>
+                          </div>
+                          <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium truncate bg-gradient-to-t from-black/80 to-transparent">
+                            {cam.label}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Funk — kommuniziere mit Kameras vor Start */}
+                <div className="mb-4 max-h-64 overflow-hidden rounded-xl border border-border">
+                  <FunkPanel sessionId={session.id} onClose={() => {}} />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setSession(null); setCameras([]); setCameraCount(1); }}
+                    className="flex-1">
+                    Zurück
+                  </Button>
+                  <Button onClick={handleLiveStart} className="flex-1 bg-primary text-primary-foreground gap-2 font-bold">
+                    <Play className="w-4 h-4" /> Live starten
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SETUP PHASE (Kamera Konfiguration) ── */}
+      {!sessionActive && !session && (
+        <div className="max-w-lg mx-auto space-y-3">
           {/* Step 1: Title — auto-filled */}
           <div className="glass rounded-xl p-5 space-y-3">
             <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
@@ -416,7 +482,7 @@ export default function LiveSession() {
             className="w-full bg-red-500 hover:bg-red-600 text-white gap-2 h-14 text-lg font-bold"
           >
             {createSession.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            Live starten
+            Weiter
           </Button>
         </div>
       )}
