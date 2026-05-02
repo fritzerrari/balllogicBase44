@@ -65,12 +65,6 @@ export default function CameraView() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [recentEvents, setRecentEvents] = useState([]);
 
-  // Orientation detection
-  const { orientation, isPortrait } = useDeviceOrientation(videoRef);
-
-  // Camera Heartbeat — sendet Status an LiveSession
-  useCameraHeartbeat(sessionInfo?.id, sessionCodeRef.current, camLabel, step === 'live');
-
   // Refs — use refs for values used inside intervals/callbacks to avoid stale closures
   const videoRef         = useRef(null);
   const streamRef        = useRef(null);
@@ -86,6 +80,12 @@ export default function CameraView() {
   const lastEventTimeRef = useRef({});
   const thumbIntervalRef = useRef(null);
   const stepRef          = useRef('enter');
+
+  // Orientation detection (nach videoRef init)
+  const { orientation, isPortrait } = useDeviceOrientation(videoRef);
+
+  // Camera Heartbeat — sendet Status an LiveSession
+  useCameraHeartbeat(sessionInfo?.id, sessionCodeRef.current, camLabel, step === 'live');
 
   // Keep refs in sync
   useEffect(() => { uptimeValueRef.current = uptime; }, [uptime]);
