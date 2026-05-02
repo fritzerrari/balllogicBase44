@@ -28,6 +28,7 @@ import CameraFeedCard from '@/components/live/CameraFeedCard';
 import ShareCameraLink from '@/components/live/ShareCameraLink';
 import EventLog from '@/components/live/EventLog';
 import LiveStats from '@/components/live/LiveStats';
+import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import {
   detectFrame,
   assignTeamsByColor,
@@ -53,6 +54,9 @@ export default function CoachingCockpit() {
   const [showTracking, setShowTracking] = useState(true);
   const [copiedCode, setCopiedCode] = useState(null);
   const [showApiSetup, setShowApiSetup] = useState(false);
+  const [showDsgvo, setShowDsgvo] = useState(false);
+  // DSGVO-Gate: Tracking nur starten wenn Einwilligung geprüft oder bestätigt
+  const [trackingUnlocked, setTrackingUnlocked] = useState(false);
 
   // Tracking state
   const [trackingMode, setTrackingMode] = useState('simulation'); // 'simulation' | 'roboflow'
@@ -71,7 +75,12 @@ export default function CoachingCockpit() {
   const detectionIntervalRef = useRef(null);
   const simIntervalRef = useRef(null);
 
-  // ── Load sessions ──────────────────────────────────────────────────────────
+  // ── Load sessions + players (für DSGVO) ────────────────────────────────────
+  const { data: players = [] } = useQuery({
+    queryKey: ['players'],
+    queryFn: () => base44.entities.Player.list('-created_date', 100),
+  });
+
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
@@ -181,11 +190,31 @@ export default function CoachingCockpit() {
 
   const handleActivateRoboflow = () => {
     if (!apiKeyInput.trim()) return;
+    // DSGVO-Check: Warnen wenn Spieler mit ausstehender Einwilligung vorhanden
+    const pendingConsent = players.filter(p =>
+      !p.tracking_consent || p.tracking_consent === 'pending' || p.tracking_consent === 'guardian_required'
+    );
+    if (pendingConsent.length > 0 && !trackingUnlocked) {
+      setShowDsgvo(true);
+      return;
+    }
     setApiKey(apiKeyInput.trim());
     setTrackingMode('roboflow');
     setShowApiSetup(false);
     clearInterval(simIntervalRef.current);
     startRoboflowTracking(apiKeyInput.trim());
+  };
+
+  const handleDsgvoConfirm = () => {
+    setTrackingUnlocked(true);
+    setShowDsgvo(false);
+    if (apiKeyInput.trim()) {
+      setApiKey(apiKeyInput.trim());
+      setTrackingMode('roboflow');
+      setShowApiSetup(false);
+      clearInterval(simIntervalRef.current);
+      startRoboflowTracking(apiKeyInput.trim());
+    }
   };
 
   const handleSwitchToSim = () => {
@@ -245,7 +274,14 @@ export default function CoachingCockpit() {
             <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">{activeSession.match_title}</Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* DSGVO Button */}
+          <button
+            onClick={() => setShowDsgvo(true)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1"
+          >
+            <Shield className="w-3.5 h-3.5" /> DSGVO
+          </button>
           {/* Tracking mode toggle */}
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <button
@@ -501,6 +537,28 @@ export default function CoachingCockpit() {
       <AnimatePresence>
         {showShare && (
           <ShareCameraLink cam={showShare} liveUrl={liveUrl} onClose={() => setShowShare(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* DSGVO Manager Modal */}
+      <AnimatePresence>
+        {showDsgvo && (
+          <div>
+            <DsgvoConsentManager players={players} onClose={() => setShowDsgvo(false)} />
+            {/* Bestätigungs-Banner wenn Roboflow aktiviert werden soll */}
+            {apiKeyInput.trim() && !trackingUnlocked && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] glass rounded-2xl p-4 border border-primary/30 shadow-2xl flex items-center gap-4 max-w-sm w-full mx-4">
+                <Shield className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-foreground">Einwilligungen geprüft?</div>
+                  <div className="text-xs text-muted-foreground">Tracking starten wenn alle Einwilligungen erteilt oder anonymisiert</div>
+                </div>
+                <Button size="sm" onClick={handleDsgvoConfirm} className="bg-primary text-primary-foreground">
+                  Starten
+                </Button>
+              </div>
+            )}
+          </div>
         )}
       </AnimatePresence>
     </div>

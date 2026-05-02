@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Zap, BarChart3, Video, Clock, Camera } from 'lucide-react';
+import { ArrowLeft, Loader2, Zap, BarChart3, Video, Clock, Camera, Upload, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -24,6 +24,9 @@ export default function MatchDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [analyzing, setAnalyzing] = useState(false);
+  const [showVideoUpload, setShowVideoUpload] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const { data: match, isLoading } = useQuery({
     queryKey: ['match', id],
@@ -47,6 +50,22 @@ export default function MatchDetail() {
     mutationFn: (data) => base44.entities.AnalysisReport.create(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['report', id] }),
   });
+
+  const handleVideoUpload = async () => {
+    if (!uploadFiles.length) return;
+    setUploading(true);
+    const newUrls = [];
+    for (const file of uploadFiles) {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      newUrls.push(file_url);
+    }
+    const combined = [...(match.video_urls || []), ...newUrls];
+    await updateMutation.mutateAsync({ video_urls: combined, camera_count: combined.length });
+    setUploadFiles([]);
+    setShowVideoUpload(false);
+    toast({ title: `${newUrls.length} Video(s) hochgeladen!` });
+    setUploading(false);
+  };
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -207,14 +226,27 @@ Die Analyse soll für einen Profi-Trainer nützlich sein.`;
           </div>
         </div>
 
-        {/* Videos */}
-        {match.video_urls?.length > 0 && (
-          <div className="glass rounded-xl p-5 mb-6">
-            <div className="flex items-center gap-2 mb-3">
+        {/* Videos + nachträglicher Upload */}
+        <div className="glass rounded-xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
               <Camera className="w-4 h-4 text-primary" />
-              <h2 className="font-grotesk font-semibold text-foreground">{match.video_urls.length} Kamera-Perspektive{match.video_urls.length > 1 ? 'n' : ''}</h2>
+              <h2 className="font-grotesk font-semibold text-foreground">
+                {match.video_urls?.length > 0
+                  ? `${match.video_urls.length} Kamera-Perspektive${match.video_urls.length > 1 ? 'n' : ''}`
+                  : 'Videos'}
+              </h2>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setShowVideoUpload(v => !v)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" /> Video hochladen
+            </button>
+          </div>
+
+          {match.video_urls?.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 mb-3">
               {match.video_urls.map((url, i) => (
                 <div key={i} className="bg-muted rounded-lg p-3 flex items-center gap-2">
                   <Video className="w-4 h-4 text-muted-foreground" />
@@ -223,8 +255,43 @@ Die Analyse soll für einen Profi-Trainer nützlich sein.`;
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-muted-foreground mb-3">Noch keine Videos hochgeladen.</p>
+          )}
+
+          {/* Upload-Bereich (optional, ausblendbar) */}
+          {showVideoUpload && (
+            <div className="border-t border-border pt-3 space-y-3">
+              <label className="block cursor-pointer">
+                <div className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-primary/40 transition-all">
+                  <Upload className="w-7 h-7 text-muted-foreground mx-auto mb-1.5" />
+                  <div className="text-sm text-foreground font-medium">MP4, MOV, AVI auswählen</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Mehrere Kameraperspektiven möglich</div>
+                </div>
+                <input type="file" multiple accept="video/*" className="hidden"
+                  onChange={e => setUploadFiles(prev => [...prev, ...Array.from(e.target.files)])} />
+              </label>
+              {uploadFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {uploadFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-xs">
+                      <Video className="w-3.5 h-3.5 text-primary" />
+                      <span className="flex-1 truncate">{f.name}</span>
+                      <button onClick={() => setUploadFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                        <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                  <Button onClick={handleVideoUpload} disabled={uploading} size="sm"
+                    className="bg-primary text-primary-foreground gap-2 w-full">
+                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {uploading ? 'Lädt hoch...' : `${uploadFiles.length} Video(s) hochladen`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="grid sm:grid-cols-2 gap-4">

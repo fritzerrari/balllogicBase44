@@ -45,6 +45,31 @@
     },
     "avatar_url": {
       "type": "string"
+    },
+    "tracking_consent": {
+      "type": "string",
+      "enum": [
+        "granted",
+        "denied",
+        "pending",
+        "guardian_required"
+      ],
+      "default": "pending",
+      "description": "DSGVO-Einwilligung f\u00fcr KI-Tracking. Minderj\u00e4hrige (<18): guardian_required bis Erziehungsberechtigte zustimmen."
+    },
+    "tracking_consent_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Datum der Einwilligungserteilung"
+    },
+    "tracking_anonymize": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wenn true: Spieler wird im Tracking anonym behandelt (kein Name, zuf\u00e4llige ID). F\u00fcr DSGVO-Konformit\u00e4t ohne Einwilligung."
+    },
+    "guardian_email": {
+      "type": "string",
+      "description": "E-Mail Erziehungsberechtigter (bei Minderj\u00e4hrigen)"
     }
   },
   "required": [

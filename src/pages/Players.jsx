@@ -8,9 +8,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Plus, X, Zap, Loader2,
-  TrendingUp, Target, ChevronRight, User, Award, BarChart3,
-  Search, ChevronLeft
+  TrendingUp, Target, ChevronRight, Award, BarChart3,
+  Search, ChevronLeft, Shield
 } from 'lucide-react';
+import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,7 @@ export default function Players() {
   const [form, setForm] = useState({ name: '', number: '', position: POSITIONS[4], team: '' });
   const [generatingFeedback, setGeneratingFeedback] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDsgvo, setShowDsgvo] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -151,9 +153,15 @@ Fokus: Stärken, Entwicklungspotenzial, eine konkrete Trainingsempfehlung.`,
           <h1 className="text-2xl lg:text-3xl font-grotesk font-bold text-foreground">Kader</h1>
           <p className="text-muted-foreground text-xs mt-0.5">{players.length} Spieler · Performance-Tracking</p>
         </div>
-        <Button onClick={() => setView('add')} className="bg-primary text-primary-foreground gap-2 shrink-0">
-          <Plus className="w-4 h-4" /> Spieler
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setShowDsgvo(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-bold">
+            <Shield className="w-3.5 h-3.5" /> DSGVO
+          </button>
+          <Button onClick={() => setView('add')} className="bg-primary text-primary-foreground gap-2">
+            <Plus className="w-4 h-4" /> Spieler
+          </Button>
+        </div>
       </motion.div>
 
       {/* Search */}
@@ -200,6 +208,11 @@ Fokus: Stärken, Entwicklungspotenzial, eine konkrete Trainingsempfehlung.`,
           ))}
         </div>
       )}
+
+      {/* DSGVO Manager */}
+      <AnimatePresence>
+        {showDsgvo && <DsgvoConsentManager players={players} onClose={() => setShowDsgvo(false)} />}
+      </AnimatePresence>
     </div>
   );
 

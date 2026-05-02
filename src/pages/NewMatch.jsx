@@ -17,8 +17,7 @@ import LineupBuilder from '@/components/players/LineupBuilder';
 
 const STEPS = [
   { id: 1, label: 'Spieldaten', icon: Zap },
-  { id: 2, label: 'Videos', icon: Upload },
-  { id: 3, label: 'Aufstellung', icon: Users },
+  { id: 2, label: 'Aufstellung', icon: Users },
 ];
 
 const POSITIONS = ['Torwart', 'Innenverteidiger', 'Außenverteidiger', 'Defensives Mittelfeld', 'Zentrales Mittelfeld', 'Offensives Mittelfeld', 'Linksaußen', 'Rechtsaußen', 'Mittelstürmer'];
@@ -35,7 +34,8 @@ export default function NewMatch() {
   const [apiSearch, setApiSearch] = useState({ loading: false, result: null, error: null });
   const [apiMatches, setApiMatches] = useState([]);
 
-  // Step 2 — Videos
+  // Step 2 — Videos (optional, standardmäßig ausgeblendet)
+  const [showVideoStep, setShowVideoStep] = useState(false);
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadedUrls, setUploadedUrls] = useState([]);
@@ -111,6 +111,7 @@ export default function NewMatch() {
   };
 
   const canNext1 = form.title && form.date && form.home_team && form.away_team;
+  const canNext2 = true; // Aufstellung ist optional
 
   return (
     <div className="p-4 lg:p-8 min-h-screen max-w-2xl mx-auto">
@@ -213,57 +214,54 @@ export default function NewMatch() {
                 </div>
               </div>
             </div>
-            <Button onClick={() => setStep(2)} disabled={!canNext1} className="w-full bg-primary text-primary-foreground gap-2 h-12">
+            {/* Optionaler Video-Upload — ausblendbar */}
+            <div className="mt-3">
+              <button
+                onClick={() => setShowVideoStep(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-muted/50 border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+              >
+                <span className="flex items-center gap-2">
+                  <Upload className="w-3.5 h-3.5" />
+                  {showVideoStep ? 'Videos ausblenden' : 'Videos vorab hochladen (optional)'}
+                </span>
+                <span>{showVideoStep ? '▲' : '▼'}</span>
+              </button>
+              {showVideoStep && (
+                <div className="mt-2 glass rounded-xl p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">Videos können auch jederzeit nachträglich in der Spieldetailseite hochgeladen werden.</p>
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-primary/40 transition-all">
+                      <Upload className="w-7 h-7 text-muted-foreground mx-auto mb-1" />
+                      <div className="text-sm text-foreground font-medium">MP4, MOV, AVI auswählen</div>
+                    </div>
+                    <input type="file" multiple accept="video/*" className="hidden"
+                      onChange={e => setFiles(Array.from(e.target.files))} />
+                  </label>
+                  {files.length > 0 && (
+                    <div className="space-y-1.5">
+                      {files.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-xs">
+                          <Camera className="w-3.5 h-3.5 text-primary" />
+                          <span className="flex-1 truncate">{f.name}</span>
+                          <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                            <X className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Button onClick={() => setStep(2)} disabled={!canNext1} className="w-full bg-primary text-primary-foreground gap-2 h-12 mt-4">
               Weiter <ArrowRight className="w-4 h-4" />
             </Button>
           </motion.div>
         )}
 
-        {/* ── STEP 2: Videos ── */}
+        {/* ── STEP 2: Aufstellung ── */}
         {step === 2 && (
-          <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-            <div className="glass rounded-xl p-5 mb-4">
-              <h2 className="font-grotesk font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-primary" /> Spielvideos hochladen
-              </h2>
-              <p className="text-xs text-muted-foreground mb-4">Optional — du kannst Videos auch später hochladen.</p>
-
-              <label className="block">
-                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 transition-all">
-                  <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                  <div className="text-sm text-foreground font-medium">Videos hier ablegen</div>
-                  <div className="text-xs text-muted-foreground mt-1">MP4, MOV, AVI — Mehrere Kameras möglich</div>
-                </div>
-                <input type="file" multiple accept="video/*" className="hidden"
-                  onChange={e => setFiles(Array.from(e.target.files))} />
-              </label>
-
-              {files.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {files.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-xs">
-                      <Camera className="w-3.5 h-3.5 text-primary" />
-                      <span className="flex-1 truncate">{f.name}</span>
-                      <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))}><X className="w-3.5 h-3.5 text-muted-foreground" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(1)} className="flex-1 border-border text-muted-foreground">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Zurück
-              </Button>
-              <Button onClick={handleUpload} disabled={uploading} className="flex-1 bg-primary text-primary-foreground gap-2">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {uploading ? 'Lädt hoch...' : files.length > 0 ? 'Hochladen & Weiter' : 'Überspringen'}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── STEP 3: Aufstellung ── */}
-        {step === 3 && (
           <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
             <div className="glass rounded-xl p-5 mb-4 space-y-6">
               <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
@@ -288,7 +286,7 @@ export default function NewMatch() {
               />
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(2)} className="flex-1 border-border text-muted-foreground">
+              <Button variant="outline" onClick={() => setStep(1)} className="flex-1 border-border text-muted-foreground">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Zurück
               </Button>
               <Button onClick={handleSave} disabled={saving} className="flex-1 bg-primary text-primary-foreground gap-2">
