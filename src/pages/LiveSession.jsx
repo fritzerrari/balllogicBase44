@@ -368,13 +368,13 @@ export default function LiveSession() {
                               {isConnected ? 'LIVE' : 'WARTET'}
                             </div>
                           </div>
-                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center gap-1">
+                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center gap-1.5">
+                            <CameraInviteButton code={cam.code} position={cam.label} />
                             <button onClick={() => deleteCamera(cam.id)}
-                              className="w-6 h-6 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-xs font-bold transition-all"
+                              className="w-7 h-7 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-sm font-bold transition-all"
                               title="Kamera löschen">
                               ✕
                             </button>
-                            <CameraInviteButton code={cam.code} position={cam.label} />
                           </div>
                           <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium bg-gradient-to-t from-black/80 to-transparent">
                             <div className="truncate">{cam.label}</div>
