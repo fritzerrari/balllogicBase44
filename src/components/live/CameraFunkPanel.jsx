@@ -20,20 +20,7 @@ function vibrate() {
   if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
 }
 
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  } catch (_) {}
-}
+// Beep entfernt — nur Vibration als Warning
 
 export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
   const [messages, setMessages] = useState([]);
@@ -66,8 +53,7 @@ export default function CameraFunkPanel({ sessionId, camLabel, onClose }) {
         if (newFromCoach > seenCountRef.current && !expanded) {
           const diff = newFromCoach - seenCountRef.current;
           setUnread(diff);
-          vibrate();
-          playBeep();
+          vibrate(); // nur stille Vibration, kein Beep
         }
         if (expanded) {
           seenCountRef.current = newFromCoach;

@@ -291,7 +291,7 @@ export default function LiveSession() {
 
   return (
     <div className="p-4 lg:p-8 min-h-screen">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 mb-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 mb-4 flex-wrap">
         <Radio className="w-4 h-4 text-red-400" />
         <h1 className="text-xl sm:text-2xl font-grotesk font-bold text-foreground">Live-Session</h1>
         {sessionActive && (
@@ -302,6 +302,7 @@ export default function LiveSession() {
             {halfTime}. HZ · {gameMinute}'
           </Badge>
         )}
+        {/* PTT-Status wird im Funk-Panel angezeigt */}
       </motion.div>
 
       {/* ── HALBZEIT ALERT ── */}

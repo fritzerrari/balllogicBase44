@@ -82,9 +82,11 @@ export default function FunkPanel({ sessionId, onClose }) {
           <Radio className="w-4 h-4 text-primary" />
           <span className="font-grotesk font-bold text-sm text-foreground">Funk-Kanal</span>
           {activeSpeaker && (
-            <span className="flex items-center gap-1 bg-primary/15 border border-primary/30 text-primary text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary" /> {activeSpeaker} spricht
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1 bg-primary/15 border border-primary/30 text-primary text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" /> {activeSpeaker} spricht
+              </span>
+            </div>
           )}
         </div>
         {onClose && (
@@ -125,6 +127,13 @@ export default function FunkPanel({ sessionId, onClose }) {
           );
         })}
       </div>
+
+      {/* Waveform wenn Kamera spricht */}
+      {activeSpeaker && (
+        <div className="px-3 py-1.5 border-t border-border/30 bg-primary/5">
+          <AudioWaveform isActive={true} />
+        </div>
+      )}
 
       {/* Input */}
       <div className="px-3 py-3 border-t border-border space-y-2">
