@@ -1,0 +1,75 @@
+{
+  "name": "AutoEvent",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Referenz zu LiveSession"
+    },
+    "match_id": {
+      "type": "string"
+    },
+    "tracking_data_id": {
+      "type": "string",
+      "description": "Welche TrackingData hat Event erkannt"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ball_in_penalty_area",
+        "ball_in_goal_area",
+        "player_offside",
+        "high_speed_transition",
+        "ball_lost",
+        "possession_change",
+        "dangerous_situation"
+      ],
+      "description": "Auto-erkanntes Event-Typ"
+    },
+    "team": {
+      "type": "string",
+      "enum": [
+        "home",
+        "away",
+        "unknown"
+      ]
+    },
+    "minute": {
+      "type": "number"
+    },
+    "elapsed_seconds": {
+      "type": "number"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "0-100 Erkennungssicherheit"
+    },
+    "description": {
+      "type": "string",
+      "description": "Generierte Beschreibung des Events"
+    },
+    "data": {
+      "type": "object",
+      "description": "Rohe Detection-Daten (Positionen, etc.)"
+    },
+    "approved_by_trainer": {
+      "type": "boolean",
+      "default": false,
+      "description": "Hat Trainer manuell best\u00e4tigt?"
+    },
+    "rejected": {
+      "type": "boolean",
+      "default": false,
+      "description": "False positive?"
+    },
+    "timestamp_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "session_id",
+    "type",
+    "confidence",
+    "timestamp_ms"
+  ]
+}

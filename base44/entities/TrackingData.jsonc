@@ -1,0 +1,97 @@
+{
+  "name": "TrackingData",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Referenz zu LiveSession"
+    },
+    "match_id": {
+      "type": "string",
+      "description": "Referenz zu Match"
+    },
+    "frame_number": {
+      "type": "number",
+      "description": "Frame-Index im Video"
+    },
+    "timestamp_ms": {
+      "type": "number",
+      "description": "Unix-Timestamp (Spielzeit)"
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "description": "Sekunden seit Session-Start"
+    },
+    "ball_position": {
+      "type": "object",
+      "description": "Ball XY-Koordinaten + Konfidenz",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number"
+        }
+      }
+    },
+    "player_positions": {
+      "type": "array",
+      "description": "Array aller erkannten Spieler",
+      "items": {
+        "type": "object",
+        "properties": {
+          "player_id": {
+            "type": "string"
+          },
+          "team": {
+            "type": "string",
+            "enum": [
+              "home",
+              "away"
+            ]
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "detection_quality": {
+      "type": "number",
+      "description": "0-100 Gesamterkennungsqualit\u00e4t"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "roboflow",
+        "manual",
+        "hybrid"
+      ],
+      "description": "Erkennungsquelle"
+    },
+    "error": {
+      "type": "string",
+      "description": "Fehlermeldung falls Detection fehlgeschlagen"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Wie oft wurde Retry versucht"
+    }
+  },
+  "required": [
+    "session_id",
+    "frame_number",
+    "timestamp_ms",
+    "source"
+  ]
+}
