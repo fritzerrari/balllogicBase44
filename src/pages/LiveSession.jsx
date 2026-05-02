@@ -122,6 +122,7 @@ export default function LiveSession() {
   };
 
   // ── Start (Setup → Create Session für Funk) ────────────────────────────────
+  // ── Start ─────────────────────────────────────────────────────────────────
   const handleStart = async () => {
     // Validierungen
     if (!sessionTitle) return;
@@ -148,19 +149,12 @@ export default function LiveSession() {
     const s = await createSession.mutateAsync({
       match_title: sessionTitle,
       match_id: matchId,
-      status: 'ready', // 'ready' statt 'active' — Funk funktioniert schon, aber Uptime läuft noch nicht
+      status: 'active',
       half_time: 1,
       started_at: new Date().toISOString(),
       camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting', enabled: c.enabled !== false })),
     });
     setSession(s);
-    // Starte nur UI, noch nicht Live (Timer fängt erst bei handleLiveStart an)
-  };
-
-  const handleLiveStart = async () => {
-    if (!session) return;
-    // Jetzt: status auf 'active' setzen + Timer starten
-    await updateSession.mutateAsync({ id: session.id, data: { status: 'active' } });
     setSessionActive(true);
     setElapsedTime(0);
   };
@@ -330,54 +324,6 @@ export default function LiveSession() {
       {/* ── SETUP PHASE ── */}
       {!sessionActive && (
         <div className="max-w-lg mx-auto space-y-3">
-          {/* Wenn Session bereit: Kameras + Funk schon anzeigen */}
-          {session && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur z-40 flex items-center justify-center p-4">
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-6 w-full max-w-md border border-border">
-                <h2 className="font-grotesk font-bold text-lg text-foreground mb-4">Bereit zum starten</h2>
-                
-                {/* Kamera-Status Grid */}
-                <div className="mb-4 p-4 rounded-xl bg-muted/50">
-                  <div className="text-xs text-muted-foreground font-bold mb-2 uppercase">Kameras bereit</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {cameras.map(cam => {
-                      const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
-                      const isConnected = liveStream?.status === 'connected';
-                      return (
-                        <div key={cam.id} className={`px-3 py-2 rounded-lg border text-xs font-medium flex items-center gap-2 ${
-                          isConnected ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-muted border-border text-muted-foreground'
-                        }`}>
-                          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-primary animate-pulse' : 'bg-muted-foreground'}`} />
-                          {cam.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Funk */}
-                <div className="mb-4 max-h-48 overflow-hidden rounded-xl border border-border">
-                  <FunkPanel sessionId={session.id} onClose={() => {}} />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => { setSession(null); setCameras([]); setCameraCount(1); }}
-                    className="flex-1">
-                    Zurück
-                  </Button>
-                  <Button onClick={handleLiveStart} className="flex-1 bg-primary text-primary-foreground gap-2 font-bold">
-                    <Play className="w-4 h-4" /> Live starten
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── SETUP PHASE (Kamera Konfiguration) ── */}
-      {!sessionActive && !session && (
-        <div className="max-w-lg mx-auto space-y-3">
           {/* Step 1: Title — auto-filled */}
           <div className="glass rounded-xl p-5 space-y-3">
             <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
@@ -470,15 +416,8 @@ export default function LiveSession() {
             className="w-full bg-red-500 hover:bg-red-600 text-white gap-2 h-14 text-lg font-bold"
           >
             {createSession.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            Weiter
+            Live starten
           </Button>
-        </div>
-      )}
-
-      {/* ── LIVE STATUS POLLING (während Setup + Live) ── */}
-      {session && (
-        <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
-          {/* Invisible element nur für Polling */}
         </div>
       )}
 
