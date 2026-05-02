@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import CameraFunkPanel from '@/components/live/CameraFunkPanel';
 
 const DIGITS = 6;
-const POLL_INTERVAL_MS = 3000;
-const HEARTBEAT_INTERVAL_MS = 10000;
+const POLL_INTERVAL_MS = 5000; // Reduziert von 3s auf 5s
+const HEARTBEAT_INTERVAL_MS = 15000; // Reduziert von 10s auf 15s
 
 const QUICK_EVENTS = [
   { key: 'goal',        label: 'TOR',     icon: '⚽', color: 'bg-primary/90 text-primary-foreground' },
@@ -315,10 +315,8 @@ export default function CameraView() {
     const poll = async () => {
       count++;
       try {
-        // Akzeptiere both 'ready' und 'active' Sessions — Trainer muss erst "Live starten" klicken
-        const sessionsReady = await base44.entities.LiveSession.filter({ status: 'ready' });
-        const sessionsActive = await base44.entities.LiveSession.filter({ status: 'active' });
-        const allSessions = [...sessionsReady, ...sessionsActive];
+        // Batch-Anfrage: beide Status in einer Liste
+        const allSessions = await base44.entities.LiveSession.list('-created_date', 100);
         const matched = allSessions.find(s => matchCode(s, codeStr));
         if (matched) {
           clearInterval(pollRef.current);
@@ -336,14 +334,15 @@ export default function CameraView() {
             setUptime(t => t + 1);
           }, 1000);
           startHeartbeat(matched, codeStr);
-          const src = cam?.label ? `camera_${cam.label}` : 'camera_1';
-          startAudioDetection(matched.id, matched.match_title, src);
+          // Audio-Detection deaktiviert (verursacht Rate-Limiting)
+          // const src = cam?.label ? `camera_${cam.label}` : 'camera_1';
+          // startAudioDetection(matched.id, matched.match_title, src);
           startThumbnailPush(matched.id, codeStr);
           return;
         }
         setWaitMsg(count < 10
-          ? `Warte auf Session... (${count * 3}s)`
-          : `Warte auf Trainer. (${Math.round(count * 3 / 60)}min gewartet)`
+          ? `Warte auf Session... (${count * 5}s)`
+          : `Warte auf Trainer. (${Math.round(count * 5 / 60)}min gewartet)`
         );
       } catch (_) {
         setWaitMsg('Verbindungsproblem — wird wiederholt...');

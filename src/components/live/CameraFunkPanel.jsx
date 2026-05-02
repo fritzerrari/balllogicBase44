@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Radio, Send, Mic, MicOff, ChevronDown, X } from 'lucide-react';
 import AudioWaveform from './AudioWaveform';
 
-const POLL_MS = 2000;
+const POLL_MS = 4000; // Reduziert von 2s auf 4s
 const MAX_MSGS = 20;
 const QUICK_REPLIES = ['👍 OK', '🔄 Wiederholen', '⚠️ Problem', '📍 Position?'];
 
