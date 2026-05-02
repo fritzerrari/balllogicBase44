@@ -29,13 +29,14 @@ const DEDUP_WINDOW_MS = 10000;
 /**
  * @param {object} props
  * @param {string} props.sessionId
+ * @param {string} props.matchId - Match-ID (optional, aber wichtig für Reporting!)
  * @param {string} props.matchTitle
  * @param {string} props.source - 'coach' | 'camera_1' | 'camera_2' etc.
  * @param {number} props.elapsedSeconds - Spielzeit in Sekunden
  * @param {boolean} props.compact - kleine Version (für Mobile)
  * @param {string[]} props.visibleEvents - welche Buttons zeigen (undefined = alle)
  */
-export default function EventButtons({ sessionId, matchTitle, source = 'coach', elapsedSeconds = 0, compact = false, visibleEvents, onEventLogged }) {
+export default function EventButtons({ sessionId, matchId, matchTitle, source = 'coach', elapsedSeconds = 0, compact = false, visibleEvents, onEventLogged }) {
   const [localEvents, setLocalEvents] = useState([]);
   const [flash, setFlash] = useState(null);
   const [showTeamPicker, setShowTeamPicker] = useState(null); // { evt, resolve }
@@ -70,6 +71,7 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
 
     const eventData = {
       session_id: sessionId,
+      match_id: matchId || null,
       match_title: matchTitle || '',
       type: evt.key,
       team,

@@ -515,6 +515,7 @@ export default function LiveSession() {
               <div className="text-xs text-muted-foreground uppercase tracking-wide font-bold mb-2.5">Event tippen</div>
               <EventButtons
                 sessionId={session?.id}
+                matchId={session?.match_id}
                 matchTitle={sessionTitle}
                 source="coach"
                 elapsedSeconds={elapsedTime}
