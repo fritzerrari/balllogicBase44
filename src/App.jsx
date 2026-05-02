@@ -30,6 +30,8 @@ import EventReview from './pages/EventReview.jsx';
 import TacticsBoard from './pages/TacticsBoard.jsx';
 import SessionReports from './pages/SessionReports.jsx';
 import AnalyticsCockpit from './pages/AnalyticsCockpit.jsx';
+import AdminManual from './pages/AdminManual.jsx';
+import AdminDemo from './pages/AdminDemo.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -77,6 +79,8 @@ const AuthenticatedApp = () => {
         <Route path="/analytics" element={<AnalyticsCockpit />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/docs" element={<AdminDocs />} />
+        <Route path="/admin/manual" element={<AdminManual />} />
+        <Route path="/admin/demo" element={<AdminDemo />} />
       </Route>
       {/* Public camera page — no login required */}
       <Route path="/cam" element={<CameraView />} />
