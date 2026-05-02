@@ -57,12 +57,19 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
   };
 
   const tapEvent = async (evt, team = 'unknown') => {
+    // VALIDATION: Session erforderlich
+    if (!sessionId) {
+      setFlash({ key: evt.key, isDuplicate: false, message: '❌ Keine aktive Session' });
+      setTimeout(() => setFlash(null), 1200);
+      return;
+    }
+
     const gameMinute = Math.floor(elapsedSeconds / 60);
     const isDuplicate = checkDuplicate(evt.key, team, gameMinute);
     const now = Date.now();
 
     const eventData = {
-      session_id: sessionId || 'local',
+      session_id: sessionId,
       match_title: matchTitle || '',
       type: evt.key,
       team,
@@ -85,9 +92,7 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
     setTimeout(() => setFlash(null), isDuplicate ? 1200 : 800);
 
     // In DB speichern (non-blocking)
-    if (sessionId) {
-      base44.entities.MatchEvent.create(eventData).catch(() => {});
-    }
+    base44.entities.MatchEvent.create(eventData).catch(() => {});
     if (onEventLogged) onEventLogged();
   };
 
@@ -183,7 +188,9 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
           <button
             key={evt.key}
             onClick={() => handleEventClick(evt)}
-            className={`${compact ? 'py-3 text-xs' : 'py-4 text-sm'} rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 select-none touch-manipulation ${evt.color}`}
+            disabled={!sessionId}
+            className={`${compact ? 'py-3 text-xs' : 'py-4 text-sm'} rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 select-none touch-manipulation ${evt.color} ${!sessionId ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={!sessionId ? 'Starten Sie zuerst eine Live-Session' : ''}
           >
             <span className={compact ? 'text-xl' : 'text-2xl'}>{evt.icon}</span>
             <span>{evt.label}</span>
