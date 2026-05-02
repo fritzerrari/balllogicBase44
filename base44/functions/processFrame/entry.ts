@@ -12,11 +12,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
-const API_TIMEOUT_MS = 8000; // Timeout nach 8s
-const MAX_RETRIES = 3;
-const RETRY_BACKOFF_MS = [500, 1500, 3000]; // Exponential backoff
-const CIRCUIT_BREAKER_THRESHOLD = 5; // Failure threshold
-const CIRCUIT_BREAKER_RESET_MS = 60000; // Reset nach 60s
+const API_TIMEOUT_MS = 3000; // Timeout nach 3s (fast fail)
+const MAX_RETRIES = 2;
+const RETRY_BACKOFF_MS = [200, 500]; // Schneller backoff
+const CIRCUIT_BREAKER_THRESHOLD = 10; // 10 failures before open
+const CIRCUIT_BREAKER_RESET_MS = 30000; // Reset nach 30s
 
 // CRITICAL FIX: Circuit Breaker MUST be per-session, NOT global
 // Otherwise Trainer A's API errors block Trainer B's session

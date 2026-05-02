@@ -12,33 +12,45 @@ function detectFormationFromPositions(homePositions, awayPositions) {
 
   for (const [team, positions] of [['home', homePositions], ['away', awayPositions]]) {
     if (!positions || positions.length < 6) {
-      formations[team] = 'unknown';
+      formations[team] = { formation: 'unknown', confidence: 0 };
       continue;
     }
 
     // Sortiere nach Y-Position (0=Torwart hinten, 100=Stürmer vorne)
     const sortedByY = [...positions].sort((a, b) => a.y - b.y);
 
-    // Teile in 4 Zonen auf (Torwart, Abwehr, Mittelfeld, Angriff)
+    // Flexible Zonen-Grenzen für Robustheit
+    const avg_y = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    const half_field = avg_y / 2;
+    
     const goalkeeper = sortedByY.slice(0, 1);
-    const defenders = sortedByY.filter(p => p.y >= 5 && p.y <= 35);
-    const midfielders = sortedByY.filter(p => p.y > 35 && p.y <= 70);
-    const forwards = sortedByY.filter(p => p.y > 70);
+    const defenders = sortedByY.filter(p => p.y >= 0 && p.y <= 30);
+    const midfielders = sortedByY.filter(p => p.y > 30 && p.y <= 65);
+    const forwards = sortedByY.filter(p => p.y > 65);
 
-    const defCount = defenders.length;
-    const midCount = midfielders.length;
-    const fwdCount = forwards.length;
+    const defCount = Math.max(1, defenders.length);
+    const midCount = Math.max(0, midfielders.length);
+    const fwdCount = Math.max(1, forwards.length);
 
-    // Mapping zu bekannten Formationen
+    // Intelligente Heuristik statt exakte Matches
     let formation = 'unknown';
-    if (defCount === 4 && midCount === 4 && fwdCount === 2) formation = '4-4-2';
-    else if (defCount === 4 && midCount === 3 && fwdCount === 3) formation = '4-3-3';
-    else if (defCount === 3 && midCount === 5 && fwdCount === 2) formation = '3-5-2';
-    else if (defCount === 5 && midCount === 3 && fwdCount === 2) formation = '5-3-2';
-    else if (defCount === 4 && midCount === 2 && fwdCount === 4) formation = '4-2-3-1';
-    else if (defCount === 3 && midCount === 4 && fwdCount === 3) formation = '3-4-3';
-    else if (defCount === 5 && midCount === 4 && fwdCount === 1) formation = '5-4-1';
-    else {
+    const total = defCount + midCount + fwdCount;
+    
+    if (total <= 11) {
+      // Def-heavy
+      if (defCount >= 5) formation = '5-3-2';
+      // Mid-balanced
+      else if (midCount >= 4) {
+        if (fwdCount >= 3) formation = '3-4-3';
+        else if (fwdCount === 2) formation = '4-4-2';
+        else formation = '4-5-1';
+      }
+      // Standard formations
+      else if (defCount === 4 && fwdCount === 3) formation = '4-3-3';
+      else if (defCount === 4 && fwdCount === 2) formation = '4-4-2';
+      else if (defCount === 4) formation = '4-2-3-1';
+      else formation = `${defCount}-${midCount}-${fwdCount}`;
+    } else {
       formation = `${defCount}-${midCount}-${fwdCount}`;
     }
 
@@ -48,6 +60,7 @@ function detectFormationFromPositions(homePositions, awayPositions) {
       midfielders: midCount,
       forwards: fwdCount,
       confidence: Math.round((positions.reduce((sum, p) => sum + p.confidence, 0) / positions.length)),
+      dynamic_detected: true, // Mark as dynamically detected, not static
     };
   }
 
@@ -91,13 +104,29 @@ Deno.serve(async (req) => {
     // Detektiere Formation
     const formations = detectFormationFromPositions(allHomePositions, allAwayPositions);
 
-    // Speichere aktuelle Formation als Metadata
+    // Speichere Formation Timeline (nicht static!)
+    const timestamp = new Date().toISOString();
+    const formationHistory = {
+      timestamp,
+      home: formations.home,
+      away: formations.away,
+    };
+
+    // Speichere in TrackingData als Metadaten statt Session
     const session = await base44.entities.LiveSession.filter({ id: session_id });
     if (session[0]) {
-      await base44.entities.LiveSession.update(session[0].id, {
-        formation_home: formations.home?.formation || 'unknown',
-        formation_away: formations.away?.formation || 'unknown',
-      }).catch(() => {});
+      // Aktualisiere nur wenn Formation sich changed
+      const prevFormation = {
+        home: session[0].formation_home,
+        away: session[0].formation_away,
+      };
+      if (JSON.stringify(prevFormation) !== JSON.stringify({ home: formations.home?.formation, away: formations.away?.formation })) {
+        await base44.entities.LiveSession.update(session[0].id, {
+          formation_home: formations.home?.formation || 'unknown',
+          formation_away: formations.away?.formation || 'unknown',
+          last_formation_change: timestamp,
+        }).catch(() => {});
+      }
     }
 
     return Response.json({
