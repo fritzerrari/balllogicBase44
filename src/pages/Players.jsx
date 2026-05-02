@@ -9,12 +9,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Plus, X, Zap, Loader2, Star,
-  TrendingUp, Target, ChevronRight, User, Award
+  TrendingUp, Target, ChevronRight, User, Award, BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from 'recharts';
+import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { useToast } from '@/components/ui/use-toast';
 
 const POSITIONS = [
@@ -236,19 +236,37 @@ Fokussiere auf: Stärken, Entwicklungspotenzial, eine konkrete Trainingsempfehlu
                   )}
                 </div>
 
-                {/* Radar Chart */}
+                {/* Charts: Radar + Trend */}
                 {radarData.length > 0 && (
-                  <div className="glass rounded-xl p-5">
-                    <h3 className="text-sm font-grotesk font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <Target className="w-4 h-4 text-primary" /> Leistungs-Radar
-                    </h3>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <RadarChart data={radarData}>
-                        <PolarGrid stroke="hsl(var(--border))" />
-                        <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-                        <Radar dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="glass rounded-xl p-5">
+                      <h3 className="text-sm font-grotesk font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-primary" /> Leistungs-Radar
+                      </h3>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <RadarChart data={radarData}>
+                          <PolarGrid stroke="hsl(var(--border))" />
+                          <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+                          <Radar dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {stats.length >= 2 && (
+                      <div className="glass rounded-xl p-5">
+                        <h3 className="text-sm font-grotesk font-semibold text-foreground mb-3 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-primary" /> Noten-Verlauf
+                        </h3>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <LineChart data={[...stats].reverse().map((s, i) => ({ spiel: `S${i + 1}`, note: s.rating, tore: s.goals, assists: s.assists }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis dataKey="spiel" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+                            <YAxis domain={[0, 10]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+                            <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 11 }} />
+                            <Line type="monotone" dataKey="note" name="Note" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                   </div>
                 )}
 

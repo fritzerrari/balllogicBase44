@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Download, Activity, Target, Zap, Users, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, Activity, Target, Zap, Users, TrendingUp, AlertTriangle, FileText, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, Legend, BarChart, Bar } from 'recharts';
@@ -30,34 +30,56 @@ export default function TacticsAnalysis() {
     enabled: !!id,
   });
 
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+
   const handleExportReport = async () => {
     if (!report || !match) return;
-    const content = `
-TactIQ – Taktische Analyse
-===========================
+    setExportLoading(true);
+
+    // Automatisch vollständigen Bericht per KI generieren
+    const aiReport = await base44.integrations.Core.InvokeLLM({
+      prompt: `Erstelle einen professionellen, vollständigen Spielanalyse-Bericht für folgendes Spiel:
+
 Spiel: ${match.title}
 Datum: ${match.date}
 Ergebnis: ${match.score_home ?? '?'} – ${match.score_away ?? '?'}
+Formation Heim: ${report.formation_home} | Gäste: ${report.formation_away}
+Ballbesitz Heim: ${report.possession_home?.toFixed(1)}% | Gäste: ${report.possession_away?.toFixed(1)}%
+Pressing-Index Heim: ${report.pressing_index_home?.toFixed(0)}/100 | Gäste: ${report.pressing_index_away?.toFixed(0)}/100
+Pressing-Höhe Heim: ${report.pressing_height_home?.toFixed(0)}m | Gäste: ${report.pressing_height_away?.toFixed(0)}m
+Ballgewinne Heim: ${report.ball_recoveries_home} | Gäste: ${report.ball_recoveries_away}
+Umschaltsituationen Heim: ${report.transitions_home} | Gäste: ${report.transitions_away}
+Kompaktheit Heim: ${report.compactness_home} | Gäste: ${report.compactness_away}
 
-FORMATION
-Home: ${report.formation_home} | Away: ${report.formation_away}
+KI-Zusammenfassung: ${report.ai_summary}
+KI-Empfehlungen: ${report.ai_recommendations}
 
-BALLBESITZ
-${match.home_team}: ${report.possession_home?.toFixed(1)}%
-${match.away_team}: ${report.possession_away?.toFixed(1)}%
+Schlüsselmomente: ${(report.key_moments || []).map(m => `${m.minute}' ${m.type}: ${m.description}`).join(', ')}
 
-PRESSING
-Pressing-Intensität Home: ${report.pressing_index_home?.toFixed(0)}/100
-Pressing-Intensität Away: ${report.pressing_index_away?.toFixed(0)}/100
-Pressing-Höhe Home: ${report.pressing_height_home?.toFixed(0)}m
-Pressing-Höhe Away: ${report.pressing_height_away?.toFixed(0)}m
+Schreibe einen strukturierten Bericht mit: 1) Spielzusammenfassung, 2) Taktische Analyse Heim, 3) Taktische Analyse Gäste, 4) Pressing & Kompaktheit, 5) Entscheidende Szenen, 6) Trainer-Empfehlungen für das nächste Spiel. Professionell, konkret, ca. 400 Wörter.`,
+    });
 
-KI-ANALYSE
-${report.ai_summary}
+    const content = `TactIQ – Automatisierter Spielanalyse-Bericht
+================================================
+Spiel: ${match.title}
+Datum: ${match.date}
+Ergebnis: ${match.score_home ?? '?'} – ${match.score_away ?? '?'}
+Formation: ${report.formation_home} vs ${report.formation_away}
+================================================
 
-EMPFEHLUNGEN
-${report.ai_recommendations}
-    `.trim();
+${aiReport}
+
+------------------------------------------------
+ROHDATEN
+------------------------------------------------
+Ballbesitz: ${match.home_team} ${report.possession_home?.toFixed(1)}% | ${match.away_team} ${report.possession_away?.toFixed(1)}%
+Pressing-Index: ${report.pressing_index_home?.toFixed(0)} vs ${report.pressing_index_away?.toFixed(0)}
+Pressing-Höhe: ${report.pressing_height_home?.toFixed(0)}m vs ${report.pressing_height_away?.toFixed(0)}m
+Ballgewinne: ${report.ball_recoveries_home} vs ${report.ball_recoveries_away}
+Umschaltsituationen: ${report.transitions_home} vs ${report.transitions_away}
+
+Generiert von TactIQ – ${new Date().toLocaleString('de')}`.trim();
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -66,6 +88,7 @@ ${report.ai_recommendations}
     a.download = `${match.title}-TactIQ-Report.txt`;
     a.click();
     URL.revokeObjectURL(url);
+    setExportLoading(false);
   };
 
   if (isLoading) {
@@ -109,8 +132,9 @@ ${report.ai_recommendations}
               <span className="text-red-400 font-medium">{report.formation_away}</span>
             </p>
           </div>
-          <Button onClick={handleExportReport} variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/10">
-            <Download className="w-4 h-4" /> Report exportieren
+          <Button onClick={handleExportReport} disabled={exportLoading} variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/10">
+            {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            {exportLoading ? 'KI generiert Bericht...' : 'KI-Bericht exportieren'}
           </Button>
         </div>
       </motion.div>
@@ -129,7 +153,7 @@ ${report.ai_recommendations}
           {['overview', 'pitch', 'pressing', 'fatigue', 'moments', 'ai'].map(t => (
             <TabsTrigger key={t} value={t} className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md">
               {t === 'overview' && 'Übersicht'}
-              {t === 'pitch' && 'Spielfeld'}
+              {t === 'pitch' && '🗺 Interaktiv'}
               {t === 'pressing' && 'Pressing'}
               {t === 'fatigue' && 'Ermüdung'}
               {t === 'moments' && 'Schlüsselszenen'}
@@ -160,16 +184,133 @@ ${report.ai_recommendations}
           </div>
         </TabsContent>
 
-        {/* Pitch Heatmap */}
+        {/* Interactive Pitch */}
         <TabsContent value="pitch">
-          <div className="glass rounded-xl p-5">
-            <h3 className="font-grotesk font-semibold text-foreground mb-2">Gefahrenzonen-Heatmap</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              <span className="text-primary font-medium">■</span> {match?.home_team} &nbsp;
-              <span className="text-red-400 font-medium">■</span> {match?.away_team}
-            </p>
-            <div className="aspect-[3/2] max-h-[460px]">
-              <FootballPitch dangerZones={report.danger_zones || []} showGrid />
+          <div className="grid lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 glass rounded-xl p-5">
+              <h3 className="font-grotesk font-semibold text-foreground mb-2 flex items-center gap-2">
+                🗺 Interaktive Taktik-Visualisierung
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Klicke auf eine Gefahrenzone um Details zu sehen ·
+                <span className="text-primary font-medium"> ■ {match?.home_team}</span> &nbsp;
+                <span className="text-red-400 font-medium">■ {match?.away_team}</span>
+              </p>
+              <div className="aspect-[3/2] max-h-[420px] relative cursor-pointer"
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = ((e.clientX - rect.left) / rect.width) * 100;
+                  const y = ((e.clientY - rect.top) / rect.height) * 100;
+                  // Find nearest danger zone
+                  const nearest = (report.danger_zones || []).reduce((best, z) => {
+                    const dist = Math.hypot(z.x - x, z.y - y);
+                    return (!best || dist < best.dist) ? { ...z, dist } : best;
+                  }, null);
+                  if (nearest && nearest.dist < 12) setSelectedZone(nearest);
+                  else setSelectedZone(null);
+                }}>
+                <FootballPitch dangerZones={report.danger_zones || []} showGrid />
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center">
+                {[
+                  { label: 'Gefahrenzonen', value: report.danger_zones?.length || 0, color: 'text-primary' },
+                  { label: 'Umschaltsituationen', value: report.transitions_home + report.transitions_away, color: 'text-yellow-400' },
+                  { label: 'Ballgewinne gesamt', value: report.ball_recoveries_home + report.ball_recoveries_away, color: 'text-blue-400' },
+                ].map(s => (
+                  <div key={s.label} className="bg-muted rounded-lg py-2 px-3">
+                    <div className={`text-lg font-grotesk font-bold ${s.color}`}>{s.value}</div>
+                    <div className="text-muted-foreground">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-3">
+              {/* Zone Detail */}
+              <div className="glass rounded-xl p-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                  {selectedZone ? '📍 Zone Details' : '📍 Zone auswählen'}
+                </h4>
+                {selectedZone ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${selectedZone.team === 'home' ? 'bg-primary' : 'bg-red-400'}`} />
+                      <span className="text-sm font-medium text-foreground">{selectedZone.team === 'home' ? match?.home_team : match?.away_team}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Gefahr-Intensität</span>
+                        <span className="text-foreground font-bold">{(selectedZone.intensity * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{ width: `${selectedZone.intensity * 100}%` }} />
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Position X</span>
+                        <span className="font-mono text-primary">{selectedZone.x?.toFixed(0)}%</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Position Y</span>
+                        <span className="font-mono text-primary">{selectedZone.y?.toFixed(0)}%</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2 bg-muted rounded-lg p-2 leading-relaxed">
+                        {selectedZone.intensity > 0.7
+                          ? '🔴 Hochgefährliche Zone — häufige Chancen aus diesem Bereich'
+                          : selectedZone.intensity > 0.4
+                          ? '🟡 Mittlere Gefahr — regelmäßige Aktionen im Strafraum-Nähe'
+                          : '🟢 Niedrige Gefahr — vereinzelte Aktionen'}
+                      </div>
+                    </div>
+                    <button onClick={() => setSelectedZone(null)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">× Schließen</button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    Klicke auf eine farbige Zone im Spielfeld um Details anzuzeigen.<br /><br />
+                    Intensivere Farben = höhere Gefahr in diesem Bereich.
+                  </div>
+                )}
+              </div>
+
+              {/* Formation vs Formation */}
+              <div className="glass rounded-xl p-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Formation Vergleich</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground">{match?.home_team}</div>
+                      <div className="text-lg font-grotesk font-bold text-foreground">{report.formation_home}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-red-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground">{match?.away_team}</div>
+                      <div className="text-lg font-grotesk font-bold text-foreground">{report.formation_away}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pressing Height visual */}
+              <div className="glass rounded-xl p-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Pressing-Linien</h4>
+                <div className="space-y-2">
+                  {[
+                    { team: match?.home_team, val: report.pressing_height_home, color: 'bg-primary' },
+                    { team: match?.away_team, val: report.pressing_height_away, color: 'bg-red-400' },
+                  ].map(({ team, val, color }) => (
+                    <div key={team}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">{team}</span>
+                        <span className="text-foreground font-bold">{val?.toFixed(0)}m</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (val / 80) * 100)}%` }} transition={{ duration: 1 }} className={`h-full ${color} rounded-full`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
