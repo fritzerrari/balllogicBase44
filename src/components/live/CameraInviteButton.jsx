@@ -50,41 +50,41 @@ export default function CameraInviteButton({ code, position }) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-96 bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl p-8 space-y-6"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-grotesk font-bold text-foreground">Kameramann einladen</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{position}</div>
+                  <div className="text-xl font-grotesk font-bold text-foreground">Kameramann einladen</div>
+                  <div className="text-sm text-muted-foreground mt-1">{position}</div>
                 </div>
-                <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
+                <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* URL Preview */}
-              <div className="space-y-2 p-3 bg-muted rounded-lg border border-border/50">
-                <div className="text-[10px] text-muted-foreground font-bold">6-stelliger Code:</div>
-                <div className="text-2xl font-grotesk font-bold text-primary tracking-widest text-center select-all">
+              {/* Code Display */}
+              <div className="space-y-3 p-5 bg-primary/5 rounded-2xl border-2 border-primary/20">
+                <div className="text-xs text-muted-foreground font-bold uppercase tracking-widest">6-stelliger Code:</div>
+                <div className="text-5xl font-grotesk font-bold text-primary tracking-[0.3em] text-center select-all py-2">
                   {code}
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
+              <div className="space-y-3 pt-2">
                 {/* Copy Code */}
                 <button
                   onClick={copyLink}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-base font-bold transition-all neon-glow"
                 >
-                  {copied ? <><Check className="w-4 h-4" /> Kopiert!</> : <><Copy className="w-4 h-4" /> Code kopieren</>}
+                  {copied ? <><Check className="w-5 h-5" /> Kopiert!</> : <><Copy className="w-5 h-5" /> Code kopieren</>}
                 </button>
 
                 {/* WhatsApp */}
                 <button
                   onClick={shareWhatsApp}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-sm font-bold transition-all border border-[#25D366]/20"
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-base font-bold transition-all border-2 border-[#25D366]/30"
                 >
-                  <MessageCircle className="w-4 h-4" />
+                  <MessageCircle className="w-5 h-5" />
                   Per WhatsApp senden
                 </button>
 
@@ -92,9 +92,9 @@ export default function CameraInviteButton({ code, position }) {
                 {typeof navigator !== 'undefined' && 'share' in navigator && (
                   <button
                     onClick={shareNative}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-muted hover:bg-muted/80 text-foreground text-sm font-bold transition-all border border-border"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground text-base font-bold transition-all border-2 border-border"
                   >
-                    <Share2 className="w-4 h-4" />
+                    <Share2 className="w-5 h-5" />
                     Systemteilen
                   </button>
                 )}
