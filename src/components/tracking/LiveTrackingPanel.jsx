@@ -11,6 +11,7 @@ import { Loader2, Zap } from 'lucide-react';
 import HeatmapVisualization from './HeatmapVisualization';
 import AutoEventLog from './AutoEventLog';
 import LiveKPIDashboard from './LiveKPIDashboard';
+import PlayerStatsPanel from './PlayerStatsPanel';
 
 export default function LiveTrackingPanel({ sessionId }) {
   const queryClient = useQueryClient();
@@ -91,21 +92,8 @@ export default function LiveTrackingPanel({ sessionId }) {
         </TabsContent>
 
         {/* Stats Tab */}
-        <TabsContent value="stats" className="mt-3 text-xs text-muted-foreground">
-          <div className="space-y-2">
-            <div className="flex justify-between p-2 bg-muted/30 rounded">
-              <span>Frames processed:</span>
-              <span className="font-bold text-foreground">{allTracking.length}</span>
-            </div>
-            <div className="flex justify-between p-2 bg-muted/30 rounded">
-              <span>Auto-Events:</span>
-              <span className="font-bold text-foreground">{autoEvents.length}</span>
-            </div>
-            <div className="flex justify-between p-2 bg-muted/30 rounded">
-              <span>Approved:</span>
-              <span className="font-bold text-primary">{autoEvents.filter(e => e.approved_by_trainer).length}</span>
-            </div>
-          </div>
+        <TabsContent value="stats" className="mt-3">
+          <PlayerStatsPanel sessionId={sessionId} />
         </TabsContent>
 
         {/* Heatmap Tab */}

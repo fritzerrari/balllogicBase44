@@ -10,6 +10,7 @@
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Users, Trophy, AlertCircle } from 'lucide-react';
+import SessionReportPDFExport from './SessionReportPDFExport';
 
 export default function SessionReportTemplate({ report }) {
   if (!report) return null;
@@ -32,6 +33,9 @@ export default function SessionReportTemplate({ report }) {
           {report.match_title}
         </h1>
         <p className="text-lg text-muted-foreground mb-4">{report.summary}</p>
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <SessionReportPDFExport report={report} />
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="w-4 h-4" />
