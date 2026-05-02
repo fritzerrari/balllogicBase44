@@ -18,20 +18,20 @@ export default function LiveTrackingPanel({ sessionId }) {
   const [selectedTeam, setSelectedTeam] = useState('home');
   const [heatmapType, setHeatmapType] = useState('player_density');
 
-  // Auto-Events laden (Poll alle 8s)
+  // Auto-Events laden (Poll alle 15s um Cloudflare Challenge zu vermeiden)
   const { data: autoEvents = [], isLoading: eventsLoading } = useQuery({
     queryKey: ['auto-events', sessionId],
     queryFn: () => base44.entities.AutoEvent.filter({ session_id: sessionId }),
-    refetchInterval: 8000,
-    staleTime: 5000,
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
   // TrackingData laden für Stats
   const { data: allTracking = [] } = useQuery({
     queryKey: ['tracking-data', sessionId],
     queryFn: () => base44.entities.TrackingData.filter({ session_id: sessionId }),
-    refetchInterval: 12000,
-    staleTime: 8000,
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
 
   // Heatmap-Cache laden
@@ -45,8 +45,8 @@ export default function LiveTrackingPanel({ sessionId }) {
       });
       return caches[0] || null;
     },
-    refetchInterval: 10000,
-    staleTime: 6000,
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
 
   // Approval Mutations
