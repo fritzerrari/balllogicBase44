@@ -25,6 +25,11 @@
       "type": "string",
       "format": "date-time"
     },
+    "half_time": {
+      "type": "number",
+      "default": 1,
+      "description": "Aktuelle Halbzeit: 1 oder 2. Wird f\u00fcr Seitenwechsel auf Kamera-Handy angezeigt."
+    },
     "camera_streams": {
       "type": "array",
       "items": {
@@ -37,6 +42,15 @@
             "type": "string"
           },
           "stream_url": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "last_seen": {
             "type": "string"
           }
         }

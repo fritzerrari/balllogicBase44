@@ -112,8 +112,12 @@ export default function LiveSession() {
   const startHalfTwo = () => {
     setShowHalftimeAlert(false);
     setHalfTime(2);
-    setElapsedTime(45 * 60); // reset to 45:00 start
+    setElapsedTime(45 * 60);
     halftimeAlertRef.current = false;
+    // In DB schreiben — Kameras zeigen Seitenwechsel-Banner
+    if (session) {
+      updateSession.mutate({ id: session.id, data: { half_time: 2 } });
+    }
   };
 
   // ── Start ─────────────────────────────────────────────────────────────────
@@ -122,8 +126,9 @@ export default function LiveSession() {
     const s = await createSession.mutateAsync({
       match_title: sessionTitle,
       status: 'active',
+      half_time: 1,
       started_at: new Date().toISOString(),
-      camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code })),
+      camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting' })),
     });
     setSession(s);
     setSessionActive(true);
@@ -176,9 +181,22 @@ export default function LiveSession() {
     navigate('/session-reports');
   };
 
-  // ── Live minute display (correct half) ───────────────────────────────────
-  const displayMinute = Math.floor(elapsedTime / 60) + (halfTime === 2 ? 0 : 0);
-  // HZ2: elapsed starts at 45*60, so minute 46-90
+  // Live camera status — pollt alle 5s wenn aktiv
+  const [liveCameraStreams, setLiveCameraStreams] = useState([]);
+  useEffect(() => {
+    if (!sessionActive || !session) return;
+    const poll = async () => {
+      try {
+        const sessions = await base44.entities.LiveSession.filter({ status: 'active' });
+        const fresh = sessions.find(s => s.id === session.id);
+        if (fresh?.camera_streams) setLiveCameraStreams(fresh.camera_streams);
+      } catch (_) {}
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [sessionActive, session]);
+
   const gameMinute = halfTime === 1
     ? Math.floor(elapsedTime / 60)
     : 45 + Math.floor((elapsedTime - 45 * 60) / 60);
@@ -428,35 +446,39 @@ export default function LiveSession() {
                 <span className="text-xs text-primary font-medium">KI kombiniert automatisch</span>
               </div>
               <div className={`grid gap-2 ${cameraCount > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {cameras.map((cam) => (
-                  <div key={cam.id} className="aspect-video bg-black rounded-lg border border-primary/20 flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam">
-                    <div className="absolute inset-0 opacity-10" style={{ background: 'linear-gradient(135deg, #1a3a1a 0%, #0d260d 100%)' }} />
-                    <Video className="w-5 h-5 text-muted-foreground relative z-10" />
-                    {/* Inline-editierbares Label */}
-                    {editingCamId === cam.id ? (
-                      <div className="relative z-10 flex items-center gap-1">
-                        <input
-                          value={editingCamLabel}
-                          onChange={e => setEditingCamLabel(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveLabel(cam.id); if (e.key === 'Escape') setEditingCamId(null); }}
-                          className="w-20 bg-background/80 border border-primary/40 rounded px-1 py-0.5 text-[10px] text-foreground focus:outline-none text-center"
-                          autoFocus
-                        />
-                        <button onClick={() => saveLabel(cam.id)} className="text-primary"><Check className="w-3 h-3" /></button>
+                {cameras.map((cam) => {
+                  const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
+                  const isConnected = liveStream?.status === 'connected';
+                  const lastSeen = liveStream?.last_seen ? Math.round((Date.now() - new Date(liveStream.last_seen).getTime()) / 1000) : null;
+                  return (
+                    <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
+                      <div className="absolute inset-0 opacity-10" style={{ background: 'linear-gradient(135deg, #1a3a1a 0%, #0d260d 100%)' }} />
+                      <Video className={`w-5 h-5 relative z-10 ${isConnected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      {editingCamId === cam.id ? (
+                        <div className="relative z-10 flex items-center gap-1">
+                          <input value={editingCamLabel} onChange={e => setEditingCamLabel(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveLabel(cam.id); if (e.key === 'Escape') setEditingCamId(null); }}
+                            className="w-20 bg-background/80 border border-primary/40 rounded px-1 py-0.5 text-[10px] text-foreground focus:outline-none text-center" autoFocus />
+                          <button onClick={() => saveLabel(cam.id)} className="text-primary"><Check className="w-3 h-3" /></button>
+                        </div>
+                      ) : (
+                        <div className="relative z-10 flex items-center gap-1 group/lbl cursor-pointer"
+                          onClick={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}>
+                          <span className="text-[10px] text-muted-foreground">{cam.label}</span>
+                          <Pencil className="w-2.5 h-2.5 text-muted-foreground opacity-0 group-hover/lbl:opacity-100 transition-opacity" />
+                        </div>
+                      )}
+                      <div className={`text-[9px] relative z-10 font-bold ${isConnected ? 'text-primary' : 'text-muted-foreground/60'}`}>
+                        {isConnected
+                          ? `● Verbunden${lastSeen !== null && lastSeen < 20 ? ` · ${lastSeen}s` : ''}`
+                          : `○ Wartet · ${cam.code}`}
                       </div>
-                    ) : (
-                      <div className="relative z-10 flex items-center gap-1 group/lbl cursor-pointer"
-                        onClick={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}>
-                        <span className="text-[10px] text-muted-foreground">{cam.label}</span>
-                        <Pencil className="w-2.5 h-2.5 text-muted-foreground opacity-0 group-hover/lbl:opacity-100 transition-opacity" />
-                      </div>
-                    )}
-                    <div className="text-[9px] text-primary relative z-10">● Code {cam.code}</div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
               <div className="mt-3 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                💡 Kamera-Label anpassen? Einfach draufklicken.
+                <span className="text-primary font-medium">● = Handy verbunden</span> · ○ = wartet auf Kameramann · Label: klicken zum Bearbeiten
               </div>
             </div>
           </div>
