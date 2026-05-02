@@ -605,12 +605,13 @@ export default function CoachingCockpit() {
             </div>
             <div className="space-y-2">
               {cameras.map((cam) => {
-                const code = cam.code || cam.camera_id;
+                // Code aus camera_id generieren (6-stellig mit Padding)
+                const code = cam.code || String(cam.camera_id || '').padStart(6, '0').slice(-6) || '000000';
                 const camUrl = `${liveUrl}?code=${code}`;
                 return (
                   <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-foreground">{cam.label}</span>
+                      <span className="text-xs font-medium text-foreground">{cam.label || `Kamera ${cam.camera_id}`}</span>
                       <div className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-primary' : 'bg-yellow-400'} animate-pulse`} />
                         <span className={`text-[10px] ${cam.status === 'connected' ? 'text-primary' : 'text-yellow-400'}`}>
