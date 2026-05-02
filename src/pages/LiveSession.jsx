@@ -224,7 +224,7 @@ export default function LiveSession() {
     navigate('/session-reports');
   };
 
-  // Live camera status — pollt alle 3s (auch während Setup wenn session bereit)
+  // Live camera status — pollt alle 1.5s (während Setup für schnellere Rückmeldung)
   const [liveCameraStreams, setLiveCameraStreams] = useState([]);
   useEffect(() => {
     if (!session) return;
@@ -235,7 +235,7 @@ export default function LiveSession() {
       } catch (_) {}
     };
     poll();
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 1500); // schneller während Setup
     return () => clearInterval(interval);
   }, [session?.id]);
 
