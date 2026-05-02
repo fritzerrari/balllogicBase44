@@ -65,12 +65,11 @@ export default function LiveSession() {
 
   // ── Auto-fill title from latest match ──────────────────────────────────────
   useEffect(() => {
-    if (recentMatches.length > 0 && !sessionTitle) {
-      setSessionTitle(recentMatches[0].title || `Spiel ${toDay()}`);
-    } else if (recentMatches.length === 0 && !sessionTitle) {
-      setSessionTitle(`Spiel ${toDay()}`);
+    if (!sessionTitle) {
+      const title = recentMatches.length > 0 ? recentMatches[0].title : `Spiel ${toDay()}`;
+      setSessionTitle(title);
     }
-  }, [recentMatches]);
+  }, [recentMatches, sessionTitle]);
 
   // ── Timer + Halbzeit-Automatik ─────────────────────────────────────────────
   useEffect(() => {

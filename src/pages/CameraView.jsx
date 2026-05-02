@@ -113,7 +113,9 @@ export default function CameraView() {
   }, [step]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
-  useEffect(() => () => { clearAllTimers(); stopStream(); stopAudio(); }, []);
+  useEffect(() => {
+    return () => { clearAllTimers(); stopStream(); stopAudio(); };
+  }, []);
 
   const clearAllTimers = () => {
     clearInterval(heartbeatRef.current);

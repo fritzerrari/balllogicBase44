@@ -74,7 +74,7 @@ export default function useDeviceOrientation(videoRef) {
         videoRef.current.removeEventListener('loadedmetadata', checkVideoResolution);
       }
     };
-  }, [videoRef]);
+  }, []);
 
   return { orientation, aspectRatio, isPortrait };
 }

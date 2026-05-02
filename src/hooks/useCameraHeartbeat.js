@@ -20,7 +20,8 @@ export default function useCameraHeartbeat(sessionId, cameraCode, cameraLabel, i
     // Zunächst: Session laden
     const initSession = async () => {
       try {
-        const session = await base44.entities.LiveSession.filter({ id: sessionId }).then(r => r[0]);
+        const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
+        const session = sessions[0];
         if (!session) return;
         sessionRef.current = session;
       } catch (e) {
