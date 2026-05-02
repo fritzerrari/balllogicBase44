@@ -8,17 +8,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Radio, Send, Mic, MicOff, X } from 'lucide-react';
 import AudioWaveform from './AudioWaveform';
 
-const POLL_MS = 6000; // Erhöht von 2s auf 6s — Rate-Limiting vermeiden
-const MAX_MSGS = 30;
+const POLL_MS = 2000; // Schneller Polling für Live-Kommunikation
+const MAX_MSGS = 50;
+const OPTIMISTIC_UPDATE = true; // Show messages immediately before DB confirmation
 
 export default function FunkPanel({ sessionId, onClose }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [pttActive, setPttActive] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [optimisticMessages, setOptimisticMessages] = useState([]);
   const pollRef = useRef(null);
   const lastSeenRef = useRef(Date.now());
   const listRef = useRef(null);
+  const pollIntervalRef = useRef(POLL_MS);
 
   // Nachrichten laden & polln
   useEffect(() => {
@@ -98,12 +101,12 @@ export default function FunkPanel({ sessionId, onClose }) {
 
       {/* Message List */}
       <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
-        {messages.length === 0 && (
+        {messages.length === 0 && optimisticMessages.length === 0 && (
           <div className="text-center text-xs text-muted-foreground py-8">
             Funk-Kanal aktiv — warte auf Nachrichten...
           </div>
         )}
-        {messages.map((msg, i) => {
+        {[...messages, ...optimisticMessages].map((msg, i) => {
           const isCoach = msg.from === 'coach';
           return (
             <motion.div key={msg.id || i}

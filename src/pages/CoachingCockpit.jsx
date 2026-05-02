@@ -11,6 +11,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import useFrameCapture from '@/hooks/useFrameCapture';
+import useStreamHealth from '@/hooks/useStreamHealth';
+import StreamMonitor from '@/components/live/StreamMonitor';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -80,6 +82,9 @@ export default function CoachingCockpit() {
   const hiddenCanvasRef = useRef(null);
   const detectionIntervalRef = useRef(null);
   const simIntervalRef = useRef(null);
+
+  // Stream Health Monitoring
+  const { cameraHealth, globalHealth, recordFrameLatency } = useStreamHealth();
 
   // ── Load sessions + players (für DSGVO) ────────────────────────────────────
   const { data: players = [] } = useQuery({
@@ -511,6 +516,9 @@ export default function CoachingCockpit() {
 
           {/* Live Stats */}
           <LiveStats stats={stats} playerCounts={playerCounts} />
+
+          {/* Stream Monitor */}
+          <StreamMonitor cameraHealth={cameraHealth} globalHealth={globalHealth} />
 
           {/* Live Tracking Panel (Auto-Events + Heatmaps) */}
           {activeSession && (

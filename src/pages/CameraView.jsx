@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import useStreamHealth from '@/hooks/useStreamHealth';
 import {
   Video, AlertTriangle, Wifi, WifiOff, Mic, MicOff,
   Radio, MessageSquare, Home, LogOut, Loader2
@@ -34,13 +35,16 @@ export default function CameraView() {
   const canvasRef = useRef(null);
   const heartbeatRef = useRef(null);
 
-  // Lade Session
+  const { recordFrameLatency, getOptimalPollingInterval, cameraHealth } = useStreamHealth();
+  const pollIntervalRef = useRef(3000);
+
+  // Lade Session mit adaptivem Polling basierend auf Stream-Health
   const { data: session, isLoading, error } = useQuery({
     queryKey: ['live-session', sessionId],
     queryFn: () => sessionId ? base44.entities.LiveSession.filter({ id: sessionId }) : Promise.resolve([]),
     enabled: !!sessionId,
-    refetchInterval: 3000,
-    staleTime: 2000,
+    refetchInterval: pollIntervalRef.current,
+    staleTime: Math.floor(pollIntervalRef.current / 2),
   });
 
   const activeSession = session?.[0];
@@ -53,10 +57,11 @@ export default function CameraView() {
     }
   }, [activeSession]);
 
-  // Heartbeat — update session connection status
+  // Heartbeat — update session connection status mit adaptivem Interval
   useEffect(() => {
     if (!activeSession?.id) return;
     const sendHeartbeat = async () => {
+      const startTime = Date.now();
       try {
         const streams = activeSession.camera_streams || [];
         const updated = streams.map(s => ({
@@ -66,14 +71,24 @@ export default function CameraView() {
           thumbnail: canvasRef.current?.toDataURL() || undefined,
         }));
         await base44.entities.LiveSession.update(activeSession.id, { camera_streams: updated });
+        
+        // Record latency für Stream-Health
+        const latency = Date.now() - startTime;
+        recordFrameLatency('camera-main', latency);
+        
+        // Adaptive polling interval
+        pollIntervalRef.current = getOptimalPollingInterval('camera-main') || 3000;
       } catch (e) {
         console.warn('Heartbeat failed:', e);
+        // On error: increase poll interval
+        pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, 8000);
       }
     };
 
-    heartbeatRef.current = setInterval(sendHeartbeat, 2000);
+    const interval = pollIntervalRef.current;
+    heartbeatRef.current = setInterval(sendHeartbeat, interval);
     return () => clearInterval(heartbeatRef.current);
-  }, [activeSession?.id, activeSession?.camera_streams]);
+  }, [activeSession?.id, activeSession?.camera_streams, recordFrameLatency, getOptimalPollingInterval]);
 
   // Video-Stream starten
   const [cameraError, setCameraError] = useState(null);
