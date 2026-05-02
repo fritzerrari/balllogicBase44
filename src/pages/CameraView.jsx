@@ -222,6 +222,7 @@ export default function CameraView() {
             <div className="text-xs text-muted-foreground uppercase font-bold mb-2">Events tippen</div>
             <EventButtons
               sessionId={activeSession.id}
+              matchId={activeSession.match_id}
               matchTitle={activeSession.match_title}
               source={cameraLabel}
               elapsedSeconds={elapsedSeconds}

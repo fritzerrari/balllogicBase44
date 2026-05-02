@@ -554,6 +554,7 @@ export default function CoachingCockpit() {
             </div>
             <EventButtons
               sessionId={activeSession?.id}
+              matchId={activeSession?.match_id}
               matchTitle={activeSession?.match_title}
               source="coach_cockpit"
               elapsedSeconds={0}
