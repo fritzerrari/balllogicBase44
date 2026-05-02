@@ -333,71 +333,112 @@ export default function LiveSession() {
       {/* ── SETUP PHASE ── */}
       {!sessionActive && (
         <div className="max-w-lg mx-auto space-y-3">
-          {/* Wenn Session bereit: Kameras + Funk + Live-Bilder anzeigen */}
+          {/* Wenn Session bereit: Setup-Modal mit Kamera-Overview */}
           {session && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur z-40 flex items-center justify-center p-4">
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
-                <h2 className="font-grotesk font-bold text-lg text-foreground mb-4">Bereit zum starten</h2>
-                
-                {/* Kamera-Status + Live-Bilder Grid */}
-                <div className="mb-4 space-y-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs text-muted-foreground font-bold uppercase">Kameras bereit</div>
-                    <button onClick={addCameraLive}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/20 transition-all">
-                      <Plus className="w-3 h-3" /> Kamera
-                    </button>
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl w-full max-w-2xl border border-border max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-gradient-to-b from-card to-card/80 px-6 py-4 border-b border-border/50">
+                  <h2 className="font-grotesk font-bold text-xl text-foreground">Session bereit</h2>
+                  <p className="text-xs text-muted-foreground mt-1">{sessionTitle}</p>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Status Summary */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-primary/10 border border-primary/30 p-3 text-center">
+                      <div className="text-2xl font-grotesk font-bold text-primary">{cameras.length}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Kameras konfiguriert</div>
+                    </div>
+                    <div className={`rounded-xl border p-3 text-center ${liveCameraStreams.filter(s => s.status === 'connected').length > 0 ? 'bg-primary/10 border-primary/30' : 'bg-muted border-border'}`}>
+                      <div className="text-2xl font-grotesk font-bold text-primary">{liveCameraStreams.filter(s => s.status === 'connected').length}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Kameras verbunden</div>
+                    </div>
+                    <div className={`rounded-xl border p-3 text-center ${liveCameraStreams.some(s => s.thumbnail) ? 'bg-primary/10 border-primary/30' : 'bg-muted border-border'}`}>
+                      <div className="text-2xl font-grotesk font-bold text-primary">{liveCameraStreams.filter(s => s.thumbnail).length}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Mit Live-Bild</div>
+                    </div>
                   </div>
-                  <div className={`grid gap-2 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                    {cameras.map(cam => {
-                      const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
-                      const isConnected = liveStream?.status === 'connected';
-                      const thumbnail = liveStream?.thumbnail;
-                      return (
-                        <div key={cam.id} className={`aspect-video rounded-lg border overflow-hidden relative flex flex-col items-center justify-center bg-black group/cam ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
-                          {thumbnail ? (
-                            <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover" />
-                          ) : (
-                            <div className="text-muted-foreground/50 text-xs text-center px-1">
-                              {isConnected ? 'Wird geladen...' : 'Wartet...'}
+
+                  {/* Kamera-Grid mit Einladung inline */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-grotesk font-semibold text-foreground">Kameras</h3>
+                      <button onClick={addCameraLive}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold hover:bg-primary/20 transition-all">
+                        <Plus className="w-3.5 h-3.5" /> Kamera hinzufügen
+                      </button>
+                    </div>
+                    <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
+                      {cameras.map(cam => {
+                        const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
+                        const isConnected = liveStream?.status === 'connected';
+                        const thumbnail = liveStream?.thumbnail;
+                        return (
+                          <div key={cam.id} className={`rounded-xl border overflow-hidden flex flex-col transition-all ${isConnected ? 'border-primary/60 bg-primary/5' : 'border-border/50 bg-muted/30'}`}>
+                            {/* Thumbnail */}
+                            <div className={`aspect-video bg-black relative flex items-center justify-center overflow-hidden group/thumb`}>
+                              {thumbnail ? (
+                                <img src={thumbnail} alt={cam.label} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="text-center">
+                                  <Video className="w-6 h-6 text-muted-foreground/50 mx-auto mb-1" />
+                                  <div className="text-[10px] text-muted-foreground/60">{isConnected ? 'Wird geladen...' : 'Wartet auf Kamera'}</div>
+                                </div>
+                              )}
+                              {/* Status Badge */}
+                              <div className={`absolute top-2 left-2 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1.5 ${isConnected ? 'bg-primary/80 text-primary-foreground' : 'bg-black/70 text-muted-foreground'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
+                                {isConnected ? 'LIVE' : 'WARTET'}
+                              </div>
                             </div>
-                          )}
-                          <div className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected ? 'bg-primary/80 text-primary-foreground' : 'bg-black/70 text-muted-foreground'}`}>
-                            <div className="flex items-center gap-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
-                              {isConnected ? 'LIVE' : 'WARTET'}
+
+                            {/* Info + Actions */}
+                            <div className="p-3 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-foreground truncate">{cam.label}</div>
+                                  <div className="text-xs text-muted-foreground font-mono tracking-widest">{cam.code}</div>
+                                </div>
+                                <button onClick={() => deleteCamera(cam.id)}
+                                  className="flex-shrink-0 w-7 h-7 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/40 flex items-center justify-center text-sm font-bold transition-all"
+                                  title="Kamera löschen">
+                                  ✕
+                                </button>
+                              </div>
+
+                              {/* Invite Actions */}
+                              <div className="space-y-1.5">
+                                <CameraInviteButton code={cam.code} position={cam.label} />
+                              </div>
                             </div>
                           </div>
-                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity flex items-center gap-1.5">
-                            <CameraInviteButton code={cam.code} position={cam.label} />
-                            <button onClick={() => deleteCamera(cam.id)}
-                              className="w-7 h-7 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-sm font-bold transition-all"
-                              title="Kamera löschen">
-                              ✕
-                            </button>
-                          </div>
-                          <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium bg-gradient-to-t from-black/80 to-transparent">
-                            <div className="truncate">{cam.label}</div>
-                            <div className="text-white/60 font-mono tracking-widest">{cam.code}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Hinweis */}
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                    <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                      💡 <strong>Tipp:</strong> Teile den Code oder Link mit deinem Kameramann. Sobald er den Code eingibt, siehst du hier das Live-Bild. Du kannst dann Live starten.
+                    </p>
                   </div>
                 </div>
 
-                {/* Funk — kommuniziere mit Kameras vor Start */}
-                <div className="mb-4 max-h-64 overflow-hidden rounded-xl border border-border">
-                  <FunkPanel sessionId={session.id} onClose={() => {}} />
-                </div>
-
-                <div className="flex gap-2">
+                {/* Footer */}
+                <div className="sticky bottom-0 bg-gradient-to-t from-card to-card/80 px-6 py-4 border-t border-border/50 flex gap-2">
                   <Button variant="outline" onClick={() => { setSession(null); setCameras([]); setCameraCount(1); }}
                     className="flex-1">
-                    Zurück
+                    Abbrechen
                   </Button>
-                  <Button onClick={handleLiveStart} className="flex-1 bg-primary text-primary-foreground gap-2 font-bold">
-                    <Play className="w-4 h-4" /> Live starten
+                  <Button 
+                    onClick={handleLiveStart}
+                    disabled={liveCameraStreams.filter(s => s.status === 'connected').length === 0}
+                    className="flex-1 bg-primary text-primary-foreground gap-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={liveCameraStreams.filter(s => s.status === 'connected').length === 0 ? 'Warte bis mindestens eine Kamera verbunden ist' : ''}
+                  >
+                    <Play className="w-4 h-4" /> Live starten ({liveCameraStreams.filter(s => s.status === 'connected').length}/{cameras.length})
                   </Button>
                 </div>
               </motion.div>
