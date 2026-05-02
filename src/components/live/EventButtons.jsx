@@ -35,7 +35,7 @@ const DEDUP_WINDOW_MS = 10000;
  * @param {boolean} props.compact - kleine Version (für Mobile)
  * @param {string[]} props.visibleEvents - welche Buttons zeigen (undefined = alle)
  */
-export default function EventButtons({ sessionId, matchTitle, source = 'coach', elapsedSeconds = 0, compact = false, visibleEvents }) {
+export default function EventButtons({ sessionId, matchTitle, source = 'coach', elapsedSeconds = 0, compact = false, visibleEvents, onEventLogged }) {
   const [localEvents, setLocalEvents] = useState([]);
   const [flash, setFlash] = useState(null);
   const [showTeamPicker, setShowTeamPicker] = useState(null); // { evt, resolve }
@@ -84,6 +84,7 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
     if (sessionId) {
       base44.entities.MatchEvent.create(eventData).catch(() => {});
     }
+    if (onEventLogged) onEventLogged();
   };
 
   const handleEventClick = (evt) => {
