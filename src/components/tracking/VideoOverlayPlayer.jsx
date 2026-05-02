@@ -56,13 +56,15 @@ export default function VideoOverlayPlayer({ videoStream, detections, ball, team
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Confidence-Ring (optional)
-            const confidence = (player.confidence / 100) * 3;
-            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(x, y, 8 + confidence, 0, Math.PI * 2);
-            ctx.stroke();
+            // Confidence-Label
+            const confPercent = Math.round(player.confidence);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(x - 12, y - 18, 24, 14);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${confPercent}%`, x, y - 11);
           });
         }
 

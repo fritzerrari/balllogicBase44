@@ -1,160 +1,147 @@
 /**
- * PlayerStatsPanel – Individual Player Performance Metrics
- * 
- * Zeigt pro Spieler:
- * - Distance, Sprints, Touches
- * - Heatmap
- * - Rating
+ * PlayerStatsPanel — Live-Spieler Performance Metriken
+ * Zeigt: Distance, Sprints, Avg Speed, Max Speed pro Spieler
  */
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Loader2, TrendingUp, Activity } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Loader2, Zap, Activity } from 'lucide-react';
 
 export default function PlayerStatsPanel({ sessionId }) {
-  const [stats, setStats] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('distance');
+  const [sortBy, setSortBy] = useState('distance'); // 'distance' | 'sprints' | 'speed'
 
+  // Poll aggregatePlayerStats every 8s
   useEffect(() => {
+    if (!sessionId) return;
+
     const fetchStats = async () => {
       try {
-        setLoading(true);
         const result = await base44.functions.invoke('aggregatePlayerStats', { session_id: sessionId });
-        if (result?.data?.player_stats) {
-          setStats(result.data.player_stats);
+        if (result?.data?.stats) {
+          setStats(result.data.stats);
         }
-      } catch (err) {
-        console.error('Stats fetch failed:', err);
+      } catch (e) {
+        console.warn('⚠️ Stats fetch failed:', e.message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 10000); // Poll alle 10s
+    const interval = setInterval(fetchStats, 8000);
     return () => clearInterval(interval);
   }, [sessionId]);
 
+  const playerArray = Object.values(stats);
+
+  // Sort
+  const sorted = [...playerArray].sort((a, b) => {
+    if (sortBy === 'distance') return (b.total_distance_km || 0) - (a.total_distance_km || 0);
+    if (sortBy === 'sprints') return (b.sprint_count || 0) - (a.sprint_count || 0);
+    if (sortBy === 'speed') return (b.max_speed_kmh || 0) - (a.max_speed_kmh || 0);
+    return 0;
+  });
+
   if (loading) {
     return (
-      <div className="glass rounded-xl p-4 border border-border flex items-center justify-center min-h-32">
-        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+      <div className="flex items-center justify-center py-6">
+        <Loader2 className="w-4 h-4 text-primary animate-spin mr-2" />
+        <span className="text-xs text-muted-foreground">Spieler-Stats werden geladen...</span>
       </div>
     );
   }
 
-  const sorted = [...stats].sort((a, b) => {
-    if (sortBy === 'distance') return (b.distance_km || 0) - (a.distance_km || 0);
-    if (sortBy === 'sprints') return (b.sprints || 0) - (a.sprints || 0);
-    if (sortBy === 'touches') return (b.touch_count || 0) - (a.touch_count || 0);
-    return 0;
-  });
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-grotesk font-bold text-foreground">👥 Spieler-Performance</h3>
-        <div className="flex gap-1.5">
-          {[
-            { key: 'distance', label: 'km' },
-            { key: 'sprints', label: 'Sprints' },
-            { key: 'touches', label: 'Touches' },
-          ].map(btn => (
-            <button
-              key={btn.key}
-              onClick={() => setSortBy(btn.key)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                sortBy === btn.key
-                  ? 'bg-primary/15 border border-primary/30 text-primary'
-                  : 'bg-muted border border-border text-muted-foreground'
-              }`}
-            >
-              {btn.label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-3">
+      {/* Sort Buttons */}
+      <div className="flex gap-1.5 flex-wrap">
+        {[
+          { key: 'distance', label: '🏃 Distanz' },
+          { key: 'sprints', label: '⚡ Sprints' },
+          { key: 'speed', label: '💨 Speed' },
+        ].map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => setSortBy(opt.key)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+              sortBy === opt.key
+                ? 'bg-primary/20 border border-primary/40 text-primary'
+                : 'bg-muted border border-border text-muted-foreground'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
-      {stats.length === 0 ? (
-        <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground border border-border">
-          Noch keine Spieler-Daten — Tracking läuft...
+      {/* Player List */}
+      {sorted.length === 0 ? (
+        <div className="text-center py-6 text-xs text-muted-foreground">
+          Noch keine Spieler-Daten
         </div>
       ) : (
-        <div className="glass rounded-xl border border-border overflow-hidden">
-          <div className="divide-y divide-border/30">
-            {sorted.map((player, i) => {
-              const distanceBar = Math.min(100, ((player.distance_km || 0) / 12) * 100); // 12km = max
-              const sprintBar = Math.min(100, ((player.sprints || 0) / 40) * 100); // 40 sprints = max
-              return (
-                <motion.div
-                  key={player.player_id || i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-4 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-foreground truncate">
-                        {player.player_name || `Spieler ${player.player_id}`}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {Math.floor(player.minutes_played || 0)}min · {player.touch_count || 0} Touches
-                      </div>
-                    </div>
-                    <Badge className={player.distance_km > 10 ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}>
-                      {(player.distance_km || 0).toFixed(1)} km
-                    </Badge>
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {sorted.map((player, idx) => (
+            <motion.div
+              key={player.player_id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.03 }}
+              className={`rounded-lg p-3 border flex items-center justify-between ${
+                player.team === 'home'
+                  ? 'bg-primary/5 border-primary/20'
+                  : player.team === 'away'
+                    ? 'bg-red-500/5 border-red-500/20'
+                    : 'bg-muted/30 border-border'
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                    player.team === 'home'
+                      ? 'bg-primary text-primary-foreground'
+                      : player.team === 'away'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {player.number || '?'}
+                  </span>
+                  {player.player_id?.substring(0, 20) || `Player ${idx + 1}`}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 grid grid-cols-3 gap-2">
+                  <span>📏 {(player.total_distance_km || 0).toFixed(2)} km</span>
+                  <span>⚡ {player.sprint_count || 0} Sprints</span>
+                  <span>💨 {(player.max_speed_kmh || 0).toFixed(1)} km/h</span>
+                </div>
+              </div>
+              {/* Quick Indicator */}
+              <div className="flex-shrink-0 ml-2 text-right">
+                {sortBy === 'distance' && (
+                  <div className="text-lg font-grotesk font-bold text-primary">
+                    {(player.total_distance_km || 0).toFixed(1)}
                   </div>
-
-                  {/* Distance Bar */}
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-muted-foreground">Distanz</span>
-                      <span className="text-[10px] font-bold text-primary">{Math.round(distanceBar)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${distanceBar}%` }}
-                      />
-                    </div>
+                )}
+                {sortBy === 'sprints' && (
+                  <div className="text-lg font-grotesk font-bold text-yellow-400">
+                    {player.sprint_count || 0}
                   </div>
-
-                  {/* Sprints Bar */}
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-muted-foreground">Sprints</span>
-                      <span className="text-[10px] font-bold text-accent">{player.sprints || 0}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full bg-accent transition-all"
-                        style={{ width: `${sprintBar}%` }}
-                      />
-                    </div>
+                )}
+                {sortBy === 'speed' && (
+                  <div className="text-lg font-grotesk font-bold text-cyan-400">
+                    {(player.max_speed_kmh || 0).toFixed(0)}
                   </div>
-
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-2 text-[10px] mt-3 pt-2 border-t border-border/30">
-                    <div className="text-center">
-                      <div className="text-muted-foreground">Intensität</div>
-                      <div className="font-bold text-foreground">{player.intensity_index || 0}%</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-muted-foreground">Ballkontakte</div>
-                      <div className="font-bold text-foreground">{player.ball_touches || 0}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-muted-foreground">Erfolgsquote</div>
-                      <div className="font-bold text-foreground">{player.success_rate || 0}%</div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+                )}
+                <div className="text-[10px] text-muted-foreground">
+                  {sortBy === 'distance' && 'km'}
+                  {sortBy === 'sprints' && 'x'}
+                  {sortBy === 'speed' && 'km/h'}
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
     </div>

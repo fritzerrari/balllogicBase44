@@ -93,7 +93,13 @@ export default function LiveTrackingPanel({ sessionId }) {
 
         {/* Stats Tab */}
         <TabsContent value="stats" className="mt-3">
-          <PlayerStatsPanel sessionId={sessionId} />
+          {allTracking.length > 0 ? (
+            <PlayerStatsPanel sessionId={sessionId} />
+          ) : (
+            <div className="text-center py-6 text-xs text-muted-foreground">
+              Warte auf Tracking-Daten...
+            </div>
+          )}
         </TabsContent>
 
         {/* Heatmap Tab */}
