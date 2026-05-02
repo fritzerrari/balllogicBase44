@@ -15,7 +15,22 @@ import FootballPitch from '@/components/pitch/FootballPitch';
 import EventButtons from '@/components/live/EventButtons';
 import CameraInviteButton from '@/components/live/CameraInviteButton';
 
-const CAMERA_POSITIONS = ['Tribüne Mitte', 'Tribüne Links', 'Tribüne Rechts', 'Torlinie Heim', 'Torlinie Gäste', 'Erhöht Mitte'];
+const CAMERA_POSITIONS = [
+  '— Position wählen —',
+  'Tribüne Mitte (Übersicht)',
+  'Tribüne Links',
+  'Tribüne Rechts',
+  'Torlinie Heim',
+  'Torlinie Gäste',
+  'Seitenlinie Hälfte Heim',
+  'Seitenlinie Hälfte Gäste',
+  'Seitenlinie Mitte',
+  'Erhöht Mitte',
+  'Ecke vorne links',
+  'Ecke vorne rechts',
+  'Ecke hinten links',
+  'Ecke hinten rechts',
+];
 
 export default function LiveSession() {
   const navigate = useNavigate();
@@ -24,6 +39,7 @@ export default function LiveSession() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [cameraCount, setCameraCount] = useState(1);
   const [cameras, setCameras] = useState([{ id: 1, position: CAMERA_POSITIONS[0], code: Math.floor(100000 + Math.random() * 900000).toString(), status: 'ready' }]);
+  // CAMERA_POSITIONS[0] = "— Position wählen —" (kein Vorausfüllen)
   const [events, setEvents] = useState([]);
   const [session, setSession] = useState(null);
   const [isMicActive, setIsMicActive] = useState(false);
@@ -50,7 +66,7 @@ export default function LiveSession() {
     setCameraCount(count);
     setCameras(Array.from({ length: count }, (_, i) => ({
       id: i + 1,
-      position: CAMERA_POSITIONS[i] || `Kamera ${i + 1}`,
+      position: CAMERA_POSITIONS[0], // leer / "Position wählen"
       code: Math.floor(100000 + Math.random() * 900000).toString(),
       status: 'ready'
     })));
