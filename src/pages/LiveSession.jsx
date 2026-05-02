@@ -350,7 +350,7 @@ export default function LiveSession() {
                       const isConnected = liveStream?.status === 'connected';
                       const thumbnail = liveStream?.thumbnail;
                       return (
-                        <div key={cam.id} className={`aspect-video rounded-lg border overflow-hidden relative flex flex-col items-center justify-center bg-black ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
+                        <div key={cam.id} className={`aspect-video rounded-lg border overflow-hidden relative flex flex-col items-center justify-center bg-black group/cam ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
                           {thumbnail ? (
                             <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover" />
                           ) : (
@@ -364,8 +364,12 @@ export default function LiveSession() {
                               {isConnected ? 'LIVE' : 'WARTET'}
                             </div>
                           </div>
-                          <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium truncate bg-gradient-to-t from-black/80 to-transparent">
-                            {cam.label}
+                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity">
+                            <CameraInviteButton code={cam.code} position={cam.label} />
+                          </div>
+                          <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] text-white font-medium bg-gradient-to-t from-black/80 to-transparent">
+                            <div className="truncate">{cam.label}</div>
+                            <div className="text-white/60 font-mono tracking-widest">{cam.code}</div>
                           </div>
                         </div>
                       );
