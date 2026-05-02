@@ -1,118 +1,99 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-
 /**
- * AutoEventLog — Zeigt auto-erkannte Events mit Approval-Buttons
- * 
- * Props:
- *   - events: AutoEvent[]
- *   - onApprove: (eventId) => void
- *   - onReject: (eventId) => void
+ * AutoEventLog — Auto-erkannte Events mit Approval/Reject Buttons
  */
-export default function AutoEventLog({ events = [], onApprove, onReject }) {
-  const typeEmojis = {
-    ball_in_penalty_area: '🎯',
-    ball_in_goal_area: '⚽',
-    player_offside: '🚩',
-    high_speed_transition: '⚡',
-    ball_lost: '❌',
-    possession_change: '🔄',
-    dangerous_situation: '⚠️',
-  };
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, X, AlertCircle } from 'lucide-react';
 
-  const typeLabels = {
-    ball_in_penalty_area: 'Ball im Strafraum',
-    ball_in_goal_area: 'Ball im Tor-Bereich',
-    player_offside: 'Abseits?',
-    high_speed_transition: 'Schneller Konter',
-    ball_lost: 'Ballverlust',
-    possession_change: 'Ballwechsel',
-    dangerous_situation: 'Gefährliche Situation',
-  };
+const EVENT_ICONS = {
+  ball_in_penalty_area: '⚠️',
+  ball_in_goal_area: '🎯',
+  player_offside: '🚩',
+  high_speed_transition: '⚡',
+  ball_lost: '❌',
+  possession_change: '🔄',
+  dangerous_situation: '💥',
+};
+
+export default function AutoEventLog({ events, onApprove, onReject }) {
+  const pending = events.filter(e => !e.approved_by_trainer && !e.rejected);
+  const approved = events.filter(e => e.approved_by_trainer);
+  const rejected = events.filter(e => e.rejected);
 
   return (
-    <div className="space-y-2 max-h-96 overflow-y-auto">
-      {events.length === 0 ? (
-        <div className="text-center py-4 text-xs text-muted-foreground">
-          Keine automatischen Events erkannt
-        </div>
-      ) : (
-        <AnimatePresence>
-          {events.map((evt, i) => (
-            <motion.div
-              key={evt.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg border border-border/50"
-            >
-              {/* Icon */}
-              <div className="flex-shrink-0 text-lg">
-                {typeEmojis[evt.type] || '📍'}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-foreground text-xs">
-                  {typeLabels[evt.type] || evt.type}
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {evt.description}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge
-                    variant="outline"
-                    className="text-[9px]"
-                  >
-                    {evt.minute}' · {evt.team === 'home' ? '🏠' : evt.team === 'away' ? '✈️' : '⚪'}
-                  </Badge>
-                  <Badge
-                    className={`text-[9px] ${
-                      evt.confidence >= 80
-                        ? 'bg-green-500/20 text-green-400'
-                        : evt.confidence >= 60
-                          ? 'bg-yellow-500/20 text-yellow-400'
-                          : 'bg-red-500/20 text-red-400'
-                    }`}
-                  >
-                    {evt.confidence}% Konfidenz
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {!evt.approved_by_trainer && !evt.rejected ? (
-                  <>
+    <div className="space-y-3">
+      {pending.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5" /> Ausstehend ({pending.length})
+          </h4>
+          <div className="space-y-1.5">
+            <AnimatePresence>
+              {pending.map((evt, idx) => (
+                <motion.div
+                  key={evt.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5 flex items-start gap-2.5"
+                >
+                  <span className="text-lg flex-shrink-0">{EVENT_ICONS[evt.type] || '•'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-yellow-400 capitalize">{evt.type.replace(/_/g, ' ')}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{evt.description}</div>
+                    <div className="text-[9px] text-muted-foreground/70 mt-1">
+                      {evt.minute}' · Confidence: {evt.confidence}%
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
                     <button
-                      onClick={() => onApprove?.(evt.id)}
-                      className="p-1 rounded-lg bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-all"
-                      title="Bestätigen"
+                      onClick={() => onApprove(evt.id)}
+                      className="w-6 h-6 rounded-lg bg-primary/20 border border-primary/30 text-primary hover:bg-primary/40 flex items-center justify-center text-xs transition-all"
+                      title="Genehmigen"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      ✓
                     </button>
                     <button
-                      onClick={() => onReject?.(evt.id)}
-                      className="p-1 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all"
+                      onClick={() => onReject(evt.id)}
+                      className="w-6 h-6 rounded-lg bg-destructive/20 border border-destructive/30 text-destructive hover:bg-destructive/40 flex items-center justify-center text-xs transition-all"
                       title="Ablehnen"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      ✕
                     </button>
-                  </>
-                ) : evt.approved_by_trainer ? (
-                  <Badge className="bg-green-500/20 text-green-400 text-[9px]">
-                    ✓ Bestätigt
-                  </Badge>
-                ) : (
-                  <Badge className="bg-red-500/20 text-red-400 text-[9px]">
-                    ✗ Abgelehnt
-                  </Badge>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {approved.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Genehmigt ({approved.length})
+          </h4>
+          <div className="space-y-1.5">
+            <AnimatePresence>
+              {approved.slice(0, 3).map(evt => (
+                <motion.div
+                  key={evt.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 text-xs"
+                >
+                  <div className="font-bold text-primary capitalize">{evt.type.replace(/_/g, ' ')}</div>
+                  <div className="text-muted-foreground text-[9px] mt-1">{evt.minute}' · {evt.confidence}%</div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {pending.length === 0 && approved.length === 0 && rejected.length === 0 && (
+        <div className="text-center py-6 text-xs text-muted-foreground">
+          Keine Auto-Events erkannt
+        </div>
       )}
     </div>
   );

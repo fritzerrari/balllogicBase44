@@ -1,107 +1,92 @@
+/**
+ * HeatmapVisualization — 10x10 Grid Heatmap Canvas Renderer
+ */
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
-/**
- * HeatmapVisualization — Canvas-basierte Heatmap Rendering
- * 
- * Props:
- *   - gridData: Array von {x, y, intensity}
- *   - title: "Player Density" etc.
- *   - loading: bool
- */
-export default function HeatmapVisualization({ gridData = [], title = 'Heatmap', loading = false }) {
+export default function HeatmapVisualization({ gridData, title, loading }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !gridData.length) return;
-
     const canvas = canvasRef.current;
+    if (!canvas || !gridData || gridData.length === 0) return;
+
     const ctx = canvas.getContext('2d');
-    const cellWidth = canvas.width / 10;
-    const cellHeight = canvas.height / 10;
+    const cellSize = canvas.width / 10;
 
     // Background
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#0d1f0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
+    // Draw grid
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 0.5;
     for (let i = 0; i <= 10; i++) {
       ctx.beginPath();
-      ctx.moveTo(i * cellWidth, 0);
-      ctx.lineTo(i * cellWidth, canvas.height);
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, canvas.height);
       ctx.stroke();
-
       ctx.beginPath();
-      ctx.moveTo(0, i * cellHeight);
-      ctx.lineTo(canvas.width, i * cellHeight);
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(canvas.width, i * cellSize);
       ctx.stroke();
     }
 
-    // Heatmap cells
-    for (const cell of gridData) {
-      const x = cell.x * cellWidth;
-      const y = cell.y * cellHeight;
-      const intensity = cell.intensity / 100;
+    // Draw heatmap
+    for (let i = 0; i < gridData.length; i++) {
+      const intensity = gridData[i] || 0;
+      const x = (i % 10) * cellSize;
+      const y = Math.floor(i / 10) * cellSize;
 
-      // Color gradient: blue (low) → red (high)
+      // Interpolate color: cool (0%) → hot (100%)
       let r, g, b;
-      if (intensity < 0.5) {
-        r = Math.round(0 + intensity * 2 * 255);
-        g = 0;
-        b = Math.round(255 - intensity * 2 * 255);
+      if (intensity < 50) {
+        // Blue → Green
+        const t = intensity / 50;
+        r = 0;
+        g = Math.round(255 * t);
+        b = Math.round(255 * (1 - t));
       } else {
-        r = 255;
-        g = Math.round((intensity - 0.5) * 2 * 255);
+        // Green → Red
+        const t = (intensity - 50) / 50;
+        r = Math.round(255 * t);
+        g = Math.round(255 * (1 - t));
         b = 0;
       }
 
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${intensity * 0.7})`;
-      ctx.fillRect(x + 1, y + 1, cellWidth - 2, cellHeight - 2);
-    }
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.7)`;
+      ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
 
-    // Border
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+      // Label
+      if (intensity > 0) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${intensity}`, x + cellSize / 2, y + cellSize / 2);
+      }
+    }
   }, [gridData]);
 
   return (
-    <div className="space-y-3">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-foreground text-sm">{title}</h3>
-        {loading && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+        <h4 className="text-xs font-bold text-foreground">{title}</h4>
+        {loading && <Loader2 className="w-3 h-3 text-primary animate-spin" />}
       </div>
-
-      <canvas
-        ref={canvasRef}
-        width={400}
-        height={400}
-        className="w-full rounded-lg border border-border bg-muted"
-      />
-
-      {/* Legend */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div>Low</div>
-        <div className="flex gap-1">
-          {[0, 25, 50, 75, 100].map(val => (
-            <div
-              key={val}
-              style={{
-                background: val < 50
-                  ? `rgb(${val * 2.55}, 0, ${255 - val * 2.55})`
-                  : `rgb(255, ${(val - 50) * 5.1}, 0)`,
-                width: '20px',
-                height: '12px',
-                borderRadius: '2px',
-              }}
-            />
-          ))}
-        </div>
-        <div>High</div>
+      <div className="aspect-square rounded-xl overflow-hidden border border-border bg-black">
+        <canvas
+          ref={canvasRef}
+          width={300}
+          height={300}
+          className="w-full h-full"
+        />
       </div>
-    </div>
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground px-2">
+        <span>Kalt (0%)</span>
+        <span>Heiß (100%)</span>
+      </div>
+    </motion.div>
   );
 }
