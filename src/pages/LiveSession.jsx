@@ -691,7 +691,7 @@ export default function LiveSession() {
                   const thumbnail = liveStream?.thumbnail;
                   return (
                     <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${!isEnabled ? 'opacity-50' : ''} ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
-                      {/* Vorschau-Thumbnail wenn vorhanden */}
+                      {/* Thumbnail wenn vorhanden */}
                       {thumbnail ? (
                         <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover opacity-80" />
                       ) : (
