@@ -36,6 +36,8 @@ const bottomItems = [
   { label: 'Changelog', icon: BookOpen, path: '/changelog' },
   { label: 'Ereignis-Protokoll', icon: ClipboardList, path: '/events' },
   { label: 'Admin-Dashboard', icon: Shield, path: '/admin', adminOnly: true },
+  { label: 'Admin-Handbuch', icon: BookOpen, path: '/admin/manual', adminOnly: true },
+  { label: 'Admin-Demo', icon: Tv2, path: '/admin/demo', adminOnly: true },
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
 ];
 
