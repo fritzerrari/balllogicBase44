@@ -2,8 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield, ClipboardList,
-  Clipboard
+  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield, ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -38,6 +37,7 @@ const bottomItems = [
   { label: 'Admin-Dashboard', icon: Shield, path: '/admin', adminOnly: true },
   { label: 'Admin-Handbuch', icon: BookOpen, path: '/admin/manual', adminOnly: true },
   { label: 'Admin-Demo', icon: Tv2, path: '/admin/demo', adminOnly: true },
+  { label: 'Example Report', icon: FileText, path: '/admin/example-report', adminOnly: true },
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
 ];
 
