@@ -296,8 +296,11 @@ export default function CameraView() {
     const poll = async () => {
       count++;
       try {
-        const sessions = await base44.entities.LiveSession.filter({ status: 'active' });
-        const matched = sessions.find(s => matchCode(s, codeStr));
+        // Akzeptiere both 'ready' und 'active' Sessions — Trainer muss erst "Live starten" klicken
+        const sessionsReady = await base44.entities.LiveSession.filter({ status: 'ready' });
+        const sessionsActive = await base44.entities.LiveSession.filter({ status: 'active' });
+        const allSessions = [...sessionsReady, ...sessionsActive];
+        const matched = allSessions.find(s => matchCode(s, codeStr));
         if (matched) {
           clearInterval(pollRef.current);
           const cam = matched.camera_streams?.find(c => String(c.code).trim() === codeStr);
