@@ -197,9 +197,10 @@ export default function LiveSession() {
         const cards = events.filter(e => e.type === 'yellow_card' || e.type === 'red_card');
         const subs = events.filter(e => e.type === 'substitution');
         
-        // Delta-Check: vergleiche session.camera_streams mit initialer Anzahl
+        // Delta-Check: vergleiche finale vs initial camera count
         const cameraStreams = session.camera_streams || [];
-        const cameraChanges = cameraStreams.length !== cameraCount ? `Kameras: ${cameraCount} → ${cameraStreams.length}` : null;
+        const initialCount = cameras.length;
+        const cameraChanges = cameraStreams.length !== initialCount ? `Kameras: ${initialCount} → ${cameraStreams.length}` : null;
 
         await base44.entities.SessionReport.create({
           session_id: session.id,
@@ -235,7 +236,7 @@ export default function LiveSession() {
       } catch (_) {}
     };
     poll();
-    const interval = setInterval(poll, 1500); // schneller während Setup
+    const interval = setInterval(poll, 5000); // REDUCED: 1.5s → 5s (Rate-Limit)
     return () => clearInterval(interval);
   }, [session?.id]);
 

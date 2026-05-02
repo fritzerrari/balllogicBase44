@@ -210,7 +210,7 @@ export default function CameraView() {
           return;
         }
 
-        const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.7); // Better quality
         if (!thumbnail) return;
 
         // Update session with thumbnail
