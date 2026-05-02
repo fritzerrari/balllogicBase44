@@ -90,7 +90,7 @@ export default function CoachingCockpit() {
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
-    refetchInterval: 8000,
+    refetchInterval: 15000, // Reduced from 8s to prevent rate-limit spikes
   });
 
   const activeSession = sessions[0];
@@ -105,12 +105,14 @@ export default function CoachingCockpit() {
   // ── Simulation mode ────────────────────────────────────────────────────────
   useEffect(() => {
     if (trackingMode !== 'simulation') return;
+    let prevPlayers = [];
     simIntervalRef.current = setInterval(() => {
       setTrackTick(t => {
         const newTick = t + 1;
         const { players } = simulateDetections(newTick, { playersPerTeam, pitchType, includeReferee: pitchType === 'full' });
-        setPrevDetections(detections);
+        setPrevDetections(prevPlayers);
         setDetections(players);
+        prevPlayers = players; // Keep in local ref, not state
         // Simulate auto events occasionally
         if (newTick % 40 === 0) {
           const simEvents = detectEvents(players, [], { left: 2, right: 98, top: 2, bottom: 98 });
@@ -237,11 +239,13 @@ export default function CoachingCockpit() {
     setApiError(null);
   };
 
-  // Cleanup
-  useEffect(() => () => {
-    clearInterval(detectionIntervalRef.current);
-    clearInterval(simIntervalRef.current);
-    stopRoboflowTracking();
+  // Cleanup — only on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(detectionIntervalRef.current);
+      clearInterval(simIntervalRef.current);
+      stopRoboflowTracking();
+    };
   }, []);
 
   // ── Derived data ───────────────────────────────────────────────────────────
