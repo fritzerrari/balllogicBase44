@@ -58,31 +58,29 @@ KI-Zusammenfassung: ${analysisReport.ai_summary || '–'}` : '';
       : '';
 
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Du bist ein Elite-Fußballanalyst und Coach-Advisor. Analysiere das Spiel "${match?.title || 'Unbekannt'}" für die Heimmannschaft "${match?.home_team || 'Eigenes Team'}" mit absoluter Tiefe und Professionalität.
+      prompt: `Du bist ein Fußballanalyst. Analysiere das Spiel "${match?.title || 'Unbekannt'}" für die Heimmannschaft "${match?.home_team || 'Eigenes Team'}".
 
 Match: ${match?.title}, Ergebnis: ${match?.score_home ?? '–'}:${match?.score_away ?? '–'}
 ${reportContext}
 ${eventsContext}
 
-SCHWERPUNKT: Verbesserungsanalyse des eigenen Spiels, Schwachpunkte aufzeigen, konkrete Konsequenzen!
+Gib PRÄGNANTE Einschätzung:
+- management_summary: 2-3 klare Sätze
+- strengths: 4-5 Stärken
+- weaknesses: 4-5 Schwachpunkte (am wichtigsten!)
+- opportunities: 3-4 Chancen
+- threats: 3-4 Risiken
+- tactical_observations: 1 Absatz, kernhaft
+- consequences: 4-5 sofortige Maßnahmen
+- recommendations: 4-5 konkrete Empfehlungen
+- training_focus: 3-4 Trainingsschwerpunkte
+- pressing_analysis: Kurz (1-2 Sätze)
+- formation_analysis: Kurz (1-2 Sätze)
+- set_pieces_analysis: Kurz (1-2 Sätze)
+- performance_score: 0-100
 
-Liefere:
-- management_summary: 4-5 prägnante Sätze für den Cheftrainer — was war gut, was muss sich DRINGEND ändern
-- strengths: 5-7 konkrete Stärken des eigenen Spiels in diesem Match
-- weaknesses: 5-8 SCHONUNGSLOSE Schwachpunkte (das ist der wichtigste Teil!)
-- opportunities: 4-6 Chancen die nicht genutzt wurden und beim nächsten Spiel genutzt werden sollten
-- threats: 4-5 Faktoren die dem Team gefährlich werden könnten
-- tactical_observations: Tiefgehende taktische Analyse (3-4 Absätze, Fließtext) mit Formations-Analyse, Pressingverhalten, Übergangsspiel, Standardsituationen
-- consequences: 6-8 direkte KONSEQUENZEN die der Trainer JETZT ziehen muss
-- recommendations: 6-8 sehr konkrete taktische Empfehlungen für die nächsten Spiele
-- training_focus: 5-6 Trainingsschwerpunkte mit klarer Priorität
-- pressing_analysis: Detaillierte Pressing-Analyse (wann, wo, wie intensiv, Verbesserungen)
-- formation_analysis: War die Formation optimal? Alternativen? (konkret)
-- set_pieces_analysis: Standardsituationen Analyse (Für und Wider, Verbesserungen)
-- performance_score: Gesamtbewertung 0-100 (sei kritisch und ehrlich!)
-
-Schreibe auf höchstem Niveau, wie ein UEFA-Pro-Lizenz-Trainer. Konkret, prägnant, handlungsleitend.`,
-      model: 'claude_sonnet_4_6',
+Kurz & knapp, keine Floskeln.`,
+      model: 'gemini_3_flash',
       response_json_schema: {
         type: 'object',
         properties: {

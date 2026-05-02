@@ -59,7 +59,7 @@ export default function CoachingCockpit() {
   // DSGVO-Gate: Tracking nur starten wenn Einwilligung geprüft oder bestätigt
   const [trackingUnlocked, setTrackingUnlocked] = useState(false);
 
-  // Tracking state
+  // Tracking state — START IN SIMULATION FOR IMMEDIATE FEEDBACK
   const [trackingMode, setTrackingMode] = useState('simulation'); // 'simulation' | 'roboflow'
   const [apiKey, setApiKey] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -502,8 +502,8 @@ export default function CoachingCockpit() {
               <span className="text-sm font-grotesk font-semibold text-foreground flex items-center gap-2">
                 <Target className="w-4 h-4 text-primary" />
                 Live-Tracking
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${trackingMode === 'roboflow' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                  {trackingMode === 'roboflow' ? '🔴 RF-DETR LIVE' : '⚪ Simulation'}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${trackingMode === 'roboflow' ? 'bg-primary/20 text-primary' : 'bg-yellow-500/30 text-yellow-400'}`}>
+                  {trackingMode === 'roboflow' ? '🔴 RF-DETR LIVE' : '▶️ SIMULATION (aktiv)'}
                 </span>
                 <span className="text-[10px] text-muted-foreground">{playersPerTeam}v{playersPerTeam}</span>
               </span>
@@ -514,14 +514,19 @@ export default function CoachingCockpit() {
                 <span className="flex items-center gap-1 text-yellow-400"><Circle className="w-2 h-2 fill-current" /> Ball</span>
               </div>
             </div>
+            {playerCounts.home === 0 && playerCounts.away === 0 && (
+              <div className="mb-2 text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-lg border border-yellow-500/20">
+                💡 Spieler erscheinen in wenigen Sekunden — Simulation startet automatisch...
+              </div>
+            )}
             <div className="relative aspect-[3/2] max-h-[300px]">
               <FootballPitch
-                players={showTracking ? playerList : []}
+                players={playerList}
                 dangerZones={ball ? [{ x: ball.x, y: ball.y, intensity: 0.8, team: 'home' }] : []}
                 showGrid
                 pitchType={pitchType}
               />
-              {showTracking && (
+              {playerList.length > 0 && (
                 <TrackingOverlay
                   players={playerList}
                   ball={ball}
