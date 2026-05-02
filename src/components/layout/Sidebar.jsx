@@ -32,6 +32,10 @@ const toolsItems = [
   { label: 'Session-Archiv', icon: Calendar, path: '/archive' },
 ];
 
+const scoutingLinks = [
+  { label: 'Gegner-Scouting', icon: Users, path: '/scouting-dashboard' },
+];
+
 const bottomItems = [
   { label: 'Einstellungen', icon: Settings, path: '/settings' },
   { label: 'Changelog', icon: BookOpen, path: '/changelog' },

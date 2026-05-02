@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Search, AlertTriangle, TrendingUp, Shield, Loader2, Target, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export default function ScoutingReport() {
+  const navigate = useNavigate();
   const [opponent, setOpponent] = useState('');
   const [loading, setLoading] = useState(false);
   const [scouting, setScouting] = useState(null);
@@ -63,9 +65,18 @@ Erstelle ein kompaktes Scouting-Profil.`,
 
   return (
     <div className="p-6 lg:p-8 min-h-screen max-w-3xl mx-auto">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
-        <h1 className="text-3xl font-grotesk font-bold text-foreground mb-1">Gegner-Scouting</h1>
-        <p className="text-muted-foreground">KI-Profil aus eigenen Spielen & Gegner-Daten</p>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-grotesk font-bold text-foreground mb-1">Gegner-Scouting</h1>
+          <p className="text-muted-foreground">KI-Profil aus eigenen Spielen & Gegner-Daten</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/scouting-dashboard')}
+          className="gap-2"
+        >
+          <Target className="w-4 h-4" /> Spieler-Details
+        </Button>
       </motion.div>
 
       <div className="glass rounded-xl p-5 mb-6">

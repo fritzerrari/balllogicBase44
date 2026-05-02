@@ -31,6 +31,7 @@ import ShareCameraLink from '@/components/live/ShareCameraLink';
 import EventLog from '@/components/live/EventLog';
 import LiveStats from '@/components/live/LiveStats';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
+import NotificationBanner from '@/components/live/NotificationBanner';
 import {
   detectFrame,
   assignTeamsByColor,
@@ -69,6 +70,7 @@ export default function CoachingCockpit() {
   const [trackTick, setTrackTick] = useState(0);
   const [isDetecting, setIsDetecting] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const [activeNotification, setActiveNotification] = useState(null);
 
   // Training mode config
   const [pitchType, setPitchType] = useState('full'); // 'full' | 'half' | 'small' | 'training'
@@ -270,6 +272,13 @@ export default function CoachingCockpit() {
 
   return (
     <div className="p-4 lg:p-6 min-h-screen">
+      {/* Notifications */}
+      {activeNotification && (
+        <NotificationBanner
+          notification={activeNotification}
+          onDismiss={() => setActiveNotification(null)}
+        />
+      )}
       {/* Hidden elements for Roboflow capture */}
       <video ref={videoRef} className="hidden" muted playsInline />
       <canvas ref={hiddenCanvasRef} className="hidden" />
