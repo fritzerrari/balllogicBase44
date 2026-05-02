@@ -12,8 +12,14 @@ export default function CameraInviteButton({ code, position }) {
   const url = `${window.location.origin}/cam?code=${code}&pos=${encodeURIComponent(position)}`;
   const message = `📹 Kamera-Assistent für "${position}"\n\nÖffne diesen Link auf deinem Handy und starte die Kamera:\n${url}\n\nOder gib Code ein: ${code}`;
 
-  const copyLink = async () => {
+  const copyCode = async () => {
     await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => { setCopied(false); }, 1500);
+  };
+
+  const copyFullLink = async () => {
+    await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => { setCopied(false); }, 1500);
   };
@@ -75,10 +81,18 @@ export default function CameraInviteButton({ code, position }) {
               <div className="space-y-3 pt-2">
                 {/* Copy Code */}
                 <button
-                  onClick={copyLink}
+                  onClick={copyCode}
                   className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-base font-bold transition-all neon-glow"
                 >
                   {copied ? <><Check className="w-5 h-5" /> Kopiert!</> : <><Copy className="w-5 h-5" /> Code kopieren</>}
+                </button>
+
+                {/* Copy Full Link */}
+                <button
+                  onClick={copyFullLink}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary/10 border-2 border-primary/30 text-primary hover:bg-primary/20 text-base font-bold transition-all"
+                >
+                  {copied ? <><Check className="w-5 h-5" /> Link kopiert!</> : <><Copy className="w-5 h-5" /> Link kopieren</>}
                 </button>
 
                 {/* WhatsApp */}
