@@ -45,12 +45,14 @@ export default function CameraInviteButton({ code, position }) {
           <>
             {/* Backdrop */}
             <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setOpen(false)} />
-            {/* Dialog — centered auf viewport */}
+            {/* Dialog — centered auf viewport mit Padding */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl p-8 space-y-6"
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -98,6 +100,7 @@ export default function CameraInviteButton({ code, position }) {
                     Systemteilen
                   </button>
                 )}
+              </div>
               </div>
             </motion.div>
           </>
