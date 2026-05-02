@@ -177,63 +177,60 @@ export default function CameraView() {
     return false;
   }, []);
 
-  // ── Thumbnail push: only every 5s to reduce API load ──────────────────────
+  // ── Thumbnail push: robust update every 3s ────────────────────────────────
   const startThumbnailPush = useCallback((sessionId, codeStr) => {
     clearInterval(thumbIntervalRef.current);
-    const canvas = document.createElement('canvas');
-    canvas.width = 320; canvas.height = 180;
-    let lastPushTime = 0;
+    let consecutiveErrors = 0;
+    const maxErrors = 5;
 
-    const pushThumb = async () => {
-      const now = Date.now();
-      // Skip if less than 5s since last push (rate limiting)
-      if (now - lastPushTime < 5000) return;
-      lastPushTime = now;
-
+    const pushStatus = async () => {
       try {
-        const video = videoRef.current;
-        if (!video || video.readyState < 2) return;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        
-        // Only render if video dimensions are ready
-        if (!video.videoWidth || !video.videoHeight) return;
-        
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        try {
-          ctx.drawImage(video, 0, 0);
-        } catch (_) {
-          // CORS or other canvas error — skip this push
-          return;
-        }
-
-        const thumbnail = canvas.toDataURL('image/jpeg', 0.7); // Better quality
-        if (!thumbnail) return;
-
-        // Update session with thumbnail
-        const allSessions = await base44.entities.LiveSession.list('-created_date', 50);
-        const fresh = allSessions.find(s => s.id === sessionId);
+        // Direct update: set status + last_seen without thumbnail
+        // (Thumbnail is optional; connection status is critical)
+        const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
+        const fresh = sessions[0];
         if (!fresh) return;
 
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
           String(cam.code).trim() === codeStr 
-            ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } 
+            ? { 
+                ...cam, 
+                status: 'connected', 
+                last_seen: new Date().toISOString(),
+                // Try to capture thumbnail if possible
+                ...(videoRef.current && videoRef.current.readyState >= 2 
+                  ? (() => {
+                      try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 320;
+                        canvas.height = 180;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx && videoRef.current.videoWidth > 0) {
+                          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                          const thumb = canvas.toDataURL('image/jpeg', 0.5);
+                          return thumb ? { thumbnail: thumb } : {};
+                        }
+                      } catch (_) {}
+                      return {};
+                    })()
+                  : {})
+              }
             : cam
         );
 
         await base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
-      } catch (_) {
-        // Silent fail — retry on next interval
+        consecutiveErrors = 0;
+      } catch (error) {
+        consecutiveErrors++;
+        if (consecutiveErrors >= maxErrors) {
+          clearInterval(thumbIntervalRef.current);
+        }
       }
     };
 
-    // Push every 5s (not 3s) to avoid API throttling
-    thumbIntervalRef.current = setInterval(pushThumb, 5000);
-    // First push delayed to 2s (let video load)
-    setTimeout(pushThumb, 2000);
+    // Poll every 3s — status ist wichtiger als thumbnail
+    thumbIntervalRef.current = setInterval(pushStatus, 3000);
+    pushStatus(); // Immediate first call
   }, []);
 
   // ── Simple audio detection (no uptime dep) ────────────────────────────────
