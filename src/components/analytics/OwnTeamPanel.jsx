@@ -134,15 +134,16 @@ Schreibe auf höchstem Niveau, wie ein UEFA-Pro-Lizenz-Trainer. Konkret, prägna
   return (
     <div className="space-y-5">
       {/* Generate Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-grotesk font-bold text-foreground">Eigenes Team — Tiefenanalyse</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Schwerpunkt: Schwachstellen, Verbesserungspotenziale, Handlungsempfehlungen</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-grotesk font-bold text-foreground text-sm sm:text-base">Eigenes Team — Tiefenanalyse</h2>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Schwachstellen, Verbesserungspotenziale, Handlungsempfehlungen</p>
         </div>
         <Button onClick={handleGenerate} disabled={generating}
-          className="bg-primary text-primary-foreground gap-2">
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : analysis ? <RefreshCw className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-          {generating ? 'Analysiere...' : analysis ? 'Neu' : 'KI starten'}
+          className="bg-primary text-primary-foreground gap-2 flex-shrink-0 text-xs sm:text-sm">
+          {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : analysis ? <RefreshCw className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">{generating ? 'Analysiere...' : analysis ? 'Neu analysieren' : 'KI starten'}</span>
+          <span className="sm:hidden">{generating ? '...' : 'KI'}</span>
         </Button>
       </div>
 
@@ -155,7 +156,7 @@ Schreibe auf höchstem Niveau, wie ein UEFA-Pro-Lizenz-Trainer. Konkret, prägna
 
       {/* Metrics Grid */}
       {analysisReport && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {[
             { label: 'Ballbesitz', value: `${analysisReport.possession_home ?? '–'}%`, color: 'text-primary', sub: `Gegner: ${analysisReport.possession_away ?? '–'}%` },
             { label: 'Pressing-Index', value: analysisReport.pressing_index_home ?? '–', color: 'text-orange-400', sub: `Höhe: ${analysisReport.pressing_height_home ?? '–'}m` },

@@ -27,7 +27,7 @@ const toolsItems = [
   { label: 'Kader & Performance', icon: Users, path: '/players' },
   { label: 'Taktik-Board', icon: BarChart3, path: '/tactics-board' },
   { label: 'Berichte', icon: FileText, path: '/session-reports' },
-  { label: 'Analytics Cockpit', icon: Clipboard, path: '/analytics', badge: 'NEU' },
+  { label: 'Analytics Cockpit', icon: BarChart3, path: '/analytics', badge: 'NEU' },
 ];
 
 const bottomItems = [

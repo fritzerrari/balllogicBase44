@@ -36,7 +36,7 @@ export default function ManagementSummaryCard({ analysis, title = "Management Su
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      className="glass rounded-2xl p-6 border border-border">
+      className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-border">
       
       {/* Header */}
       <div className="flex items-start justify-between mb-4 gap-4">
@@ -60,7 +60,7 @@ export default function ManagementSummaryCard({ analysis, title = "Management Su
       )}
 
       {/* SWOT Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
         {analysis.strengths?.length > 0 && (
           <SwotBox icon={CheckCircle2} label="Stärken" items={analysis.strengths} color="text-primary" bg="bg-primary/5 border-primary/20" />
         )}

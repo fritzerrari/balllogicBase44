@@ -85,19 +85,17 @@ export default function LiveSession() {
 
   return (
     <div className="p-4 lg:p-8 min-h-screen">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4">
-        <div className="flex items-center gap-2">
-          <Radio className="w-4 h-4 text-red-400" />
-          <h1 className="text-2xl font-grotesk font-bold text-foreground">Live-Session</h1>
-          {sessionActive && (
-            <Badge className="bg-red-500/15 text-red-400 border border-red-500/30 text-xs ml-2 animate-pulse">● LIVE</Badge>
-          )}
-        </div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 mb-4">
+        <Radio className="w-4 h-4 text-red-400" />
+        <h1 className="text-xl sm:text-2xl font-grotesk font-bold text-foreground">Live-Session</h1>
+        {sessionActive && (
+          <Badge className="bg-red-500/15 text-red-400 border border-red-500/30 text-xs animate-pulse">● LIVE</Badge>
+        )}
       </motion.div>
 
       {/* SETUP PHASE */}
       {!sessionActive && (
-        <div className="max-w-xl mx-auto space-y-4">
+        <div className="max-w-lg mx-auto space-y-3">
           <div className="glass rounded-xl p-5 space-y-4">
             <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">1</span>
@@ -157,29 +155,29 @@ export default function LiveSession() {
 
       {/* LIVE PHASE */}
       {sessionActive && (
-        <div className="grid lg:grid-cols-3 gap-4">
+        <div className="grid lg:grid-cols-3 gap-3 lg:gap-4">
           {/* Left: Timer + Events */}
-          <div className="space-y-4">
-            {/* Timer Card */}
-            <div className="glass rounded-xl p-4 border border-red-500/20">
-              <div className="flex items-center justify-between mb-3">
+          <div className="space-y-3">
+            {/* Timer Card — very compact on mobile */}
+            <div className="glass rounded-xl p-3 sm:p-4 border border-red-500/20">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-red-400 font-bold">LIVE</span>
+                  <span className="text-xs text-red-400 font-bold">LIVE · {sessionTitle}</span>
                 </div>
                 <button
                   onMouseDown={() => setIsMicActive(true)}
                   onMouseUp={() => setIsMicActive(false)}
                   onTouchStart={() => setIsMicActive(true)}
                   onTouchEnd={() => setIsMicActive(false)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${isMicActive ? 'bg-primary text-primary-foreground neon-glow' : 'bg-muted border border-border text-muted-foreground'}`}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${isMicActive ? 'bg-primary text-primary-foreground neon-glow' : 'bg-muted border border-border text-muted-foreground'}`}
                 >
                   {isMicActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                  {isMicActive ? 'SPRECHEN' : 'Push-to-Talk'}
+                  <span className="hidden sm:inline">{isMicActive ? 'SPRECHEN' : 'Push-to-Talk'}</span>
                 </button>
               </div>
-              <div className="text-5xl font-grotesk font-bold text-foreground tabular-nums text-center mb-2">{formatTime(elapsedTime)}</div>
-              <div className="grid grid-cols-2 gap-2 mb-3 text-center text-xs">
+              <div className="text-4xl sm:text-5xl font-grotesk font-bold text-foreground tabular-nums text-center mb-2">{formatTime(elapsedTime)}</div>
+              <div className="grid grid-cols-2 gap-2 mb-2 text-center text-xs">
                 <div className="bg-muted rounded-lg p-2">
                   <div className="font-bold text-primary">{cameraCount}</div>
                   <div className="text-muted-foreground">Kameras</div>
@@ -189,26 +187,26 @@ export default function LiveSession() {
                   <div className="text-muted-foreground">Events</div>
                 </div>
               </div>
-              <Button onClick={handleStop} variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 gap-2 text-sm">
-                <Square className="w-4 h-4" /> Beenden & Analyse starten
+              <Button onClick={handleStop} variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 gap-2 text-xs sm:text-sm">
+                <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Beenden & Analyse starten
               </Button>
             </div>
 
-            {/* Event Buttons — vollständig mit Deduplizierung + Korrektur */}
-            <div className="glass rounded-xl p-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide font-bold mb-3">Event tippen</div>
+            {/* Event Buttons */}
+            <div className="glass rounded-xl p-3 sm:p-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide font-bold mb-2.5">Event tippen</div>
               <EventButtons
                 sessionId={session?.id}
                 matchTitle={sessionTitle}
                 source="coach"
                 elapsedSeconds={elapsedTime}
-                compact={false}
+                compact={true}
               />
             </div>
           </div>
 
           {/* Center + Right: Pitch + Camera Grid */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-3">
 
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
