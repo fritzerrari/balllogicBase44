@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Zap } from 'lucide-react';
 import HeatmapVisualization from './HeatmapVisualization';
 import AutoEventLog from './AutoEventLog';
+import LiveKPIDashboard from './LiveKPIDashboard';
 
 export default function LiveTrackingPanel({ sessionId }) {
   const queryClient = useQueryClient();
@@ -21,6 +22,13 @@ export default function LiveTrackingPanel({ sessionId }) {
     queryKey: ['auto-events', sessionId],
     queryFn: () => base44.entities.AutoEvent.filter({ session_id: sessionId }),
     refetchInterval: 3000,
+  });
+
+  // TrackingData laden für Stats
+  const { data: allTracking = [] } = useQuery({
+    queryKey: ['tracking-data', sessionId],
+    queryFn: () => base44.entities.TrackingData.filter({ session_id: sessionId }),
+    refetchInterval: 5000,
   });
 
   // Heatmap-Cache laden
@@ -61,12 +69,16 @@ export default function LiveTrackingPanel({ sessionId }) {
         )}
       </div>
 
+      {/* KPIs */}
+      <LiveKPIDashboard sessionId={sessionId} />
+
       <Tabs defaultValue="events" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-background">
+        <TabsList className="grid w-full grid-cols-3 bg-background">
           <TabsTrigger value="events">
             Events {pendingEvents.length > 0 && <span className="ml-1 text-xs font-bold text-destructive">{pendingEvents.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
+          <TabsTrigger value="stats">Stats</TabsTrigger>
         </TabsList>
 
         {/* Events Tab */}
@@ -76,6 +88,24 @@ export default function LiveTrackingPanel({ sessionId }) {
             onApprove={(id) => approveEvent.mutate(id)}
             onReject={(id) => rejectEvent.mutate(id)}
           />
+        </TabsContent>
+
+        {/* Stats Tab */}
+        <TabsContent value="stats" className="mt-3 text-xs text-muted-foreground">
+          <div className="space-y-2">
+            <div className="flex justify-between p-2 bg-muted/30 rounded">
+              <span>Frames processed:</span>
+              <span className="font-bold text-foreground">{allTracking.length}</span>
+            </div>
+            <div className="flex justify-between p-2 bg-muted/30 rounded">
+              <span>Auto-Events:</span>
+              <span className="font-bold text-foreground">{autoEvents.length}</span>
+            </div>
+            <div className="flex justify-between p-2 bg-muted/30 rounded">
+              <span>Approved:</span>
+              <span className="font-bold text-primary">{autoEvents.filter(e => e.approved_by_trainer).length}</span>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Heatmap Tab */}
