@@ -5,8 +5,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Zap, CheckCircle2, AlertCircle, Loader2, Mic, MicOff, RotateCcw, Lock, Move, AlertTriangle } from 'lucide-react';
+import { Camera, Zap, CheckCircle2, AlertCircle, Loader2, RotateCcw, Lock, Move, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import EventButtons from '@/components/live/EventButtons';
 
 const DIGITS = 6;
 
@@ -310,6 +311,20 @@ export default function CameraView() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* ── Event Buttons für Kamera-Assistent ── */}
+            <div className="glass rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                📋 Ereignis tippen
+              </div>
+              <EventButtons
+                sessionId={sessionInfo?.id}
+                matchTitle={sessionInfo?.match_title}
+                source={`camera_${camLabel || 'assistant'}`}
+                elapsedSeconds={uptime}
+                compact={true}
+              />
+            </div>
 
             {/* Controls */}
             <div className="grid grid-cols-2 gap-2">

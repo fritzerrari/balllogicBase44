@@ -1,0 +1,74 @@
+{
+  "name": "MatchEvent",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "LiveSession ID"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "goal",
+        "chance",
+        "corner",
+        "yellow_card",
+        "red_card",
+        "foul",
+        "freekick",
+        "substitution",
+        "transition",
+        "offside",
+        "note"
+      ],
+      "description": "Ereignistyp"
+    },
+    "team": {
+      "type": "string",
+      "enum": [
+        "home",
+        "away",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "minute": {
+      "type": "number",
+      "description": "Spielminute"
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "description": "Sekunden seit Session-Start"
+    },
+    "description": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "description": "Wer hat es gedr\u00fcckt: coach, camera_1, camera_2, auto"
+    },
+    "timestamp_ms": {
+      "type": "number",
+      "description": "Unix-Timestamp in ms f\u00fcr Deduplizierung"
+    },
+    "is_duplicate": {
+      "type": "boolean",
+      "default": false
+    },
+    "corrected": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wurde nachtr\u00e4glich korrigiert?"
+    },
+    "correction_note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "type"
+  ]
+}

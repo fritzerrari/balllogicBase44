@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, Zap, Shield, Bell, Users, ChevronRight } from 'lucide-react';
+import { Settings as SettingsIcon, Zap, Shield, Bell, Users, ExternalLink, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useState } from 'react';
 
 const Section = ({ title, children }) => (
   <div className="glass rounded-xl p-6 mb-4">
@@ -13,6 +14,17 @@ const Section = ({ title, children }) => (
 );
 
 export default function Settings() {
+  const [footballApiKey, setFootballApiKey] = useState(localStorage.getItem('football_data_key') || '');
+  const [apiSaved, setApiSaved] = useState(false);
+
+  const saveFootballApiKey = () => {
+    localStorage.setItem('football_data_key', footballApiKey);
+    // Auch als env-ähnlichen Wert speichern für den footballDataApi-Helper
+    window.__FOOTBALL_DATA_KEY__ = footballApiKey;
+    setApiSaved(true);
+    setTimeout(() => setApiSaved(false), 2000);
+  };
+
   return (
     <div className="p-6 lg:p-8 min-h-screen max-w-2xl mx-auto">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
@@ -72,6 +84,39 @@ export default function Settings() {
               <Switch defaultChecked />
             </div>
           ))}
+        </div>
+      </Section>
+
+      <Section title="Fußball-API (Football-Data.org)">
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Kostenloser API-Key für Spielpläne, Kader und Tabellenstand. Registrierung auf{' '}
+            <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" className="text-primary underline flex-inline items-center gap-1">
+              football-data.org <ExternalLink className="w-3 h-3 inline" />
+            </a>
+          </p>
+          <div>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5 block flex items-center gap-1">
+              <Key className="w-3 h-3" /> API-Key
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                value={footballApiKey}
+                onChange={e => setFootballApiKey(e.target.value)}
+                placeholder="Dein football-data.org API Key"
+                className="bg-muted border-border font-mono text-sm flex-1"
+              />
+              <Button onClick={saveFootballApiKey} className={apiSaved ? 'bg-primary/50' : 'bg-primary'} size="sm">
+                {apiSaved ? '✓ Gespeichert' : 'Speichern'}
+              </Button>
+            </div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
+            <div>✓ Automatische Spielplan-Erkennung beim Anlegen neuer Spiele</div>
+            <div>✓ Kader-Import (Bundesliga, Premier League, Champions League etc.)</div>
+            <div>✓ Free tier: 10 Anfragen/Minute · Keine Kreditkarte nötig</div>
+          </div>
         </div>
       </Section>
 

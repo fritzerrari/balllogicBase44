@@ -18,6 +18,7 @@ import {
   Copy, Check, Smartphone, Share2, Settings, Play, Pause,
   Eye, EyeOff, Wifi, WifiOff
 } from 'lucide-react';
+import EventButtons from '@/components/live/EventButtons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -412,6 +413,20 @@ export default function CoachingCockpit() {
 
           {/* Live Stats */}
           <LiveStats stats={stats} playerCounts={playerCounts} />
+
+          {/* Manual Event Buttons — Coach */}
+          <div className="glass rounded-xl p-4">
+            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+              <Target className="w-3.5 h-3.5" /> Ereignis tippen
+            </div>
+            <EventButtons
+              sessionId={activeSession?.id}
+              matchTitle={activeSession?.match_title}
+              source="coach_cockpit"
+              elapsedSeconds={0}
+              compact={true}
+            />
+          </div>
 
           {/* Auto Event Log */}
           <EventLog events={events} />

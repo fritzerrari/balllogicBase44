@@ -26,6 +26,7 @@ import AdminDocs from './pages/AdminDocs.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import Players from './pages/Players.jsx';
 import ChangelogPage from './pages/ChangelogPage.jsx';
+import EventReview from './pages/EventReview.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -67,6 +68,7 @@ const AuthenticatedApp = () => {
         <Route path="/cockpit" element={<CoachingCockpit />} />
         <Route path="/players" element={<Players />} />
         <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/events" element={<EventReview />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/docs" element={<AdminDocs />} />
       </Route>

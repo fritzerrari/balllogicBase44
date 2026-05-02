@@ -5,23 +5,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Radio, Camera, Play, Square, Plus, Minus,
-  Clock, Zap, Video, Mic, MicOff, Goal,
-  AlertTriangle, CornerDownRight, RefreshCw, Circle
+  Clock, Zap, Video, Mic, MicOff,
+  AlertTriangle, Circle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import FootballPitch from '@/components/pitch/FootballPitch';
-
-// Events the camera operator can tap with one finger
-const EVENT_BUTTONS = [
-  { label: 'TOR', key: 'goal', color: 'bg-primary text-primary-foreground', icon: '⚽' },
-  { label: 'Chance', key: 'chance', color: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40', icon: '🎯' },
-  { label: 'Ecke', key: 'corner', color: 'bg-blue-500/20 text-blue-300 border border-blue-500/40', icon: '📐' },
-  { label: 'Karte', key: 'card', color: 'bg-red-500/20 text-red-300 border border-red-500/40', icon: '🟥' },
-  { label: 'Foul', key: 'foul', color: 'bg-orange-500/20 text-orange-300 border border-orange-500/40', icon: '⛔' },
-  { label: 'Konter', key: 'transition', color: 'bg-purple-500/20 text-purple-300 border border-purple-500/40', icon: '⚡' },
-];
+import EventButtons from '@/components/live/EventButtons';
 
 const CAMERA_POSITIONS = ['Tribüne Mitte', 'Tribüne Links', 'Tribüne Rechts', 'Torlinie Heim', 'Torlinie Gäste', 'Erhöht Mitte'];
 
@@ -35,9 +26,7 @@ export default function LiveSession() {
   const [events, setEvents] = useState([]);
   const [session, setSession] = useState(null);
   const [isMicActive, setIsMicActive] = useState(false);
-  const [noteInput, setNoteInput] = useState('');
   const [showCameraSetup, setShowCameraSetup] = useState(true);
-  const [eventFlash, setEventFlash] = useState(null);
   const timerRef = useRef(null);
   const queryClient = useQueryClient();
 
@@ -86,19 +75,6 @@ export default function LiveSession() {
     }
     setSessionActive(false);
     queryClient.invalidateQueries({ queryKey: ['liveSessions'] });
-  };
-
-  const tapEvent = (evt) => {
-    const newEvent = { ...evt, time: formatTime(elapsedTime), minute: Math.floor(elapsedTime / 60), id: Date.now() };
-    setEvents(prev => [newEvent, ...prev]);
-    setEventFlash(evt.key);
-    setTimeout(() => setEventFlash(null), 600);
-  };
-
-  const addNote = () => {
-    if (!noteInput.trim()) return;
-    tapEvent({ label: noteInput, key: 'note', icon: '📝', color: 'bg-muted' });
-    setNoteInput('');
   };
 
   const liveDangerZones = sessionActive ? [
@@ -218,55 +194,21 @@ export default function LiveSession() {
               </Button>
             </div>
 
-            {/* One-tap Event Buttons */}
+            {/* Event Buttons — vollständig mit Deduplizierung + Korrektur */}
             <div className="glass rounded-xl p-4">
               <div className="text-xs text-muted-foreground uppercase tracking-wide font-bold mb-3">Event tippen</div>
-              <div className="grid grid-cols-2 gap-2">
-                {EVENT_BUTTONS.map((evt) => (
-                  <button
-                    key={evt.key}
-                    onClick={() => tapEvent(evt)}
-                    className={`py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 ${evt.color} ${eventFlash === evt.key ? 'scale-110 ring-2 ring-white/30' : ''}`}
-                  >
-                    <span>{evt.icon}</span> {evt.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2 mt-3">
-                <Input value={noteInput} onChange={e => setNoteInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Eigene Notiz..." className="bg-muted border-border text-xs flex-1" />
-                <Button onClick={addNote} size="sm" className="bg-muted border border-border text-muted-foreground hover:text-foreground px-2">+</Button>
-              </div>
+              <EventButtons
+                sessionId={session?.id}
+                matchTitle={sessionTitle}
+                source="coach"
+                elapsedSeconds={elapsedTime}
+                compact={false}
+              />
             </div>
-
-            {/* Event log */}
-            {events.length > 0 && (
-              <div className="glass rounded-xl p-4 max-h-48 overflow-y-auto">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide font-bold mb-2">Log</div>
-                {events.map((ev) => (
-                  <div key={ev.id} className="flex items-center gap-2 py-1 border-b border-border/50 last:border-0">
-                    <span className="text-xs text-primary font-mono flex-shrink-0">{ev.time}</span>
-                    <span className="text-xs">{ev.icon}</span>
-                    <span className="text-xs text-foreground">{ev.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Center + Right: Pitch + Camera Grid */}
           <div className="lg:col-span-2 space-y-4">
-            <AnimatePresence>
-              {eventFlash && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.2 }}
-                  className="glass rounded-xl p-3 border border-primary/40 text-center text-primary font-grotesk font-bold text-sm"
-                >
-                  ✓ Event aufgezeichnet
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
