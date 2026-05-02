@@ -1,0 +1,69 @@
+{
+  "name": "OpponentPlayer",
+  "type": "object",
+  "properties": {
+    "opponent_id": {
+      "type": "string"
+    },
+    "opponent_name": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "number": {
+      "type": "number"
+    },
+    "position": {
+      "type": "string",
+      "enum": [
+        "Torwart",
+        "Innenverteidiger",
+        "Au\u00dfenverteidiger",
+        "Defensives Mittelfeld",
+        "Zentrales Mittelfeld",
+        "Offensives Mittelfeld",
+        "Linksau\u00dfen",
+        "Rechtsau\u00dfen",
+        "Mittelst\u00fcrmer"
+      ]
+    },
+    "age": {
+      "type": "number"
+    },
+    "dominant_foot": {
+      "type": "string",
+      "enum": [
+        "links",
+        "rechts",
+        "beidf\u00fc\u00dfig"
+      ]
+    },
+    "danger_rating": {
+      "type": "number",
+      "description": "1-10 Gefahrenpotenzial"
+    },
+    "strengths": {
+      "type": "string"
+    },
+    "weaknesses": {
+      "type": "string"
+    },
+    "special_skills": {
+      "type": "string",
+      "description": "z.B. Standardsituationen, Dribbling"
+    },
+    "ai_scouting_notes": {
+      "type": "string"
+    },
+    "unlocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Detailanalyse freigeschaltet"
+    }
+  },
+  "required": [
+    "name",
+    "opponent_id"
+  ]
+}

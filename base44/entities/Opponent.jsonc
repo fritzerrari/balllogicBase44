@@ -1,0 +1,56 @@
+{
+  "name": "Opponent",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Teamname"
+    },
+    "league": {
+      "type": "string"
+    },
+    "coach": {
+      "type": "string"
+    },
+    "preferred_formation": {
+      "type": "string",
+      "description": "z.B. 4-3-3"
+    },
+    "playing_style": {
+      "type": "string",
+      "enum": [
+        "Ballbesitzfu\u00dfball",
+        "Konterfu\u00dfball",
+        "Hohes Pressing",
+        "Tiefes Verteidigen",
+        "Direktes Spiel",
+        "Kombinationsspiel"
+      ]
+    },
+    "strengths": {
+      "type": "string"
+    },
+    "weaknesses": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "last_match_id": {
+      "type": "string"
+    },
+    "danger_level": {
+      "type": "string",
+      "enum": [
+        "niedrig",
+        "mittel",
+        "hoch",
+        "sehr hoch"
+      ],
+      "default": "mittel"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

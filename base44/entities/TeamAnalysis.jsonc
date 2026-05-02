@@ -1,0 +1,109 @@
+{
+  "name": "TeamAnalysis",
+  "type": "object",
+  "properties": {
+    "match_id": {
+      "type": "string"
+    },
+    "match_title": {
+      "type": "string"
+    },
+    "analysis_type": {
+      "type": "string",
+      "enum": [
+        "own_team",
+        "opponent",
+        "player",
+        "opponent_player"
+      ],
+      "default": "own_team"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "Falls Spieleranalyse"
+    },
+    "player_name": {
+      "type": "string"
+    },
+    "opponent_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "management_summary": {
+      "type": "string"
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "opportunities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "threats": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tactical_observations": {
+      "type": "string"
+    },
+    "consequences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "training_focus": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "danger_zones": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "performance_score": {
+      "type": "number",
+      "description": "0-100 KI-Gesamtbewertung"
+    },
+    "pressing_analysis": {
+      "type": "string"
+    },
+    "formation_analysis": {
+      "type": "string"
+    },
+    "set_pieces_analysis": {
+      "type": "string"
+    },
+    "raw_metrics": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "analysis_type"
+  ]
+}

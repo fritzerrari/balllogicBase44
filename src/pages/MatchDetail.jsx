@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Zap, BarChart3, Video, Clock, Camera, Upload, X, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Zap, BarChart3, Video, Clock, Camera, Upload, X, Plus, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -297,9 +297,14 @@ Die Analyse soll für einen Profi-Trainer nützlich sein.`;
         <div className="grid sm:grid-cols-2 gap-4">
           {match.status === 'analyzed' ? (
             <>
-              <Link to={`/tactics/${match.id}`} className="sm:col-span-2">
+              <Link to={`/analytics?match=${match.id}`} className="sm:col-span-2">
                 <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 neon-glow gap-2 h-12 text-base">
-                  <BarChart3 className="w-5 h-5" /> Taktische Analyse ansehen →
+                  <Cpu className="w-5 h-5" /> Analytics Cockpit — Tiefenanalyse →
+                </Button>
+              </Link>
+              <Link to={`/tactics/${match.id}`}>
+                <Button variant="outline" className="w-full border-primary/30 text-primary hover:bg-primary/10 gap-2">
+                  <BarChart3 className="w-4 h-4" /> Taktik-Analyse
                 </Button>
               </Link>
               <Link to={`/halftime/${match.id}`}>
@@ -307,7 +312,7 @@ Die Analyse soll für einen Profi-Trainer nützlich sein.`;
                   <Clock className="w-4 h-4" /> Halbzeit-Analyse
                 </Button>
               </Link>
-              <Link to={`/matchprep`}>
+              <Link to={`/matchprep`} className="sm:col-span-2">
                 <Button variant="outline" className="w-full border-border text-muted-foreground hover:text-foreground gap-2">
                   <Zap className="w-4 h-4" /> Nächstes Spiel vorbereiten
                 </Button>
