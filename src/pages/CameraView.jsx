@@ -68,6 +68,7 @@ export default function CameraView() {
 
   // Refs — use refs for values used inside intervals/callbacks to avoid stale closures
   const videoRef         = useRef(null);
+  const canvasRef        = useRef(null);
   const streamRef        = useRef(null);
   const heartbeatRef     = useRef(null);
   const uptimeRef        = useRef(null);
@@ -177,20 +178,21 @@ export default function CameraView() {
     const canvas = document.createElement('canvas');
     canvas.width = 320; canvas.height = 180;
 
-    const pushThumb = () => {
+    const pushThumb = async () => {
       const video = videoRef.current;
-      if (!video || video.readyState < 2) return;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, 320, 180);
-      const thumbnail = canvas.toDataURL('image/jpeg', 0.4);
-      base44.entities.LiveSession.filter({ status: 'active' }).then(sessions => {
+      if (!video || video.readyState < 3) return; // Warte bis Video frame vorhanden ist
+      try {
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, 320, 180);
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
+        const sessions = await base44.entities.LiveSession.filter({ status: 'active' });
         const fresh = sessions.find(s => s.id === sessionId);
         if (!fresh) return;
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
-          String(cam.code).trim() === codeStr ? { ...cam, thumbnail } : cam
+          String(cam.code).trim() === codeStr ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } : cam
         );
-        base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams }).catch(() => {});
-      }).catch(() => {});
+        await base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
+      } catch (_) {}
     };
 
     // First push after 3s (so the trainer sees something quickly)
@@ -335,6 +337,29 @@ export default function CameraView() {
     }
   }, []); // eslint-disable-line
 
+  // Canvas render loop für stabiles Video-Rendering — BEFORE all early returns
+  useEffect(() => {
+    if (step !== 'live' || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const video = videoRef.current;
+    let frameId = null;
+
+    const renderFrame = () => {
+      if (video && video.readyState >= 2) {
+        try {
+          canvas.width = video.videoWidth || 720;
+          canvas.height = video.videoHeight || 1280;
+          ctx.drawImage(video, 0, 0);
+        } catch (_) {}
+      }
+      frameId = requestAnimationFrame(renderFrame);
+    };
+
+    renderFrame();
+    return () => cancelAnimationFrame(frameId);
+  }, [step]);
+
   // ── Event tap ─────────────────────────────────────────────────────────────
   const tapEvent = (evtKey, team = 'unknown') => {
     const evt = QUICK_EVENTS.find(e => e.key === evtKey);
@@ -448,9 +473,14 @@ export default function CameraView() {
   // ── LIVE ──────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black overflow-hidden" data-orientation={orientation}>
+      {/* Fallback video für Metadaten */}
       <video ref={videoRef} autoPlay muted playsInline
+        className="hidden"
+        style={{ display: 'none' }} />
+      {/* Canvas für stabiles Rendering */}
+      <canvas ref={canvasRef}
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ transform: isPortrait ? 'none' : 'none' }} />
+        style={{ display: step === 'live' ? 'block' : 'none' }} />
 
       {/* Grid lines */}
       <div className="absolute inset-0 pointer-events-none">
