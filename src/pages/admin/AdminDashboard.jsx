@@ -55,6 +55,29 @@ export default function AdminDashboard() {
     queryFn: () => base44.entities.Changelog.list('-date', 30),
   });
 
+  const { data: sessionReports = [] } = useQuery({
+    queryKey: ['admin-session-reports'],
+    queryFn: () => base44.entities.SessionReport.list('-created_date', 50),
+  });
+  const { data: matchEvents = [] } = useQuery({
+    queryKey: ['admin-match-events'],
+    queryFn: () => base44.entities.MatchEvent.list('-created_date', 50),
+  });
+  const { data: analysisReportsAll = [] } = useQuery({
+    queryKey: ['admin-analysis-all'],
+    queryFn: () => base44.entities.AnalysisReport.list('-created_date', 50),
+  });
+
+  const [deleting, setDeleting] = useState({});
+
+  const deleteAll = async (entityName, items, queryKeys) => {
+    setDeleting(p => ({ ...p, [entityName]: true }));
+    await Promise.all(items.map(i => base44.entities[entityName].delete(i.id).catch(() => {})));
+    queryKeys.forEach(k => queryClient.invalidateQueries({ queryKey: [k] }));
+    setDeleting(p => ({ ...p, [entityName]: false }));
+    toast({ title: `Alle ${entityName} gelöscht (${items.length})` });
+  };
+
   const deleteMatch = useMutation({
     mutationFn: (id) => base44.entities.Match.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-matches'] }),
@@ -82,6 +105,17 @@ export default function AdminDashboard() {
     totalReports: reports.length,
     totalSessions: sessions.length,
   };
+
+  const DeleteAllButton = ({ label, entity, items, queryKeys }) => (
+    <button
+      onClick={() => deleteAll(entity, items, queryKeys)}
+      disabled={deleting[entity] || items.length === 0}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/20 disabled:opacity-40 transition-all"
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+      {deleting[entity] ? 'Löscht...' : `Alle ${label} löschen (${items.length})`}
+    </button>
+  );
 
   const typeColors = {
     added: 'bg-primary/15 text-primary border-primary/30',
@@ -136,6 +170,22 @@ export default function AdminDashboard() {
                 {s.sub && <div className="text-[10px] text-primary mt-1">{s.sub}</div>}
               </motion.div>
             ))}
+          </div>
+
+          {/* Daten-Verwaltung */}
+          <div className="glass rounded-xl p-5">
+            <h2 className="font-grotesk font-semibold text-foreground mb-1 flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" /> Daten bereinigen
+            </h2>
+            <p className="text-xs text-muted-foreground mb-4">Vorsicht: Löschen ist nicht rückgängig zu machen!</p>
+            <div className="flex flex-wrap gap-2">
+              <DeleteAllButton label="Spiele" entity="Match" items={matches} queryKeys={['admin-matches', 'matches-recent', 'matches-all']} />
+              <DeleteAllButton label="Sessions" entity="LiveSession" items={sessions} queryKeys={['admin-sessions', 'liveSessions', 'liveSessions-ended']} />
+              <DeleteAllButton label="Match-Events" entity="MatchEvent" items={matchEvents} queryKeys={['admin-match-events', 'match-events-all']} />
+              <DeleteAllButton label="Berichte" entity="SessionReport" items={sessionReports} queryKeys={['admin-session-reports', 'session-reports']} />
+              <DeleteAllButton label="Analysen" entity="AnalysisReport" items={analysisReportsAll} queryKeys={['admin-analysis-all', 'admin-reports']} />
+              <DeleteAllButton label="Changelog" entity="Changelog" items={changelogs} queryKeys={['changelogs']} />
+            </div>
           </div>
 
           {/* Letzte Sessions */}

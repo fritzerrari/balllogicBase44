@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -65,10 +66,21 @@ function NavLink({ label, icon: Icon, path, badge }) {
 
 export default function Sidebar() {
   const [toolsOpen, setToolsOpen] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const { data: user } = useQuery({
     queryKey: ['me'],
     queryFn: () => base44.auth.me(),
   });
+
+  // Poll for active live session
+  const { data: activeSessions = [] } = useQuery({
+    queryKey: ['sidebar-active-session'],
+    queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
+    refetchInterval: 10000,
+  });
+  const activeSession = activeSessions[0] || null;
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50">
@@ -112,6 +124,21 @@ export default function Sidebar() {
             <NavLink key={item.path} {...item} />
           ))}
       </nav>
+
+      {/* Active Live Session Banner */}
+      {activeSession && location.pathname !== '/live' && (
+        <button
+          onClick={() => navigate('/live')}
+          className="mx-3 mb-2 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25 transition-all"
+        >
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-xs font-bold truncate">LIVE läuft</div>
+            <div className="text-[10px] text-red-400/70 truncate">{activeSession.match_title}</div>
+          </div>
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+        </button>
+      )}
 
       {/* Footer — User Info */}
       <div className="px-4 py-4 border-t border-sidebar-border">
