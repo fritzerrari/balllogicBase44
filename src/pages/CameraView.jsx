@@ -10,7 +10,7 @@ import useCameraHeartbeat from '@/hooks/useCameraHeartbeat';
 import {
   Camera, Zap, CheckCircle2, Loader2, RotateCcw,
   Clock, Wifi, WifiOff, Battery, BatteryLow,
-  ChevronUp, ChevronDown, X, Mic
+  ChevronUp, ChevronDown, X, Mic, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CameraFunkPanel from '@/components/live/CameraFunkPanel';
@@ -63,6 +63,7 @@ export default function CameraView() {
   const [teamPicker, setTeamPicker] = useState(null);
   const [flashEvent, setFlashEvent] = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [hudVisible, setHudVisible] = useState(true);
   const [recentEvents, setRecentEvents] = useState([]);
 
   // Refs — use refs for values used inside intervals/callbacks to avoid stale closures
@@ -192,10 +193,10 @@ export default function CameraView() {
       }).catch(() => {});
     };
 
-    // First push after 5s (so the trainer sees something quickly)
-    setTimeout(pushThumb, 5000);
-    // Then every 30s
-    thumbIntervalRef.current = setInterval(pushThumb, 30000);
+    // First push after 3s (so the trainer sees something quickly)
+    setTimeout(pushThumb, 3000);
+    // Then every 10s
+    thumbIntervalRef.current = setInterval(pushThumb, 10000);
   }, []);
 
   // ── Simple audio detection (no uptime dep) ────────────────────────────────
@@ -470,7 +471,16 @@ export default function CameraView() {
         </div>
       )}
 
+      {/* HUD Toggle Button */}
+      <button
+        onClick={() => setHudVisible(o => !o)}
+        className="absolute top-3 right-3 z-30 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center hover:bg-black/70 transition-all text-white/60 hover:text-white"
+        title={hudVisible ? 'HUD ausblenden' : 'HUD einblenden'}>
+        {hudVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+      </button>
+
       {/* HUD Top */}
+      {hudVisible && (
       <div className="absolute top-0 left-0 right-0 z-10 p-3 flex items-start justify-between">
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="bg-black/70 backdrop-blur rounded-lg px-2.5 py-1 text-[11px] text-white font-bold flex items-center gap-1.5">
@@ -502,6 +512,7 @@ export default function CameraView() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Halfime banner */}
       {halfTime === 2 && (
@@ -530,11 +541,13 @@ export default function CameraView() {
       </AnimatePresence>
 
       {/* Fixed reminder */}
+      {hudVisible && (
       <div className="absolute bottom-32 left-0 right-0 z-10 flex justify-center pointer-events-none">
         <div className="bg-red-500/80 backdrop-blur rounded-full px-3 py-1 text-[10px] font-bold text-white">
           KAMERA FIXIERT LASSEN
         </div>
       </div>
+      )}
 
       {/* Team Picker */}
       <AnimatePresence>
@@ -570,6 +583,7 @@ export default function CameraView() {
       </AnimatePresence>
 
       {/* Bottom Sheet */}
+      {hudVisible && (
       <div className="absolute bottom-0 left-0 right-0 z-20">
         <CameraFunkPanel sessionId={sessionInfo?.id} camLabel={camLabel} />
 
@@ -638,6 +652,7 @@ export default function CameraView() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
