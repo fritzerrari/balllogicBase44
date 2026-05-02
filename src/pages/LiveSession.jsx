@@ -217,7 +217,10 @@ export default function LiveSession() {
           summary: `Session "${sessionTitle}" — ${events.length} Events aufgezeichnet. ${goals.length} Tore, ${cards.length} Karten, ${subs.length} Wechsel.${cameraChanges ? ` [⚠️ ${cameraChanges}]` : ''}`,
         });
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error('❌ Report generation failed:', err);
+      // Aber Session trotzdem beenden
+    }
 
     setSessionActive(false);
     setFinishing(false);
@@ -244,7 +247,7 @@ export default function LiveSession() {
       } catch (_) {}
     };
     poll(); // Initial call
-    const interval = setInterval(poll, 8000); // 8s (not 5s) to reduce API calls
+    const interval = setInterval(poll, 3000); // 3s for responsive camera detection
     return () => clearInterval(interval);
   }, [session?.id]);
 

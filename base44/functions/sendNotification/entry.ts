@@ -8,6 +8,14 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+// Rate-limiting: Track recent notifications per session
+const notificationCache = new Map(); // sessionId → { type → timestamp }
+const RATE_LIMIT_MS = {
+  goal: 2000,      // Max 1 goal per 2 seconds
+  red_card: 5000,  // Max 1 red card per 5 seconds
+  default: 1000,
+};
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -22,6 +30,30 @@ Deno.serve(async (req) => {
 
     if (!session_id || !event_type) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // RATE-LIMITING: prevent spam
+    const cacheKey = `${session_id}:${event_type}`;
+    const lastNotification = notificationCache.get(cacheKey) || 0;
+    const rateLimitMs = RATE_LIMIT_MS[event_type] || RATE_LIMIT_MS.default;
+    const timeSinceLastNotification = Date.now() - lastNotification;
+
+    if (timeSinceLastNotification < rateLimitMs) {
+      console.warn(`⏱️ Rate limit: ${event_type} notification throttled (${Math.round(rateLimitMs - timeSinceLastNotification)}ms cooldown)`);
+      return Response.json({ 
+        success: false, 
+        throttled: true,
+        message: 'Notification throttled by rate limiter'
+      }, { status: 429 });
+    }
+
+    // Update cache
+    notificationCache.set(cacheKey, Date.now());
+    
+    // Cleanup old entries (defensive memory management)
+    if (notificationCache.size > 1000) {
+      const entries = Array.from(notificationCache.entries());
+      entries.slice(0, 100).forEach(([k]) => notificationCache.delete(k));
     }
 
     // Wichtige Events

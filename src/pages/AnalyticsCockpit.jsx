@@ -20,9 +20,9 @@ import OpponentPanel from '@/components/analytics/OpponentPanel';
 import PlayersAnalyticsPanel from '@/components/analytics/PlayersAnalyticsPanel';
 import PDFExportModal from '@/components/analytics/PDFExportModal';
 
-const urlParams = new URLSearchParams(window.location.search);
-
 export default function AnalyticsCockpit() {
+  // CRITICAL FIX: Parse URL params INSIDE component to ensure reactivity
+  const urlParams = new URLSearchParams(window.location.search);
   const matchId = urlParams.get('match');
   const [activeTab, setActiveTab] = useState('own');
   const [showPDF, setShowPDF] = useState(false);
