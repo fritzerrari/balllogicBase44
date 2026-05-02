@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import FootballPitch from '@/components/pitch/FootballPitch';
 import EventButtons from '@/components/live/EventButtons';
+import CameraInviteButton from '@/components/live/CameraInviteButton';
 
 const CAMERA_POSITIONS = ['Tribüne Mitte', 'Tribüne Links', 'Tribüne Rechts', 'Torlinie Heim', 'Torlinie Gäste', 'Erhöht Mitte'];
 
@@ -128,7 +129,7 @@ export default function LiveSession() {
                   <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
                     <Camera className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <select
                       value={cam.position}
                       onChange={e => setCameras(prev => prev.map((c, idx) => idx === i ? { ...c, position: e.target.value } : c))}
@@ -137,10 +138,11 @@ export default function LiveSession() {
                       {CAMERA_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <div className="text-lg font-grotesk font-bold text-primary tracking-widest">{cam.code}</div>
                     <div className="text-[10px] text-muted-foreground">6-stelliger Code</div>
                   </div>
+                  <CameraInviteButton code={cam.code} position={cam.position} />
                 </div>
               ))}
             </div>
