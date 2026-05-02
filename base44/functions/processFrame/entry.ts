@@ -336,41 +336,59 @@ Deno.serve(async (req) => {
     // Auto-Events
     const autoEvents = detectAutoEvents(ballPos, playerPositions, minute, elapsed_seconds);
 
-    // Save TrackingData
-    const trackingData = await base44.entities.TrackingData.create({
-      session_id,
-      match_id: sessionData?.match_id,
-      frame_number,
-      timestamp_ms: Date.now(),
-      elapsed_seconds,
-      ball_position: ballPos,
-      player_positions: playerPositions,
-      detection_quality: qualityScore,
-      source,
-      error: error || null,
-      retry_count: 0,
-    });
+    // Save TrackingData — CRITICAL: must await and validate
+    let trackingData = null;
+    try {
+      trackingData = await base44.entities.TrackingData.create({
+        session_id,
+        match_id: sessionData?.match_id || null,
+        frame_number,
+        timestamp_ms: Date.now(),
+        elapsed_seconds,
+        ball_position: ballPos,
+        player_positions: playerPositions,
+        detection_quality: qualityScore,
+        source,
+        error: error || null,
+        retry_count: 0,
+      });
+      
+      if (!trackingData?.id) {
+        console.error('⚠️ TrackingData creation returned no ID');
+      }
+    } catch (dbErr) {
+      console.error('❌ Failed to save TrackingData:', dbErr.message);
+      return Response.json({ 
+        error: `Failed to persist tracking data: ${dbErr.message}` 
+      }, { status: 500 });
+    }
 
-    // Save Auto-Events (nur high-confidence)
+    // Save Auto-Events (nur high-confidence) — with validation
     const savedAutoEvents = [];
     for (const evt of autoEvents) {
       if (evt.confidence >= 60) {
-        const autoEvent = await base44.entities.AutoEvent.create({
-          session_id,
-          match_id: sessionData?.match_id,
-          tracking_data_id: trackingData.id,
-          type: evt.type,
-          team: team || 'unknown',
-          minute: evt.minute,
-          elapsed_seconds: evt.elapsed_seconds,
-          confidence: evt.confidence,
-          description: `Auto-detected: ${evt.type}`,
-          data: { ball: ballPos, players: playerPositions },
-          approved_by_trainer: false,
-          rejected: false,
-          timestamp_ms: Date.now(),
-        });
-        savedAutoEvents.push(autoEvent);
+        try {
+          const autoEvent = await base44.entities.AutoEvent.create({
+            session_id,
+            match_id: sessionData?.match_id || null,
+            tracking_data_id: trackingData?.id,
+            type: evt.type,
+            team: team || 'unknown',
+            minute: evt.minute,
+            elapsed_seconds: evt.elapsed_seconds,
+            confidence: evt.confidence,
+            description: `Auto-detected: ${evt.type}`,
+            data: { ball: ballPos, players: playerPositions },
+            approved_by_trainer: false,
+            rejected: false,
+            timestamp_ms: Date.now(),
+          });
+          if (autoEvent?.id) {
+            savedAutoEvents.push(autoEvent);
+          }
+        } catch (e) {
+          console.warn(`⚠️ Failed to save auto-event: ${e.message}`);
+        }
       }
     }
 
