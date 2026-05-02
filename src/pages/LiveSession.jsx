@@ -197,6 +197,21 @@ export default function LiveSession() {
     return () => clearInterval(interval);
   }, [sessionActive, session]);
 
+  // ── Kamera während laufender Session hinzufügen ───────────────────────────
+  const addCameraLive = async () => {
+    const newCam = { id: cameras.length + 1, label: `Kamera ${cameras.length + 1}`, code: generateCode(), status: 'waiting' };
+    const updatedCameras = [...cameras, newCam];
+    setCameras(updatedCameras);
+    setCameraCount(updatedCameras.length);
+    if (session) {
+      const updatedStreams = updatedCameras.map(c => ({
+        camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting',
+      }));
+      await base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams });
+      setLiveCameraStreams(updatedStreams);
+    }
+  };
+
   const gameMinute = halfTime === 1
     ? Math.floor(elapsedTime / 60)
     : 45 + Math.floor((elapsedTime - 45 * 60) / 60);
@@ -437,49 +452,72 @@ export default function LiveSession() {
               </div>
             </div>
 
-            {/* Camera status grid */}
+            {/* Camera status grid — live + add during session */}
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-grotesk font-semibold text-foreground flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-primary" /> Verbundene Kameras
+                  <Camera className="w-4 h-4 text-primary" /> Kameras
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {liveCameraStreams.filter(s => s.status === 'connected').length}/{cameras.length} online
+                  </span>
                 </span>
-                <span className="text-xs text-muted-foreground">{liveCameraStreams.filter(s => s.status === 'connected').length}/{cameraCount} online</span>
+                {/* + Kamera während Live */}
+                <button onClick={addCameraLive}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold hover:bg-primary/20 transition-all">
+                  <Plus className="w-3.5 h-3.5" /> Kamera hinzufügen
+                </button>
               </div>
-              <div className={`grid gap-2 ${cameraCount > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <div className={`grid gap-2 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {cameras.map((cam) => {
                   const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
                   const isConnected = liveStream?.status === 'connected';
                   const lastSeen = liveStream?.last_seen ? Math.round((Date.now() - new Date(liveStream.last_seen).getTime()) / 1000) : null;
+                  const thumbnail = liveStream?.thumbnail;
                   return (
                     <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
-                      <div className="absolute inset-0 opacity-10" style={{ background: 'linear-gradient(135deg, #1a3a1a 0%, #0d260d 100%)' }} />
-                      <Video className={`w-5 h-5 relative z-10 ${isConnected ? 'text-primary' : 'text-muted-foreground'}`} />
-                      {editingCamId === cam.id ? (
-                        <div className="relative z-10 flex items-center gap-1">
-                          <input value={editingCamLabel} onChange={e => setEditingCamLabel(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') saveLabel(cam.id); if (e.key === 'Escape') setEditingCamId(null); }}
-                            className="w-20 bg-background/80 border border-primary/40 rounded px-1 py-0.5 text-[10px] text-foreground focus:outline-none text-center" autoFocus />
-                          <button onClick={() => saveLabel(cam.id)} className="text-primary"><Check className="w-3 h-3" /></button>
-                        </div>
+                      {/* Vorschau-Thumbnail wenn vorhanden */}
+                      {thumbnail ? (
+                        <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover opacity-80" />
                       ) : (
-                        <div className="relative z-10 flex items-center gap-1 group/lbl cursor-pointer"
-                          onClick={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}>
-                          <span className="text-[10px] text-muted-foreground">{cam.label}</span>
-                          <Pencil className="w-2.5 h-2.5 text-muted-foreground opacity-0 group-hover/lbl:opacity-100 transition-opacity" />
-                        </div>
+                        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0d1f0d 0%, #060f06 100%)' }} />
                       )}
-                      <div className={`text-[9px] relative z-10 font-bold ${isConnected ? 'text-primary' : 'text-muted-foreground/60'}`}>
-                        {isConnected
-                          ? `● Verbunden${lastSeen !== null && lastSeen < 20 ? ` · ${lastSeen}s` : ''}`
-                          : `○ Wartet · ${cam.code}`}
+                      {/* Status Badge oben links */}
+                      <div className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected ? 'bg-primary/80 text-primary-foreground' : 'bg-black/70 text-muted-foreground'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
+                        {isConnected ? `LIVE${lastSeen !== null && lastSeen < 20 ? ` ${lastSeen}s` : ''}` : 'WARTET'}
                       </div>
+                      {/* Invite Button oben rechts */}
+                      <div className="absolute top-1.5 right-1.5 z-10">
+                        <CameraInviteButton code={cam.code} position={cam.label} />
+                      </div>
+                      {/* Label + Code unten */}
+                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent px-2 pt-3 pb-1.5">
+                        {editingCamId === cam.id ? (
+                          <div className="flex items-center gap-1">
+                            <input value={editingCamLabel} onChange={e => setEditingCamLabel(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveLabel(cam.id); if (e.key === 'Escape') setEditingCamId(null); }}
+                              className="flex-1 bg-black/60 border border-primary/40 rounded px-1 py-0.5 text-[10px] text-white focus:outline-none text-center" autoFocus />
+                            <button onClick={() => saveLabel(cam.id)} className="text-primary"><Check className="w-3 h-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between cursor-pointer"
+                            onClick={() => { setEditingCamId(cam.id); setEditingCamLabel(cam.label); }}>
+                            <span className="text-[10px] text-white/80 font-medium">{cam.label}</span>
+                            <span className="text-[9px] text-white/40 font-mono">{cam.code}</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Kein Bild Placeholder */}
+                      {!thumbnail && !isConnected && (
+                        <Video className="w-6 h-6 text-muted-foreground/40 relative z-10" />
+                      )}
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-3 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                <span className="text-primary font-medium">● = Handy verbunden</span> · ○ = wartet auf Kameramann · Label: klicken zum Bearbeiten
-              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                Kamera-Label: klicken zum Bearbeiten · neue Kamera teilen über <span className="text-primary">Share-Icon</span> pro Karte
+              </p>
             </div>
           </div>
         </div>

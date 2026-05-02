@@ -78,6 +78,8 @@ export default function CameraView() {
   const analyserRef   = useRef(null);
   const audioIntervalRef = useRef(null);
   const lastEventTimeRef = useRef({});
+  const thumbIntervalRef = useRef(null);
+  const thumbCanvasRef = useRef(null);
 
   // ── Batterie ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function CameraView() {
     if (prefillCode.length === DIGITS) startPolling(prefillCode);
   }, []);
 
-  useEffect(() => () => { clearAllTimers(); stopStream(); stopAudio(); }, []);
+  useEffect(() => () => { clearAllTimers(); stopStream(); stopAudio(); clearInterval(thumbIntervalRef.current); }, []);
 
   const clearAllTimers = () => {
     clearInterval(heartbeatRef.current);
@@ -128,12 +130,40 @@ export default function CameraView() {
     setAudioEnabled(false);
   };
 
+  // ── Thumbnail alle 30s in DB pushen (damit Trainer Vorschau sieht) ────────
+  const startThumbnailPush = useCallback((sessionId, codeStr) => {
+    clearInterval(thumbIntervalRef.current);
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 180;
+    thumbCanvasRef.current = canvas;
+
+    thumbIntervalRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, 320, 180);
+      const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
+      // Thumbnail in LiveSession camera_streams speichern
+      base44.entities.LiveSession.filter({ status: 'active' }).then(sessions => {
+        const fresh = sessions.find(s => s.id === sessionId);
+        if (!fresh) return;
+        const updatedStreams = (fresh.camera_streams || []).map(cam =>
+          String(cam.code).trim() === codeStr ? { ...cam, thumbnail } : cam
+        );
+        base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams }).catch(() => {});
+      }).catch(() => {});
+    }, 30000); // alle 30s
+  }, []);
+
   // ── Kamera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async (facing = 'environment') => {
     stopStream();
     setCameraError(null);
+    // Weitwinkel: zoom 0.5 + maximale Auflösung zuerst versuchen
     const tries = [
-      { video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+      { video: { facingMode: { exact: facing }, width: { ideal: 3840 }, height: { ideal: 2160 }, zoom: { ideal: 0.5 } } },
+      { video: { facingMode: { exact: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, zoom: { ideal: 0.5 } } },
+      { video: { facingMode: { exact: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
       { video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } },
       { video: { facingMode: facing } },
       { video: true },
@@ -142,6 +172,14 @@ export default function CameraView() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(c);
         streamRef.current = stream;
+        // Weitwinkel: versuche zoom über applyConstraints
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities?.();
+          if (caps?.zoom) {
+            await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+          }
+        } catch (_) {}
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.muted = true;
@@ -236,9 +274,10 @@ export default function CameraView() {
           setStep('live');
           uptimeRef.current = setInterval(() => setUptime(t => t + 1), 1000);
           startHeartbeat(matched, codeStr);
-          // Audio-KI starten
+          // Audio-KI + Thumbnail starten
           const src = cam?.label ? `camera_${cam.label}` : 'camera_1';
           startAudioDetection(matched.id, matched.match_title, src);
+          startThumbnailPush(matched.id, codeStr);
           return;
         }
         setWaitMsg(count < 10
