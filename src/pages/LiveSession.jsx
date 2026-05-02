@@ -225,18 +225,20 @@ export default function LiveSession() {
     navigate('/session-reports');
   };
 
-  // Live camera status — pollt alle 1.5s (während Setup für schnellere Rückmeldung)
+  // Live camera status — efficient single lookup instead of .list()
   const [liveCameraStreams, setLiveCameraStreams] = useState([]);
   useEffect(() => {
-    if (!session) return;
+    if (!session?.id) return; // Safety: must have session.id
+    const sessionId = session.id; // Capture in closure
     const poll = async () => {
       try {
-        const fresh = await base44.entities.LiveSession.filter({ id: session.id });
+        // CRITICAL FIX: use direct filter instead of .list() + find
+        const fresh = await base44.entities.LiveSession.filter({ id: sessionId }, '-created_date', 1);
         if (fresh?.[0]?.camera_streams) setLiveCameraStreams(fresh[0].camera_streams);
       } catch (_) {}
     };
-    poll();
-    const interval = setInterval(poll, 5000); // REDUCED: 1.5s → 5s (Rate-Limit)
+    poll(); // Initial call
+    const interval = setInterval(poll, 8000); // 8s (not 5s) to reduce API calls
     return () => clearInterval(interval);
   }, [session?.id]);
 

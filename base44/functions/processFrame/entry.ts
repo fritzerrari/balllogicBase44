@@ -18,8 +18,26 @@ const RETRY_BACKOFF_MS = [500, 1500, 3000]; // Exponential backoff
 const CIRCUIT_BREAKER_THRESHOLD = 5; // Failure threshold
 const CIRCUIT_BREAKER_RESET_MS = 60000; // Reset nach 60s
 
-// Global Circuit Breaker State
-let circuitBreakerState = { open: false, failures: 0, lastFailTime: 0 };
+// CRITICAL FIX: Circuit Breaker MUST be per-session, NOT global
+// Otherwise Trainer A's API errors block Trainer B's session
+const circuitBreakerBySession = new Map(); // sessionId → { open, failures, lastFailTime }
+const CIRCUIT_BREAKER_CLEANUP_MS = 600000; // Clean stale sessions every 10min
+
+function getCircuitBreakerState(sessionId) {
+  if (!circuitBreakerBySession.has(sessionId)) {
+    circuitBreakerBySession.set(sessionId, { open: false, failures: 0, lastFailTime: 0 });
+  }
+  // Cleanup old sessions (defensive)
+  if (circuitBreakerBySession.size > 100) {
+    const now = Date.now();
+    for (const [id, state] of circuitBreakerBySession) {
+      if (now - state.lastFailTime > CIRCUIT_BREAKER_CLEANUP_MS) {
+        circuitBreakerBySession.delete(id);
+      }
+    }
+  }
+  return circuitBreakerBySession.get(sessionId);
+}
 
 const THRESHOLDS = {
   CONFIDENCE_MIN: 0.5,
@@ -28,35 +46,39 @@ const THRESHOLDS = {
 };
 
 /**
- * Circuit Breaker Pattern — schützt vor API-Überlastung
+ * Circuit Breaker Pattern — PER-SESSION (not global!)
  */
-function checkCircuitBreaker() {
-  if (!circuitBreakerState.open) return true;
+function checkCircuitBreaker(sessionId) {
+  const state = getCircuitBreakerState(sessionId);
+  if (!state.open) return true;
   
-  const timeSinceLastFailure = Date.now() - circuitBreakerState.lastFailTime;
+  const timeSinceLastFailure = Date.now() - state.lastFailTime;
   if (timeSinceLastFailure > CIRCUIT_BREAKER_RESET_MS) {
-    console.log('🟢 Circuit Breaker Reset — Retry Roboflow');
-    circuitBreakerState = { open: false, failures: 0, lastFailTime: 0 };
+    console.log(`🟢 Circuit Breaker Reset [${sessionId}] — Retry Roboflow`);
+    state.open = false;
+    state.failures = 0;
+    state.lastFailTime = 0;
     return true;
   }
   return false;
 }
 
-function recordFailure() {
-  circuitBreakerState.failures++;
-  circuitBreakerState.lastFailTime = Date.now();
-  if (circuitBreakerState.failures >= CIRCUIT_BREAKER_THRESHOLD) {
-    circuitBreakerState.open = true;
-    console.warn(`🔴 Circuit Breaker OPEN — ${circuitBreakerState.failures} failures`);
+function recordFailure(sessionId) {
+  const state = getCircuitBreakerState(sessionId);
+  state.failures++;
+  state.lastFailTime = Date.now();
+  if (state.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+    state.open = true;
+    console.warn(`🔴 Circuit Breaker OPEN [${sessionId}] — ${state.failures} failures`);
   }
 }
 
 /**
  * Roboflow API mit Retry + Timeout
  */
-async function callRoboflowWithRetry(base64Frame) {
-  if (!checkCircuitBreaker()) {
-    console.warn('⚠️ Circuit breaker open, using fallback');
+async function callRoboflowWithRetry(base64Frame, sessionId) {
+  if (!checkCircuitBreaker(sessionId)) {
+    console.warn(`⚠️ Circuit breaker open [${sessionId}], using fallback`);
     return null;
   }
 
@@ -83,8 +105,8 @@ async function callRoboflowWithRetry(base64Frame) {
       }
 
       const data = await response.json();
-      circuitBreakerState.failures = 0; // Reset on success
-      console.log(`✅ Roboflow API success (attempt ${attempt + 1})`);
+      getCircuitBreakerState(sessionId).failures = 0; // Reset on success
+      console.log(`✅ Roboflow API success [${sessionId}] (attempt ${attempt + 1})`);
       return data;
     } catch (error) {
       const isTimeout = error.name === 'AbortError';
@@ -97,7 +119,7 @@ async function callRoboflowWithRetry(base64Frame) {
       if (attempt < MAX_RETRIES - 1) {
         await new Promise(r => setTimeout(r, backoffMs));
       } else {
-        recordFailure();
+        recordFailure(sessionId);
         return null; // All retries exhausted
       }
     }
@@ -185,7 +207,7 @@ Deno.serve(async (req) => {
     let source = 'roboflow';
     let error = null;
 
-    detections = await callRoboflowWithRetry(frame_base64);
+    detections = await callRoboflowWithRetry(frame_base64, session_id);
 
     if (!detections) {
       // Fallback: Hole letzten erfolgreichen Frame
@@ -290,12 +312,14 @@ Deno.serve(async (req) => {
       source,
       processing_time_ms: processingTime,
       error: error,
-      circuit_breaker_state: circuitBreakerState,
+      circuit_breaker_state: getCircuitBreakerState(session_id),
     });
   } catch (error) {
     console.error('❌ processFrame failed:', error);
+    // Session ID might not be available in all error paths, use 'unknown'
+    const sessId = error.sessionId || 'unknown';
     return Response.json(
-      { error: error.message, circuit_breaker_state: circuitBreakerState },
+      { error: error.message, circuit_breaker_state: getCircuitBreakerState(sessId) },
       { status: 500 }
     );
   }
