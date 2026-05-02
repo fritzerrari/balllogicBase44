@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import FootballPitch from '@/components/pitch/FootballPitch';
 import EventButtons from '@/components/live/EventButtons';
 import CameraInviteButton from '@/components/live/CameraInviteButton';
+import FunkPanel from '@/components/live/FunkPanel';
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -54,6 +55,7 @@ export default function LiveSession() {
   const [showHalftimeAlert, setShowHalftimeAlert] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [eventCount, setEventCount] = useState(0);
+  const [funkOpen, setFunkOpen] = useState(false);
 
   const timerRef = useRef(null);
   const halftimeAlertRef = useRef(false);
@@ -422,6 +424,18 @@ export default function LiveSession() {
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Bericht wird erstellt...</>
                   : <><Square className="w-3.5 h-3.5" /> Beenden & Report erstellen</>}
               </Button>
+
+              {/* Funk Button */}
+              <button
+                onClick={() => setFunkOpen(o => !o)}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                  funkOpen
+                    ? 'bg-primary/15 border-primary/40 text-primary'
+                    : 'bg-muted border-border text-muted-foreground hover:text-foreground'
+                }`}>
+                <Radio className="w-3.5 h-3.5" />
+                📻 Funk-Kanal {funkOpen ? 'schließen' : 'öffnen'}
+              </button>
             </div>
 
             {/* Event Buttons */}
@@ -437,6 +451,19 @@ export default function LiveSession() {
               />
             </div>
           </div>
+
+          {/* Funk Panel */}
+          <AnimatePresence>
+            {funkOpen && session && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden">
+                <div className="glass rounded-xl overflow-hidden" style={{ height: 360 }}>
+                  <FunkPanel sessionId={session.id} onClose={() => setFunkOpen(false)} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Center + Right: Pitch + Camera Grid */}
           <div className="lg:col-span-2 space-y-3">

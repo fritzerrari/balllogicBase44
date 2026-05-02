@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { base44 as b44 } from '@/api/base44Client';
+import CameraFunkPanel from '@/components/live/CameraFunkPanel';
 
 const DIGITS = 6;
 const POLL_INTERVAL_MS = 3000;
@@ -564,8 +565,14 @@ export default function CameraView() {
         )}
       </AnimatePresence>
 
-      {/* ── Bottom Sheet: Events ─────────────────────────────────────────── */}
+      {/* ── Bottom Sheet: Events + Funk ─────────────────────────────────── */}
       <div className="absolute bottom-0 left-0 right-0 z-20">
+        {/* Funk Panel — immer sichtbar über Events */}
+        <CameraFunkPanel
+          sessionId={sessionInfo?.id}
+          camLabel={camLabel}
+        />
+
         {/* Handle / Toggle */}
         <button
           onClick={() => setSheetOpen(o => !o)}

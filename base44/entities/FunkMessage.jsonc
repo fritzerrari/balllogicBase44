@@ -1,0 +1,36 @@
+{
+  "name": "FunkMessage",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "from": {
+      "type": "string",
+      "description": "coach | camera_[label]"
+    },
+    "from_label": {
+      "type": "string",
+      "description": "Anzeigename"
+    },
+    "text": {
+      "type": "string"
+    },
+    "is_ptt": {
+      "type": "boolean",
+      "default": false,
+      "description": "Push-to-Talk Aktivierungs-Signal"
+    },
+    "ptt_active": {
+      "type": "boolean",
+      "default": false
+    },
+    "timestamp_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "session_id",
+    "from"
+  ]
+}
