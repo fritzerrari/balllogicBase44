@@ -337,7 +337,13 @@ export default function LiveSession() {
                 
                 {/* Kamera-Status + Live-Bilder Grid */}
                 <div className="mb-4 space-y-2">
-                  <div className="text-xs text-muted-foreground font-bold uppercase">Kameras bereit</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-muted-foreground font-bold uppercase">Kameras bereit</div>
+                    <button onClick={addCameraLive}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/20 transition-all">
+                      <Plus className="w-3 h-3" /> Kamera
+                    </button>
+                  </div>
                   <div className={`grid gap-2 ${cameras.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                     {cameras.map(cam => {
                       const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
