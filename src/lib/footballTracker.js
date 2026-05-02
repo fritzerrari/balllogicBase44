@@ -225,41 +225,63 @@ export function smoothDetections(detections, alpha = 0.6) {
 }
 
 // ─── Simulation Mode (fallback / demo) ───────────────────────────────────────
-const simState = {};
 
-export function simulateDetections(tick) {
+/**
+ * @param {number} tick
+ * @param {object} options
+ * @param {number} options.playersPerTeam - 1–11 (default 11 for GK+10)
+ * @param {boolean} options.includeReferee - default true (disable for training)
+ * @param {'full'|'half'|'small'|'training'} options.pitchType - constrains player positions
+ */
+export function simulateDetections(tick, options = {}) {
+  const {
+    playersPerTeam = 11,
+    includeReferee = true,
+    pitchType = 'full',
+  } = options;
+
   const seed = (n, offset = 0) => (Math.sin(tick * 0.04 + n + offset) * 0.5 + 0.5);
-  const players = [];
 
-  // Home: 1 GK + 10 outfield
-  players.push({ id: 'gk-home', class: 'goalkeeper', team: 'home', x: 5 + seed(0) * 3, y: 40 + seed(1) * 20, confidence: 0.95, speed: (seed(0) * 5).toFixed(1) });
-  for (let i = 0; i < 10; i++) {
+  // Constrain x range based on pitch type
+  const xMin = pitchType === 'half' ? 5 : 5;
+  const xMax = pitchType === 'half' ? 50 : pitchType === 'small' ? 90 : 90;
+  const xRange = xMax - xMin;
+
+  const players = [];
+  const outfield = playersPerTeam - 1; // minus GK
+
+  // Home
+  players.push({ id: 'gk-home', class: 'goalkeeper', team: 'home', x: xMin + seed(0) * 3, y: 40 + seed(1) * 20, confidence: 0.95, speed: (seed(0) * 5).toFixed(1) });
+  for (let i = 0; i < outfield; i++) {
     players.push({
       id: `home-${i}`, class: 'player', team: 'home',
-      x: 15 + seed(i * 3) * 50, y: 5 + seed(i * 7) * 90,
+      x: xMin + 10 + seed(i * 3) * (xRange * 0.55),
+      y: 5 + seed(i * 7) * 90,
       confidence: 0.82 + seed(i) * 0.15,
       number: i + 2,
       speed: (seed(i * 11) * 28).toFixed(1),
     });
   }
 
-  // Away: 1 GK + 10 outfield
-  players.push({ id: 'gk-away', class: 'goalkeeper', team: 'away', x: 93 + seed(20) * 3, y: 40 + seed(21) * 20, confidence: 0.95, speed: (seed(20) * 5).toFixed(1) });
-  for (let i = 0; i < 10; i++) {
+  // Away
+  const awayXBase = pitchType === 'half' ? xMin + 10 : xMax - 10;
+  players.push({ id: 'gk-away', class: 'goalkeeper', team: 'away', x: xMax - seed(20) * 3, y: 40 + seed(21) * 20, confidence: 0.95, speed: (seed(20) * 5).toFixed(1) });
+  for (let i = 0; i < outfield; i++) {
     players.push({
       id: `away-${i}`, class: 'player', team: 'away',
-      x: 45 + seed(i * 2 + 30) * 50, y: 5 + seed(i * 5 + 30) * 90,
+      x: pitchType === 'half' ? xMin + 5 + seed(i * 2 + 30) * (xRange * 0.8) : (xMax - 10) - seed(i * 2 + 30) * (xRange * 0.55),
+      y: 5 + seed(i * 5 + 30) * 90,
       confidence: 0.82 + seed(i + 30) * 0.15,
       number: i + 2,
       speed: (seed(i * 9 + 30) * 28).toFixed(1),
     });
   }
 
-  // Referee
-  players.push({ id: 'ref', class: 'referee', team: 'referee', x: 40 + seed(50) * 25, y: 25 + seed(51) * 50, confidence: 0.91 });
+  if (includeReferee) {
+    players.push({ id: 'ref', class: 'referee', team: 'referee', x: xMin + xRange * 0.4 + seed(50) * xRange * 0.25, y: 25 + seed(51) * 50, confidence: 0.91 });
+  }
 
-  // Ball
-  const ball = { id: 'ball', class: 'ball', team: 'ball', x: 20 + seed(99) * 65, y: 15 + seed(88) * 70, confidence: 0.88 };
+  const ball = { id: 'ball', class: 'ball', team: 'ball', x: xMin + 10 + seed(99) * (xRange * 0.8), y: 15 + seed(88) * 70, confidence: 0.88 };
 
   return { players: [...players, ball], ball };
 }

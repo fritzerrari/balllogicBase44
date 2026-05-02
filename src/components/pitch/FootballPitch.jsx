@@ -1,6 +1,13 @@
 import { useEffect, useRef } from 'react';
 
-export default function FootballPitch({ dangerZones = [], players = [], showGrid = false, className = '' }) {
+/**
+ * pitchType:
+ *   'full'     — 11v11 Vollfeld (default)
+ *   'half'     — Halbfeld (1 Tor, 1 Strafraum)
+ *   'small'    — Kleines Feld (7v7 / 5v5, keine Strafräume)
+ *   'training' — Trainingsfläche (nur Außenlinie + Mittelkreis)
+ */
+export default function FootballPitch({ dangerZones = [], players = [], showGrid = false, pitchType = 'full', className = '' }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -10,11 +17,9 @@ export default function FootballPitch({ dangerZones = [], players = [], showGrid
     const W = canvas.width;
     const H = canvas.height;
 
-    // Pitch background
+    // Background
     ctx.fillStyle = '#0d260d';
     ctx.fillRect(0, 0, W, H);
-
-    // Grass stripes
     for (let i = 0; i < 10; i++) {
       ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
       ctx.fillRect(0, i * (H / 10), W, H / 10);
@@ -24,44 +29,67 @@ export default function FootballPitch({ dangerZones = [], players = [], showGrid
     ctx.strokeStyle = lineColor;
     ctx.lineWidth = 1.5;
 
-    // Outer boundary
-    ctx.strokeRect(20, 15, W - 40, H - 30);
+    if (pitchType === 'full') {
+      // Full 11v11 pitch
+      ctx.strokeRect(20, 15, W - 40, H - 30);
+      ctx.beginPath(); ctx.moveTo(W / 2, 15); ctx.lineTo(W / 2, H - 15); ctx.stroke();
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 55, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = lineColor;
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = lineColor;
+      ctx.strokeRect(20, H / 2 - 75, 95, 150);
+      ctx.strokeRect(20, H / 2 - 32, 40, 64);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.strokeRect(8, H / 2 - 22, 12, 44);
+      ctx.strokeStyle = lineColor;
+      ctx.strokeRect(W - 115, H / 2 - 75, 95, 150);
+      ctx.strokeRect(W - 60, H / 2 - 32, 40, 64);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.strokeRect(W - 20, H / 2 - 22, 12, 44);
 
-    // Center line
-    ctx.beginPath();
-    ctx.moveTo(W / 2, 15);
-    ctx.lineTo(W / 2, H - 15);
-    ctx.stroke();
+    } else if (pitchType === 'half') {
+      // Half pitch (left half only, 1 goal)
+      ctx.strokeRect(20, 15, W - 40, H - 30);
+      ctx.beginPath(); ctx.moveTo(20, H / 2); ctx.lineTo(W - 20, H / 2); ctx.stroke();
+      // Penalty area
+      const paW = Math.round((W - 40) * 0.45), paH = Math.round((H - 30) * 0.65);
+      ctx.strokeStyle = lineColor;
+      ctx.strokeRect(20, H / 2 - paH / 2, paW, paH);
+      // Goal area
+      const gaW = Math.round(paW * 0.35), gaH = Math.round(paH * 0.45);
+      ctx.strokeRect(20, H / 2 - gaH / 2, gaW, gaH);
+      // Goal
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.strokeRect(8, H / 2 - gaH * 0.35, 12, gaH * 0.7);
+      // Center spot
+      ctx.fillStyle = lineColor;
+      ctx.beginPath(); ctx.arc(W / 2, H - 20, 3, 0, Math.PI * 2); ctx.fill();
 
-    // Center circle
-    ctx.beginPath();
-    ctx.arc(W / 2, H / 2, 55, 0, Math.PI * 2);
-    ctx.stroke();
+    } else if (pitchType === 'small') {
+      // Small-sided field (5v5 / 7v7) — no penalty boxes, just outer + goals
+      ctx.strokeRect(20, 15, W - 40, H - 30);
+      ctx.beginPath(); ctx.moveTo(W / 2, 15); ctx.lineTo(W / 2, H - 15); ctx.stroke();
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.min(40, W * 0.07), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = lineColor;
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 3, 0, Math.PI * 2); ctx.fill();
+      // Small goals
+      const goalH = H * 0.22;
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.strokeRect(8, H / 2 - goalH / 2, 12, goalH);
+      ctx.strokeRect(W - 20, H / 2 - goalH / 2, 12, goalH);
 
-    // Center dot
-    ctx.fillStyle = lineColor;
-    ctx.beginPath();
-    ctx.arc(W / 2, H / 2, 3, 0, Math.PI * 2);
-    ctx.fill();
+    } else if (pitchType === 'training') {
+      // Open training area — just boundary + optional grid
+      ctx.strokeRect(20, 15, W - 40, H - 30);
+      // Label
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.font = `bold ${Math.round(W * 0.04)}px Space Grotesk, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('TRAININGSFELD', W / 2, H / 2);
+    }
 
-    // Left penalty area
-    ctx.strokeRect(20, H / 2 - 75, 95, 150);
-    // Left goal area
-    ctx.strokeRect(20, H / 2 - 32, 40, 64);
-    // Left goal
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.strokeRect(8, H / 2 - 22, 12, 44);
-
-    // Right penalty area
-    ctx.strokeStyle = lineColor;
-    ctx.strokeRect(W - 115, H / 2 - 75, 95, 150);
-    // Right goal area
-    ctx.strokeRect(W - 60, H / 2 - 32, 40, 64);
-    // Right goal
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.strokeRect(W - 20, H / 2 - 22, 12, 44);
-
-    // Danger zones heatmap
+    // Danger zones
     dangerZones.forEach(({ x, y, intensity, team }) => {
       const px = (x / 100) * W;
       const py = (y / 100) * H;
@@ -71,9 +99,7 @@ export default function FootballPitch({ dangerZones = [], players = [], showGrid
       gradient.addColorStop(0, `rgba(${color}, ${0.4 * intensity})`);
       gradient.addColorStop(1, `rgba(${color}, 0)`);
       ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
     });
 
     // Players
@@ -82,9 +108,7 @@ export default function FootballPitch({ dangerZones = [], players = [], showGrid
       const py = (y / 100) * H;
       const color = team === 'home' ? '#4ade80' : '#f87171';
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(px, py, 10, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#000';
       ctx.font = 'bold 8px Inter';
       ctx.textAlign = 'center';
@@ -96,19 +120,13 @@ export default function FootballPitch({ dangerZones = [], players = [], showGrid
       ctx.strokeStyle = 'rgba(255,255,255,0.05)';
       ctx.lineWidth = 0.5;
       for (let i = 1; i < 6; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * (W / 6), 15);
-        ctx.lineTo(i * (W / 6), H - 15);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(i * (W / 6), 15); ctx.lineTo(i * (W / 6), H - 15); ctx.stroke();
       }
       for (let i = 1; i < 4; i++) {
-        ctx.beginPath();
-        ctx.moveTo(20, i * (H / 4));
-        ctx.lineTo(W - 20, i * (H / 4));
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(20, i * (H / 4)); ctx.lineTo(W - 20, i * (H / 4)); ctx.stroke();
       }
     }
-  }, [dangerZones, players, showGrid]);
+  }, [dangerZones, players, showGrid, pitchType]);
 
   return (
     <canvas

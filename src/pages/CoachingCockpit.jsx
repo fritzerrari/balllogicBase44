@@ -38,11 +38,7 @@ import {
   computeStats,
 } from '@/lib/footballTracker';
 
-// ─── Simulation fallback ─────────────────────────────────────────────────────
-const buildSimFrame = (tick) => {
-  const { players } = simulateDetections(tick);
-  return players;
-};
+// removed buildSimFrame wrapper — simulateDetections used directly now
 
 export default function CoachingCockpit() {
   // UI state
@@ -69,6 +65,10 @@ export default function CoachingCockpit() {
   const [trackTick, setTrackTick] = useState(0);
   const [isDetecting, setIsDetecting] = useState(false);
   const [apiError, setApiError] = useState(null);
+
+  // Training mode config
+  const [pitchType, setPitchType] = useState('full'); // 'full' | 'half' | 'small' | 'training'
+  const [playersPerTeam, setPlayersPerTeam] = useState(11);
 
   const videoRef = useRef(null);
   const hiddenCanvasRef = useRef(null);
@@ -102,13 +102,12 @@ export default function CoachingCockpit() {
     simIntervalRef.current = setInterval(() => {
       setTrackTick(t => {
         const newTick = t + 1;
-        const frame = buildSimFrame(newTick);
+        const { players } = simulateDetections(newTick, { playersPerTeam, pitchType, includeReferee: pitchType === 'full' });
         setPrevDetections(detections);
-        setDetections(frame);
+        setDetections(players);
         // Simulate auto events occasionally
         if (newTick % 40 === 0) {
-          const ball = frame.find(d => d.class === 'ball');
-          const simEvents = detectEvents(frame, [], { left: 2, right: 98, top: 2, bottom: 98 });
+          const simEvents = detectEvents(players, [], { left: 2, right: 98, top: 2, bottom: 98 });
           if (simEvents.length > 0) {
             setEvents(prev => [
               ...simEvents.map(e => ({ ...e, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })),
@@ -120,7 +119,7 @@ export default function CoachingCockpit() {
       });
     }, 500);
     return () => clearInterval(simIntervalRef.current);
-  }, [trackingMode]);
+  }, [trackingMode, playersPerTeam, pitchType]);
 
   // ── Roboflow mode ──────────────────────────────────────────────────────────
   const startRoboflowTracking = useCallback(async (key) => {
@@ -406,6 +405,31 @@ export default function CoachingCockpit() {
             </div>
           </div>
 
+          {/* Training Config */}
+          <div className="glass rounded-xl p-3 flex flex-wrap items-center gap-3">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Modus:</span>
+            {[
+              { key: 'full', label: '11v11 Vollfeld' },
+              { key: 'half', label: 'Halbfeld' },
+              { key: 'small', label: 'Kleines Feld' },
+              { key: 'training', label: 'Training' },
+            ].map(p => (
+              <button key={p.key} onClick={() => setPitchType(p.key)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${pitchType === p.key ? 'bg-primary/15 border border-primary/30 text-primary' : 'bg-muted border border-transparent text-muted-foreground hover:text-foreground'}`}>
+                {p.label}
+              </button>
+            ))}
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-muted-foreground">Spieler/Team:</span>
+              {[3, 5, 7, 9, 11].map(n => (
+                <button key={n} onClick={() => setPlayersPerTeam(n)}
+                  className={`w-8 h-7 rounded-lg text-xs font-bold transition-all ${playersPerTeam === n ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Live Pitch + Tracking */}
           <div className="glass rounded-xl p-4">
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -415,11 +439,12 @@ export default function CoachingCockpit() {
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${trackingMode === 'roboflow' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
                   {trackingMode === 'roboflow' ? '🔴 RF-DETR LIVE' : '⚪ Simulation'}
                 </span>
+                <span className="text-[10px] text-muted-foreground">{playersPerTeam}v{playersPerTeam}</span>
               </span>
               <div className="flex items-center gap-3 text-xs">
                 <span className="flex items-center gap-1 text-primary"><Circle className="w-2 h-2 fill-current" /> Heim ({playerCounts.home})</span>
                 <span className="flex items-center gap-1 text-red-400"><Circle className="w-2 h-2 fill-current" /> Gäste ({playerCounts.away})</span>
-                <span className="flex items-center gap-1 text-orange-400"><Circle className="w-2 h-2 fill-current" /> SR ({playerCounts.referee})</span>
+                {pitchType === 'full' && <span className="flex items-center gap-1 text-orange-400"><Circle className="w-2 h-2 fill-current" /> SR ({playerCounts.referee})</span>}
                 <span className="flex items-center gap-1 text-yellow-400"><Circle className="w-2 h-2 fill-current" /> Ball</span>
               </div>
             </div>
@@ -428,6 +453,7 @@ export default function CoachingCockpit() {
                 players={showTracking ? playerList : []}
                 dangerZones={ball ? [{ x: ball.x, y: ball.y, intensity: 0.8, team: 'home' }] : []}
                 showGrid
+                pitchType={pitchType}
               />
               {showTracking && (
                 <TrackingOverlay
@@ -438,8 +464,8 @@ export default function CoachingCockpit() {
               )}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
-              <span>🟢 Heim-Spieler · 🔴 Gäste-Spieler · 🟠 Schiedsrichter · 🟡 Ball</span>
-              <span className="ml-auto">Pressing-Linie · Formationslinien · Event-Highlights</span>
+              <span>🟢 Heim · 🔴 Gäste{pitchType === 'full' ? ' · 🟠 SR' : ''} · 🟡 Ball</span>
+              <span className="ml-auto capitalize">{pitchType === 'full' ? '11v11' : pitchType === 'small' ? 'Kleines Feld' : pitchType === 'half' ? 'Halbfeld' : 'Training'} · {playersPerTeam}v{playersPerTeam}</span>
             </div>
           </div>
         </div>
