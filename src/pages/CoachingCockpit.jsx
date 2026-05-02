@@ -90,8 +90,8 @@ export default function CoachingCockpit() {
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
-    refetchInterval: 8000,
-    staleTime: 5000,
+    refetchInterval: 12000,
+    staleTime: 8000,
     gcTime: 60000,
   });
 
