@@ -571,9 +571,9 @@ export default function CoachingCockpit() {
             </div>
             <div className="space-y-2">
               {cameras.map((cam) => {
-                 // Code: nutze existierenden code oder generiere aus camera_id
-                 const code = cam.code || String(100000 + (parseInt(cam.camera_id || '1') * 12345)) % 900000 + 100000;
-                 const camUrl = `${liveUrl}?session=${activeSession?.id}`;
+                 // Code: 6-stelliger Code oder neu generieren
+                 const code = cam.code || String(100000 + Math.floor(Math.random() * 900000)).slice(0, 6);
+                 const camUrl = activeSession?.id ? `${liveUrl}?session=${activeSession.id}` : '#';
                 return (
                   <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1.5">
