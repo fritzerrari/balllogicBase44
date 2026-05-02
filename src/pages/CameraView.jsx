@@ -177,45 +177,47 @@ export default function CameraView() {
     return false;
   }, []);
 
-  // ── Thumbnail push: first after 1s, then every 3s ───────────────────────
+  // ── Thumbnail push: only every 5s to reduce API load ──────────────────────
   const startThumbnailPush = useCallback((sessionId, codeStr) => {
     clearInterval(thumbIntervalRef.current);
     const canvas = document.createElement('canvas');
     canvas.width = 320; canvas.height = 180;
+    let lastPushTime = 0;
 
     const pushThumb = async () => {
+      const now = Date.now();
+      // Skip if less than 5s since last push (rate limiting)
+      if (now - lastPushTime < 5000) return;
+      lastPushTime = now;
+
       try {
         const video = videoRef.current;
-        if (!video || video.readyState < 2) return; // Warte bis Video vorhanden (auch ohne vollständig geladen)
+        if (!video || video.readyState < 2) return;
         
-        // Canvas render — mit Fehlerbehandlung
-        let thumbnail = null;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        // Only render if video dimensions are ready
+        if (!video.videoWidth || !video.videoHeight) return;
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
         try {
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          // CORS-safe Canvas-draw
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, 320, 180); // fallback black
-          try {
-            ctx.drawImage(video, 0, 0, 320, 180);
-          } catch (drawErr) {
-            // drawImage kann fehlschlagen bei Cross-Origin — einfach black thumbnail verwenden
-            console.debug('Canvas drawImage blocked (CORS)', drawErr.name);
-          }
-          thumbnail = canvas.toDataURL('image/jpeg', 0.6); // 0.6 für bessere Qualität
-        } catch (canvasErr) {
-          // Canvas-Fehler? Ignorieren, nächster Versuch
+          ctx.drawImage(video, 0, 0);
+        } catch (_) {
+          // CORS or other canvas error — skip this push
           return;
         }
 
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
         if (!thumbnail) return;
 
-        // Suche Session direkt nach ID — keine Status-Filter!
-        const allSessions = await base44.entities.LiveSession.list('-created_date', 100);
+        // Update session with thumbnail
+        const allSessions = await base44.entities.LiveSession.list('-created_date', 50);
         const fresh = allSessions.find(s => s.id === sessionId);
         if (!fresh) return;
 
-        // Update Kamera in dieser Session
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
           String(cam.code).trim() === codeStr 
             ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } 
@@ -223,15 +225,15 @@ export default function CameraView() {
         );
 
         await base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
-      } catch (err) {
-        // Stiller Fehler — wird beim nächsten Interval versucht
+      } catch (_) {
+        // Silent fail — retry on next interval
       }
     };
 
-    // First push nach 1s (schnell für Trainer-Feedback)
-    setTimeout(pushThumb, 1000);
-    // Dann alle 3s pushen
-    thumbIntervalRef.current = setInterval(pushThumb, 3000);
+    // Push every 5s (not 3s) to avoid API throttling
+    thumbIntervalRef.current = setInterval(pushThumb, 5000);
+    // First push delayed to 2s (let video load)
+    setTimeout(pushThumb, 2000);
   }, []);
 
   // ── Simple audio detection (no uptime dep) ────────────────────────────────
