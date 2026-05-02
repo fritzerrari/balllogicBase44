@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { searchTeam, getTeamMatches, getTeamSquad, formatApiMatch, COMPETITIONS } from '@/lib/footballDataApi';
+import LineupBuilder from '@/components/players/LineupBuilder';
 
 const STEPS = [
   { id: 1, label: 'Spieldaten', icon: Zap },
@@ -42,7 +43,11 @@ export default function NewMatch() {
   // Step 3 — Aufstellung
   const [lineup, setLineup] = useState({ home: [], away: [] });
   const [apiSquad, setApiSquad] = useState([]);
-  const [addingPlayer, setAddingPlayer] = useState({ side: null, name: '', number: '', position: POSITIONS[0] });
+
+  const { data: existingPlayers = [] } = useQuery({
+    queryKey: ['players'],
+    queryFn: () => base44.entities.Player.list('-created_date', 50),
+  });
 
   const f = (k) => ({ value: form[k] ?? '', onChange: e => setForm(p => ({ ...p, [k]: e.target.value })) });
 
@@ -83,17 +88,7 @@ export default function NewMatch() {
     setStep(3);
   };
 
-  // Aufstellung
-  const addPlayer = (side) => {
-    if (!addingPlayer.name) return;
-    setLineup(prev => ({ ...prev, [side]: [...prev[side], { name: addingPlayer.name, number: addingPlayer.number, position: addingPlayer.position }] }));
-    setAddingPlayer(p => ({ ...p, name: '', number: '' }));
-  };
 
-  const addFromSquad = (player, side) => {
-    if (lineup[side].find(p => p.name === player.name)) return;
-    setLineup(prev => ({ ...prev, [side]: [...prev[side], { name: player.name, number: player.shirtNumber || '', position: POSITIONS[0] }] }));
-  };
 
   // Speichern
   const handleSave = async () => {
@@ -270,62 +265,27 @@ export default function NewMatch() {
         {/* ── STEP 3: Aufstellung ── */}
         {step === 3 && (
           <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-            <div className="glass rounded-xl p-5 mb-4 space-y-5">
+            <div className="glass rounded-xl p-5 mb-4 space-y-6">
               <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" /> Aufstellung (optional)
               </h2>
-
-              {apiSquad.length > 0 && (
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
-                  <div className="text-xs font-bold text-primary mb-2">🔍 Kader aus Datenbank ({apiSquad.length} Spieler)</div>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                    {apiSquad.slice(0, 25).map((p, i) => (
-                      <button key={i} onClick={() => addFromSquad(p, 'home')}
-                        className="text-[10px] px-2 py-1 rounded-full bg-muted border border-border text-foreground hover:border-primary/40 transition-all">
-                        {p.shirtNumber ? `#${p.shirtNumber} ` : ''}{p.name}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Tippen = zur Heim-Aufstellung hinzufügen</div>
-                </div>
-              )}
-
-              {(['home', 'away']).map(side => (
-                <div key={side}>
-                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">
-                    {side === 'home' ? `🏠 ${form.home_team || 'Heim'}` : `✈️ ${form.away_team || 'Gäste'}`} ({lineup[side].length} Spieler)
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-2 min-h-8">
-                    {lineup[side].map((p, i) => (
-                      <div key={i} className="flex items-center gap-1 bg-muted rounded-full px-2 py-1 text-xs">
-                        {p.number && <span className="text-primary font-bold">#{p.number}</span>}
-                        <span>{p.name}</span>
-                        <button onClick={() => setLineup(prev => ({ ...prev, [side]: prev[side].filter((_, idx) => idx !== i) }))}>
-                          <X className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input value={side === addingPlayer.side || !addingPlayer.side ? addingPlayer.name : ''} 
-                      onChange={e => setAddingPlayer(p => ({ ...p, name: e.target.value, side }))}
-                      onFocus={() => setAddingPlayer(p => ({ ...p, side }))}
-                      placeholder="Spielername" className="bg-muted border-border text-xs flex-1" />
-                    <Input value={side === addingPlayer.side ? addingPlayer.number : ''}
-                      onChange={e => setAddingPlayer(p => ({ ...p, number: e.target.value, side }))}
-                      placeholder="#" className="bg-muted border-border text-xs w-14 text-center" />
-                    <select value={addingPlayer.position}
-                      onChange={e => setAddingPlayer(p => ({ ...p, position: e.target.value }))}
-                      className="bg-muted border border-input rounded-md px-2 text-xs text-foreground h-9">
-                      {POSITIONS.map(pos => <option key={pos} value={pos}>{pos.split(' ').slice(-1)[0]}</option>)}
-                    </select>
-                    <button onClick={() => addPlayer(side)}
-                      className="px-3 h-9 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-all">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <LineupBuilder
+                side="home"
+                teamName={form.home_team || 'Heim'}
+                existingPlayers={existingPlayers}
+                lineup={lineup.home}
+                onLineupChange={(l) => setLineup(p => ({ ...p, home: l }))}
+                apiSquad={apiSquad}
+              />
+              <div className="border-t border-border" />
+              <LineupBuilder
+                side="away"
+                teamName={form.away_team || 'Gäste'}
+                existingPlayers={[]}
+                lineup={lineup.away}
+                onLineupChange={(l) => setLineup(p => ({ ...p, away: l }))}
+                apiSquad={[]}
+              />
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep(2)} className="flex-1 border-border text-muted-foreground">

@@ -87,35 +87,17 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Fußball-API (Football-Data.org)">
+      <Section title="Fußball-API (api-football.com)">
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Kostenloser API-Key für Spielpläne, Kader und Tabellenstand. Registrierung auf{' '}
-            <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" className="text-primary underline flex-inline items-center gap-1">
-              football-data.org <ExternalLink className="w-3 h-3 inline" />
-            </a>
-          </p>
-          <div>
-            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5 block flex items-center gap-1">
-              <Key className="w-3 h-3" /> API-Key
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                value={footballApiKey}
-                onChange={e => setFootballApiKey(e.target.value)}
-                placeholder="Dein football-data.org API Key"
-                className="bg-muted border-border font-mono text-sm flex-1"
-              />
-              <Button onClick={saveFootballApiKey} className={apiSaved ? 'bg-primary/50' : 'bg-primary'} size="sm">
-                {apiSaved ? '✓ Gespeichert' : 'Speichern'}
-              </Button>
-            </div>
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-primary font-medium flex items-center gap-2">
+            <Key className="w-3.5 h-3.5 shrink-0" />
+            API-Key ist bereits konfiguriert und aktiv
           </div>
           <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
-            <div>✓ Automatische Spielplan-Erkennung beim Anlegen neuer Spiele</div>
-            <div>✓ Kader-Import (Bundesliga, Premier League, Champions League etc.)</div>
-            <div>✓ Free tier: 10 Anfragen/Minute · Keine Kreditkarte nötig</div>
+            <div>✓ Spielplan-Erkennung (Bundesliga, PL, Champions League etc.)</div>
+            <div>✓ Kader-Import für Aufstellungen</div>
+            <div>✓ Live-Scores und Ergebnisse</div>
+            <div>✓ Über 1000 Ligen und Wettbewerbe</div>
           </div>
         </div>
       </Section>

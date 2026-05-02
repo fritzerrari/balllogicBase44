@@ -1,142 +1,139 @@
 /**
- * Football-Data.org API — Kostenlose Fußball-Daten
- * Free tier: 10 requests/min, Bundesliga, Premier League, Champions League etc.
- * API Key kostenlos registrieren auf: https://www.football-data.org/client/register
- * 
- * Caching: Ergebnisse werden 30 Minuten im SessionStorage gecacht
+ * API-Football (api-football.com via RapidAPI)
+ * API Key: a04c18ecb582e77420da7237a6ef4703
+ * Host: v3.football.api-sports.io  (direkt, kein RapidAPI-Proxy nötig)
+ * Docs: https://www.api-football.com/documentation-v3
+ *
+ * Caching: 30 Minuten im SessionStorage
  */
 
-const BASE_URL = 'https://api.football-data.org/v4';
-const CACHE_TTL = 30 * 60 * 1000; // 30 Minuten
-
-function getApiKey() {
-  return (
-    import.meta.env.VITE_FOOTBALL_DATA_KEY ||
-    window.__FOOTBALL_DATA_KEY__ ||
-    localStorage.getItem('football_data_key') ||
-    ''
-  );
-}
+const BASE_URL = 'https://v3.football.api-sports.io';
+const API_KEY = 'a04c18ecb582e77420da7237a6ef4703';
+const CACHE_TTL = 30 * 60 * 1000;
 
 function cacheGet(key) {
   try {
-    const raw = sessionStorage.getItem(`fd_${key}`);
+    const raw = sessionStorage.getItem(`af_${key}`);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(`fd_${key}`); return null; }
+    if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(`af_${key}`); return null; }
     return data;
   } catch { return null; }
 }
 
 function cacheSet(key, data) {
-  try { sessionStorage.setItem(`fd_${key}`, JSON.stringify({ data, ts: Date.now() })); } catch {}
+  try { sessionStorage.setItem(`af_${key}`, JSON.stringify({ data, ts: Date.now() })); } catch {}
 }
 
 async function apiFetch(path) {
-  const key = getApiKey();
-  if (!key) throw new Error('KEIN_API_KEY');
-
-  const cached = cacheGet(path);
+  const cacheKey = path.replace(/\//g, '_');
+  const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'X-Auth-Token': key },
+    headers: {
+      'x-apisports-key': API_KEY,
+    },
   });
 
   if (res.status === 429) throw new Error('RATE_LIMIT');
   if (!res.ok) throw new Error(`API_ERROR_${res.status}`);
 
   const data = await res.json();
-  cacheSet(path, data);
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    throw new Error(`API_ERRORS: ${JSON.stringify(data.errors)}`);
+  }
+  cacheSet(cacheKey, data);
   return data;
 }
 
-// ─── Competitions ─────────────────────────────────────────────────────────────
+// ─── Leagues ──────────────────────────────────────────────────────────────────
 export const COMPETITIONS = {
-  BL1:  { name: 'Bundesliga', country: 'Deutschland' },
-  BL2:  { name: '2. Bundesliga', country: 'Deutschland' },
-  PL:   { name: 'Premier League', country: 'England' },
-  PD:   { name: 'La Liga', country: 'Spanien' },
-  SA:   { name: 'Serie A', country: 'Italien' },
-  FL1:  { name: 'Ligue 1', country: 'Frankreich' },
-  CL:   { name: 'Champions League', country: 'Europa' },
-  DFB:  { name: 'DFB-Pokal', country: 'Deutschland' },
+  78:  { name: 'Bundesliga', country: 'Deutschland' },
+  79:  { name: '2. Bundesliga', country: 'Deutschland' },
+  39:  { name: 'Premier League', country: 'England' },
+  140: { name: 'La Liga', country: 'Spanien' },
+  135: { name: 'Serie A', country: 'Italien' },
+  61:  { name: 'Ligue 1', country: 'Frankreich' },
+  2:   { name: 'Champions League', country: 'Europa' },
+  81:  { name: 'DFB-Pokal', country: 'Deutschland' },
 };
 
 /**
- * Alle Teams einer Liga suchen
- */
-export async function getTeamsByCompetition(competitionCode) {
-  const data = await apiFetch(`/competitions/${competitionCode}/teams`);
-  return data.teams || [];
-}
-
-/**
- * Team anhand von Name suchen (fuzzy)
+ * Team anhand von Name suchen
+ * @returns {team, league} | null
  */
 export async function searchTeam(name) {
-  // Probiere Bundesliga zuerst, dann andere Ligen
-  for (const code of ['BL1', 'BL2', 'PL', 'PD', 'SA', 'FL1']) {
-    try {
-      const teams = await getTeamsByCompetition(code);
-      const match = teams.find(t =>
-        t.name?.toLowerCase().includes(name.toLowerCase()) ||
-        t.shortName?.toLowerCase().includes(name.toLowerCase()) ||
-        t.tla?.toLowerCase() === name.toLowerCase().slice(0, 3)
-      );
-      if (match) return { team: match, competition: code };
-    } catch {}
-  }
-  return null;
+  const data = await apiFetch(`/teams?search=${encodeURIComponent(name)}`);
+  const results = data.response || [];
+  if (results.length === 0) return null;
+  return { team: results[0].team, league: results[0].league };
 }
 
 /**
  * Nächste Spiele eines Teams
  */
-export async function getTeamMatches(teamId, status = 'SCHEDULED') {
-  const data = await apiFetch(`/teams/${teamId}/matches?status=${status}&limit=10`);
-  return data.matches || [];
+export async function getTeamMatches(teamId, status = 'NS') {
+  // NS = Not Started (geplant), status can also be: FT (finished), LIVE etc.
+  const season = new Date().getFullYear();
+  const data = await apiFetch(`/fixtures?team=${teamId}&season=${season}&status=${status}&next=10`);
+  return data.response || [];
 }
 
 /**
  * Kader eines Teams
  */
 export async function getTeamSquad(teamId) {
-  const data = await apiFetch(`/teams/${teamId}`);
-  return data.squad || [];
+  const data = await apiFetch(`/players/squads?team=${teamId}`);
+  const squads = data.response || [];
+  if (squads.length === 0) return [];
+  return squads[0].players || [];
 }
 
 /**
- * Laufende/heutige Spiele
+ * Aktuelle Tabelle einer Liga
+ */
+export async function getStandings(leagueId) {
+  const season = new Date().getFullYear();
+  const data = await apiFetch(`/standings?league=${leagueId}&season=${season}`);
+  return data.response || [];
+}
+
+/**
+ * Laufende Spiele
  */
 export async function getLiveMatches() {
-  const data = await apiFetch('/matches?status=LIVE');
-  return data.matches || [];
+  const data = await apiFetch('/fixtures?live=all');
+  return data.response || [];
 }
 
 /**
- * Aktuelle Tabelle
+ * Spieler-Statistiken für ein Team in einer Saison
  */
-export async function getStandings(competitionCode) {
-  const data = await apiFetch(`/competitions/${competitionCode}/standings`);
-  return data.standings || [];
+export async function getPlayerStats(teamId, season) {
+  const s = season || new Date().getFullYear();
+  const data = await apiFetch(`/players?team=${teamId}&season=${s}`);
+  return data.response || [];
 }
 
 /**
- * Formatiert ein API-Match für TactIQ
+ * Formatiert ein API-Football Fixture für TactIQ
  */
-export function formatApiMatch(m) {
+export function formatApiMatch(fixture) {
+  const f = fixture.fixture;
+  const h = fixture.teams?.home;
+  const a = fixture.teams?.away;
+  const g = fixture.goals;
   return {
-    title: `${m.homeTeam?.name} vs ${m.awayTeam?.name}`,
-    date: m.utcDate ? m.utcDate.split('T')[0] : '',
-    home_team: m.homeTeam?.name || '',
-    away_team: m.awayTeam?.name || '',
-    competition: m.competition?.name || '',
-    score_home: m.score?.fullTime?.home,
-    score_away: m.score?.fullTime?.away,
-    status: m.status === 'FINISHED' ? 'analyzed' : m.status === 'IN_PLAY' ? 'live' : 'uploading',
-    api_id: m.id,
-    matchday: m.matchday,
-    venue: m.venue || '',
+    title: `${h?.name} vs ${a?.name}`,
+    date: f?.date ? f.date.split('T')[0] : '',
+    home_team: h?.name || '',
+    away_team: a?.name || '',
+    competition: fixture.league?.name || '',
+    score_home: g?.home,
+    score_away: g?.away,
+    status: f?.status?.short === 'FT' ? 'analyzed' : f?.status?.short === 'LIVE' ? 'live' : 'uploading',
+    api_id: f?.id,
+    venue: f?.venue?.name || '',
   };
 }
