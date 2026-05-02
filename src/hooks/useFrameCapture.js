@@ -63,7 +63,7 @@ export default function useFrameCapture(canvasRef, sessionId, team = 'home', ena
     return () => {
       clearInterval(intervalRef.current);
     };
-  }, [enabled, sessionId, canvasRef, team]);
+  }, [enabled, sessionId, team]);
 
   return { frameCount: frameCountRef.current };
 }

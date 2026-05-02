@@ -37,14 +37,15 @@ export async function detectFrame(canvas, apiKey) {
   });
   const data = await res.json();
 
-  return (data.predictions || []).map(p => ({
-    id: `${p.class}-${Math.round(p.x)}-${Math.round(p.y)}`,
+  return (data.predictions || []).map((p, idx) => ({
+    id: `${p.class}-${p.class === 'player' || p.class === 'goalkeeper' ? 'temp' : 'static'}-${idx}`, // Stable across frames
     class: p.class, // 'player' | 'goalkeeper' | 'referee' | 'ball'
     x: p.x / data.image.width * 100,
     y: p.y / data.image.height * 100,
     width: p.width / data.image.width * 100,
     height: p.height / data.image.height * 100,
     confidence: p.confidence,
+    number: null, // assigned later via tracking
     team: null, // assigned later by color clustering
   }));
 }
@@ -105,12 +106,20 @@ export function assignTeamsByColor(canvas, detections) {
   const hues = playersWithColor.map(p => p.hue);
   const [c1, c2] = kMeans2(hues);
 
+  // Validate centroids are different (safety)
+  const centersValid = Math.abs(hueDiff(c1, c2)) > 30; // >30° hue difference = different colors
+
   const result = detections.map(d => {
     if (d.class === 'referee') return { ...d, team: 'referee' };
     if (d.class === 'ball') return { ...d, team: 'ball' };
 
     const p = playersWithColor.find(p => p.id === d.id);
-    if (!p) return { ...d, team: 'home' };
+    if (!p) return { ...d, team: 'home' }; // Fallback
+
+    if (!centersValid) {
+      // Poor color separation — use spatial position as fallback
+      return { ...d, team: d.x < 50 ? 'home' : 'away' };
+    }
 
     const distToC1 = Math.abs(hueDiff(p.hue, c1));
     const distToC2 = Math.abs(hueDiff(p.hue, c2));
@@ -207,26 +216,31 @@ export function detectEvents(detections, prevDetections, pitchBounds = { left: 2
 }
 
 // ─── Kalman-style Smoother — SESSION-SCOPED (no global state leakage) ────────
-const SMOOTH_STATE_BY_SESSION = new Map(); // Key: sessionId, Value: smoothState object
-const MAX_SMOOTH_STATE_SIZE = 150;
+const SMOOTH_STATE_BY_SESSION = new Map(); // Key: sessionId, Value: {smoothState, lastCleanup}
+const MAX_SMOOTH_STATE_SIZE = 100;
+const CLEANUP_INTERVAL_MS = 60000; // Cleanup every 60s
 
 export function smoothDetections(detections, alpha = 0.6, sessionId = 'default') {
   if (!SMOOTH_STATE_BY_SESSION.has(sessionId)) {
-    SMOOTH_STATE_BY_SESSION.set(sessionId, {});
+    SMOOTH_STATE_BY_SESSION.set(sessionId, { smoothState: {}, lastCleanup: Date.now() });
   }
   
-  let smoothState = SMOOTH_STATE_BY_SESSION.get(sessionId);
+  const sessionData = SMOOTH_STATE_BY_SESSION.get(sessionId);
+  let smoothState = sessionData.smoothState;
   
-  // Cleanup old entries if too large (FIFO eviction)
-  if (Object.keys(smoothState).length > MAX_SMOOTH_STATE_SIZE) {
+  // Periodic cleanup (every 60s per session)
+  const now = Date.now();
+  if (now - sessionData.lastCleanup > CLEANUP_INTERVAL_MS) {
     const keys = Object.keys(smoothState);
-    for (let i = 0; i < keys.length - MAX_SMOOTH_STATE_SIZE + 50; i++) {
-      delete smoothState[keys[i]];
+    if (keys.length > MAX_SMOOTH_STATE_SIZE) {
+      const toDelete = keys.length - MAX_SMOOTH_STATE_SIZE + 20;
+      for (let i = 0; i < toDelete; i++) delete smoothState[keys[i]];
     }
+    sessionData.lastCleanup = now;
   }
 
   return detections.map(d => {
-    const key = d.id || `${d.class}-${d.team}`;
+    const key = d.id || `${d.class}-${d.team}-${d.number || 'unknown'}`;
     const prev = smoothState[key];
     if (!prev) {
       smoothState[key] = { x: d.x, y: d.y };
