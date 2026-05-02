@@ -172,7 +172,7 @@ export default function CameraView() {
     return false;
   }, []);
 
-  // ── Thumbnail push: first after 5s, then every 30s ───────────────────────
+  // ── Thumbnail push: first after 1s, then every 3s ───────────────────────
   const startThumbnailPush = useCallback((sessionId, codeStr) => {
     clearInterval(thumbIntervalRef.current);
     const canvas = document.createElement('canvas');
@@ -185,8 +185,9 @@ export default function CameraView() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, 320, 180);
         const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
-        const sessions = await base44.entities.LiveSession.filter({ status: 'active' });
-        const fresh = sessions.find(s => s.id === sessionId);
+        // Poll auch während waiting — finde Session unabhängig vom Status
+        const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
+        const fresh = sessions[0];
         if (!fresh) return;
         const updatedStreams = (fresh.camera_streams || []).map(cam =>
           String(cam.code).trim() === codeStr ? { ...cam, thumbnail, status: 'connected', last_seen: new Date().toISOString() } : cam
@@ -195,10 +196,10 @@ export default function CameraView() {
       } catch (_) {}
     };
 
-    // First push after 3s (so the trainer sees something quickly)
-    setTimeout(pushThumb, 3000);
-    // Then every 10s
-    thumbIntervalRef.current = setInterval(pushThumb, 10000);
+    // First push nach 1s (schnell für Trainer-Feedback)
+    setTimeout(pushThumb, 1000);
+    // Dann alle 3s pushen
+    thumbIntervalRef.current = setInterval(pushThumb, 3000);
   }, []);
 
   // ── Simple audio detection (no uptime dep) ────────────────────────────────
