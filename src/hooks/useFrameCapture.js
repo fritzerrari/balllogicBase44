@@ -18,12 +18,17 @@ export default function useFrameCapture(canvasRef, sessionId, team = 'home', ena
     if (!enabled || !sessionId || !canvasRef?.current) return;
 
     const captureFrame = async () => {
-      const canvas = canvasRef.current;
-      if (!canvas || canvas.width === 0) return;
+       const canvas = canvasRef?.current;
+       if (!canvas || !canvas.getContext || canvas.width === 0 || canvas.height === 0) return;
 
-      try {
-        // Canvas → Base64 JPEG
-        const base64Frame = canvas.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1];
+       try {
+         // Canvas → Base64 JPEG (mit CORS error handling)
+         let base64Frame;
+         try {
+           base64Frame = canvas.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1];
+         } catch (corsErr) {
+           return; // CORS protected canvas — skip frame
+         }
         const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
         const frameNumber = frameCountRef.current++;
 

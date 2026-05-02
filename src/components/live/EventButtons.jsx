@@ -141,8 +141,8 @@ export default function EventButtons({ sessionId, matchTitle, source = 'coach', 
           >
             <div className="glass rounded-2xl p-6 w-full max-w-xs" onClick={e => e.stopPropagation()}>
               <div className="text-center mb-4">
-                <div className="text-3xl mb-1">{showTeamPicker.icon}</div>
-                <div className="font-grotesk font-bold text-foreground">{showTeamPicker.label}</div>
+                <div className="text-3xl mb-1">{showTeamPicker?.icon || '⚽'}</div>
+                <div className="font-grotesk font-bold text-foreground">{showTeamPicker?.label || 'Event'}</div>
                 <div className="text-xs text-muted-foreground mt-1">Für welches Team?</div>
               </div>
               <div className="grid grid-cols-2 gap-3">

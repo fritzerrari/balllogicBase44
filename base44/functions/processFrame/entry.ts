@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
       // Fallback: Hole letzten erfolgreichen Frame
       console.warn('📼 Falling back to last successful tracking data');
       try {
-        const lastTracking = await base44.entities.TrackingData.list('-timestamp_ms', 1).catch(() => []);
+        const lastTracking = await base44.entities.TrackingData.filter({ session_id }, '-timestamp_ms', 1).catch(() => []);
         if (lastTracking?.[0]?.player_positions) {
           detections = {
             predictions: [

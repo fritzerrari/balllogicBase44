@@ -37,11 +37,14 @@ export default function useCameraHeartbeat(sessionId, cameraCode, cameraLabel, i
       }
 
       try {
-        const session = sessionRef.current;
+        // Frische Session-Kopie laden statt stale ref zu verwenden
+        const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
+        const currentSession = sessions[0];
+        if (!currentSession) return;
+
         const updated = {
-          ...session,
-          camera_streams: session.camera_streams.map(cam => {
-            // Update: Nur diese Kamera, wenn Code matched
+          ...currentSession,
+          camera_streams: (currentSession.camera_streams || []).map(cam => {
             if (cam.code === cameraCode) {
               return {
                 ...cam,
@@ -54,7 +57,7 @@ export default function useCameraHeartbeat(sessionId, cameraCode, cameraLabel, i
         };
 
         // Update in DB
-        await base44.entities.LiveSession.update(session.id, {
+        await base44.entities.LiveSession.update(currentSession.id, {
           camera_streams: updated.camera_streams,
         });
 
@@ -64,9 +67,9 @@ export default function useCameraHeartbeat(sessionId, cameraCode, cameraLabel, i
       }
     };
 
-    // Starte Heartbeat
+    // Starte Heartbeat (REDUZIERT: 2s → 15s um Rate-Limit zu vermeiden)
     sendHeartbeat();
-    intervalRef.current = setInterval(sendHeartbeat, 2000);
+    intervalRef.current = setInterval(sendHeartbeat, 15000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
