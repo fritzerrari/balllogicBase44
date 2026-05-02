@@ -232,13 +232,38 @@ export default function LiveSession() {
 
   // ── Kamera während laufender Session hinzufügen ───────────────────────────
   const addCameraLive = async () => {
-    const newCam = { id: cameras.length + 1, label: `Kamera ${cameras.length + 1}`, code: generateCode(), status: 'waiting' };
+    const newCam = { id: cameras.length + 1, label: `Kamera ${cameras.length + 1}`, code: generateCode(), status: 'waiting', enabled: true };
     const updatedCameras = [...cameras, newCam];
     setCameras(updatedCameras);
     setCameraCount(updatedCameras.length);
     if (session) {
       const updatedStreams = updatedCameras.map(c => ({
-        camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting',
+        camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: 'waiting', enabled: c.enabled !== false,
+      }));
+      await base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams });
+      setLiveCameraStreams(updatedStreams);
+    }
+  };
+
+  const deleteCamera = async (id) => {
+    const updatedCameras = cameras.filter(c => c.id !== id);
+    setCameras(updatedCameras);
+    setCameraCount(updatedCameras.length);
+    if (session) {
+      const updatedStreams = updatedCameras.map(c => ({
+        camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: c.status || 'waiting', enabled: c.enabled !== false,
+      }));
+      await base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams });
+      setLiveCameraStreams(updatedStreams);
+    }
+  };
+
+  const toggleCameraEnabled = async (id, currentEnabled) => {
+    const updatedCameras = cameras.map(c => c.id === id ? { ...c, enabled: !currentEnabled } : c);
+    setCameras(updatedCameras);
+    if (session) {
+      const updatedStreams = updatedCameras.map(c => ({
+        camera_id: c.id.toString(), label: c.label, stream_url: '', code: c.code, status: c.status || 'waiting', enabled: c.enabled !== false,
       }));
       await base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams });
       setLiveCameraStreams(updatedStreams);
@@ -531,10 +556,11 @@ export default function LiveSession() {
                 {cameras.map((cam) => {
                   const liveStream = liveCameraStreams.find(s => String(s.code) === String(cam.code));
                   const isConnected = liveStream?.status === 'connected';
+                  const isEnabled = cam.enabled !== false;
                   const lastSeen = liveStream?.last_seen ? Math.round((Date.now() - new Date(liveStream.last_seen).getTime()) / 1000) : null;
                   const thumbnail = liveStream?.thumbnail;
                   return (
-                    <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
+                    <div key={cam.id} className={`aspect-video bg-black rounded-lg border flex flex-col items-center justify-center gap-1 relative overflow-hidden group/cam transition-colors ${!isEnabled ? 'opacity-50' : ''} ${isConnected ? 'border-primary/60' : 'border-border/30'}`}>
                       {/* Vorschau-Thumbnail wenn vorhanden */}
                       {thumbnail ? (
                         <img src={thumbnail} alt={cam.label} className="absolute inset-0 w-full h-full object-cover opacity-80" />
@@ -542,12 +568,26 @@ export default function LiveSession() {
                         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0d1f0d 0%, #060f06 100%)' }} />
                       )}
                       {/* Status Badge oben links */}
-                      <div className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected ? 'bg-primary/80 text-primary-foreground' : 'bg-black/70 text-muted-foreground'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
-                        {isConnected ? `LIVE${lastSeen !== null && lastSeen < 20 ? ` ${lastSeen}s` : ''}` : 'WARTET'}
+                      <div className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${isConnected && isEnabled ? 'bg-primary/80 text-primary-foreground' : !isEnabled ? 'bg-red-500/60 text-white' : 'bg-black/70 text-muted-foreground'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected && isEnabled ? 'bg-white animate-pulse' : !isEnabled ? 'bg-white' : 'bg-muted-foreground'}`} />
+                        {!isEnabled ? 'AUS' : isConnected ? `LIVE${lastSeen !== null && lastSeen < 20 ? ` ${lastSeen}s` : ''}` : 'WARTET'}
                       </div>
-                      {/* Invite Button oben rechts */}
-                      <div className="absolute top-1.5 right-1.5 z-10">
+                      {/* Control Buttons oben rechts */}
+                      <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1.5 opacity-0 group-hover/cam:opacity-100 transition-opacity">
+                        <button onClick={() => toggleCameraEnabled(cam.id, isEnabled)}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
+                            isEnabled
+                              ? 'bg-primary/80 text-primary-foreground hover:bg-primary'
+                              : 'bg-red-500/60 text-white hover:bg-red-500'
+                          }`}
+                          title={isEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}>
+                          {isEnabled ? '●' : '○'}
+                        </button>
+                        <button onClick={() => deleteCamera(cam.id)}
+                          className="w-7 h-7 rounded-lg bg-destructive/60 text-white hover:bg-destructive flex items-center justify-center text-xs font-bold transition-all"
+                          title="Kamera löschen">
+                          ✕
+                        </button>
                         <CameraInviteButton code={cam.code} position={cam.label} />
                       </div>
                       {/* Label + Code unten */}
