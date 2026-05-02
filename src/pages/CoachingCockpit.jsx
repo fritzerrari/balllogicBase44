@@ -107,6 +107,7 @@ export default function CoachingCockpit() {
   // ── Simulation mode ────────────────────────────────────────────────────────
   useEffect(() => {
     if (trackingMode !== 'simulation') return;
+
     let prevPlayers = [];
     simIntervalRef.current = setInterval(() => {
       setTrackTick(t => {
@@ -114,13 +115,19 @@ export default function CoachingCockpit() {
         const { players } = simulateDetections(newTick, { playersPerTeam, pitchType, includeReferee: pitchType === 'full' });
         setPrevDetections(prevPlayers);
         setDetections(players);
-        prevPlayers = players; // Keep in local ref, not state
-        // Simulate auto events occasionally
+        setStatsHistory(prev => [...prev.slice(-30), players]);
+        prevPlayers = players;
+
+        // Auto-Events
         if (newTick % 40 === 0) {
           const simEvents = detectEvents(players, [], { left: 2, right: 98, top: 2, bottom: 98 });
           if (simEvents.length > 0) {
             setEvents(prev => [
-              ...simEvents.map(e => ({ ...e, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })),
+              ...simEvents.map(e => ({ 
+                ...e, 
+                id: `sim-${Date.now()}-${Math.random()}`, 
+                time: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+              })),
               ...prev
             ].slice(0, 50));
           }
@@ -128,7 +135,12 @@ export default function CoachingCockpit() {
         return newTick;
       });
     }, 500);
-    return () => clearInterval(simIntervalRef.current);
+
+    return () => {
+      clearInterval(simIntervalRef.current);
+      setEvents([]);
+      setDetections([]);
+    };
   }, [trackingMode, playersPerTeam, pitchType]);
 
   // ── Roboflow mode ──────────────────────────────────────────────────────────
@@ -208,7 +220,6 @@ export default function CoachingCockpit() {
 
   const handleActivateRoboflow = () => {
     if (!apiKeyInput.trim()) return;
-    // DSGVO-Check: Warnen wenn Spieler mit ausstehender Einwilligung vorhanden
     const pendingConsent = players.filter(p =>
       !p.tracking_consent || p.tracking_consent === 'pending' || p.tracking_consent === 'guardian_required'
     );
@@ -216,10 +227,16 @@ export default function CoachingCockpit() {
       setShowDsgvo(true);
       return;
     }
+
+    // STOP Simulation zuerst
+    clearInterval(simIntervalRef.current);
+    setTrackTick(0);
+    setEvents([]);
+
+    // Starte Roboflow
     setApiKey(apiKeyInput.trim());
     setTrackingMode('roboflow');
     setShowApiSetup(false);
-    clearInterval(simIntervalRef.current);
     startRoboflowTracking(apiKeyInput.trim());
   };
 
@@ -227,18 +244,28 @@ export default function CoachingCockpit() {
     setTrackingUnlocked(true);
     setShowDsgvo(false);
     if (apiKeyInput.trim()) {
+      // STOP Simulation zuerst
+      clearInterval(simIntervalRef.current);
+      setTrackTick(0);
+      setEvents([]);
+
       setApiKey(apiKeyInput.trim());
       setTrackingMode('roboflow');
       setShowApiSetup(false);
-      clearInterval(simIntervalRef.current);
       startRoboflowTracking(apiKeyInput.trim());
     }
   };
 
   const handleSwitchToSim = () => {
     stopRoboflowTracking();
+    clearInterval(detectionIntervalRef.current);
     setTrackingMode('simulation');
     setApiError(null);
+    setApiKey('');
+    setApiKeyInput('');
+    setEvents([]);
+    setDetections([]);
+    setTrackTick(0);
   };
 
   // Cleanup — only on unmount
@@ -605,9 +632,9 @@ export default function CoachingCockpit() {
             </div>
             <div className="space-y-2">
               {cameras.map((cam) => {
-                // Code aus camera_id generieren (6-stellig mit Padding)
-                const code = cam.code || String(cam.camera_id || '').padStart(6, '0').slice(-6) || '000000';
-                const camUrl = `${liveUrl}?code=${code}`;
+                 // Code: nutze existierenden code oder generiere aus camera_id
+                 const code = cam.code || String(100000 + (parseInt(cam.camera_id || '1') * 12345)) % 900000 + 100000;
+                 const camUrl = `${liveUrl}?session=${activeSession?.id}`;
                 return (
                   <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1.5">
