@@ -38,6 +38,8 @@ import {
   simulateDetections,
   computeStats,
 } from '@/lib/footballTracker';
+import useFrameCapture from '@/hooks/useFrameCapture';
+import LiveTrackingPanel from '@/components/tracking/LiveTrackingPanel';
 
 // removed buildSimFrame wrapper — simulateDetections used directly now
 
@@ -123,6 +125,14 @@ export default function CoachingCockpit() {
   }, [trackingMode, playersPerTeam, pitchType]);
 
   // ── Roboflow mode ──────────────────────────────────────────────────────────
+  // Frame capture hook — sendet alle 2s Frames an processFrame
+  const { frameCount } = useFrameCapture(
+    hiddenCanvasRef,
+    activeSession?.id,
+    'home',
+    trackingMode === 'roboflow' && isDetecting
+  );
+
   const startRoboflowTracking = useCallback(async (key) => {
     setApiError(null);
     setIsDetecting(true);
@@ -479,6 +489,11 @@ export default function CoachingCockpit() {
 
           {/* Live Stats */}
           <LiveStats stats={stats} playerCounts={playerCounts} />
+
+          {/* Live Tracking Panel (Auto-Events + Heatmaps) */}
+          {activeSession && (
+            <LiveTrackingPanel sessionId={activeSession.id} />
+          )}
 
           {/* Manual Event Buttons — Coach */}
           <div className="glass rounded-xl p-4">
