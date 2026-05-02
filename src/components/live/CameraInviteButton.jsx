@@ -49,43 +49,44 @@ export default function CameraInviteButton({ code, position }) {
               initial={{ opacity: 0, scale: 0.9, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: -4 }}
-              className="absolute right-0 top-10 z-50 w-56 bg-card border border-border rounded-xl shadow-xl p-3 space-y-2"
+              className="absolute right-0 top-12 z-50 w-72 bg-card border border-border rounded-2xl shadow-2xl p-4 space-y-3"
             >
-              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">
-                Kameramann einladen · {position}
+              <div className="text-[11px] text-muted-foreground font-bold uppercase tracking-widest mb-2.5">
+                📹 Kameramann einladen
               </div>
+              <div className="text-xs text-foreground font-medium mb-3">{position}</div>
 
               {/* URL Preview */}
-              <div className="bg-muted rounded-lg px-2.5 py-1.5 text-[10px] text-primary font-mono break-all select-all">
-                /cam?code={code}
+              <div className="bg-muted rounded-lg px-3 py-2 text-[10px] text-primary font-mono break-all select-all border border-border/50">
+                {code}
               </div>
 
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-2 pt-2">
                 {/* Copy Link */}
                 <button
                   onClick={copyLink}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-sm text-foreground transition-all"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-xs font-medium text-foreground transition-all"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? 'Kopiert!' : 'Link kopieren'}
+                  {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Kopiert!' : 'Code kopieren'}
                 </button>
 
                 {/* WhatsApp */}
                 <button
                   onClick={shareWhatsApp}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-sm transition-all"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-xs font-medium transition-all"
                 >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  Per WhatsApp senden
+                  <MessageCircle className="w-4 h-4" />
+                  📱 Per WhatsApp
                 </button>
 
                 {/* Native Share (mobile) */}
                 {typeof navigator !== 'undefined' && 'share' in navigator && (
                   <button
                     onClick={shareNative}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-sm text-foreground transition-all"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-xs font-medium text-foreground transition-all"
                   >
-                    <Share2 className="w-3.5 h-3.5" />
+                    <Share2 className="w-4 h-4" />
                     Teilen (System)
                   </button>
                 )}
