@@ -3,13 +3,13 @@ import {
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
   Search, Dumbbell, ChevronDown, ChevronUp, BookOpen, Users, Shield, ClipboardList,
-  Calendar
+  Calendar, Tv2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
