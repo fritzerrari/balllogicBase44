@@ -38,7 +38,8 @@ import EventLog from '@/components/live/EventLog';
 import LiveStats from '@/components/live/LiveStats';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import NotificationBanner from '@/components/live/NotificationBanner';
-import CameraStreamViewer from '@/components/live/CameraStreamViewer';
+import SimpleCameraView from '@/components/live/SimpleCameraView';
+import useCameraStreamManager from '@/hooks/useCameraStreamManager';
 import CameraReadinessPanel from '@/components/live/CameraReadinessPanel';
 import {
   detectEvents,
@@ -110,8 +111,8 @@ export default function CoachingCockpit() {
   // Kameras NUR aus aktiver Session — keine Demo-Fallback-Daten
   const cameras = activeSession?.camera_streams || [];
 
-  // Camera Connections Monitoring
-  const { readyToTrack, connectedCount, cameraCount } = useCameraConnections(activeSession?.id, trackingMode === 'roboflow');
+  // Camera Stream Manager — zentrale Verwaltung aller Kamera-Verbindungen
+  const { cameraStates, globalStatus, connectedCount, totalCount } = useCameraStreamManager(activeSession?.id, true);
 
   // Race condition fix: Invalidate and refetch when session changes
   useEffect(() => {
@@ -466,7 +467,7 @@ export default function CoachingCockpit() {
           {activeSession && trackingMode === 'roboflow' && (
             <CameraReadinessPanel
               cameras={cameras}
-              readyToTrack={readyToTrack}
+              readyToTrack={connectedCount > 0}
               onStartTracking={() => setIsDetecting(true)}
               disabled={isDetecting}
             />
@@ -482,9 +483,11 @@ export default function CoachingCockpit() {
           ) : (
             <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
               {cameras.map((cam) => (
-                <CameraStreamViewer
+                <SimpleCameraView
                   key={cam.camera_id}
                   camera={cam}
+                  status={cameraStates[cam.camera_id]?.status || 'waiting'}
+                  liveUrl={liveUrl}
                   sessionId={activeSession?.id}
                 />
               ))}
