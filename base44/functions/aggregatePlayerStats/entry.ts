@@ -131,15 +131,52 @@ Deno.serve(async (req) => {
       // Normalize Heatmap — Safety: avoid division by zero
       const maxHeat = Math.max(...player.heatmap_grid) || 1;
       player.heatmap_grid = player.heatmap_grid.map(v => Math.round((v / maxHeat) * 100));
-    });
+      });
 
-    return Response.json({
-      success: true,
-      session_id,
-      player_count: Object.keys(playerStats).length,
-      tracking_frames: allTracking.length,
-      stats: playerStats,
-    });
+      // Speichere aggregierte Stats in PlayerStat Tabelle
+      const session = await base44.entities.LiveSession.filter({ id: session_id });
+      const matchId = session?.[0]?.match_id;
+      const matchTitle = session?.[0]?.match_title || 'Unknown Match';
+      const matchDate = session?.[0]?.started_at?.split('T')[0] || new Date().toISOString().split('T')[0];
+
+      // Für jeden Spieler: PlayerStat erstellen/aktualisieren
+      for (const [playerId, stats] of Object.entries(playerStats)) {
+        try {
+          // Suche existierende PlayerStat
+          const existing = await base44.entities.PlayerStat.filter({
+            player_id: playerId,
+            match_id: matchId,
+          });
+
+          const playerStatData = {
+            player_id: playerId,
+            player_name: stats.number ? `#${stats.number}` : playerId,
+            match_id: matchId,
+            match_title: matchTitle,
+            match_date: matchDate,
+            distance_km: stats.total_distance_km,
+            sprints: stats.sprint_count,
+            minutes_played: Math.round((stats.positions.length / 30) / 60), // 30fps framerate
+          };
+
+          if (existing.length > 0) {
+            await base44.entities.PlayerStat.update(existing[0].id, playerStatData);
+          } else {
+            await base44.entities.PlayerStat.create(playerStatData);
+          }
+        } catch (e) {
+          console.warn(`⚠️ PlayerStat save failed for ${playerId}: ${e.message}`);
+        }
+      }
+
+      return Response.json({
+        success: true,
+        session_id,
+        player_count: Object.keys(playerStats).length,
+        tracking_frames: allTracking.length,
+        stats_saved: Object.keys(playerStats).length,
+        stats: playerStats,
+      });
   } catch (error) {
     console.error('❌ aggregatePlayerStats failed:', error);
     return Response.json({ error: error.message }, { status: 500 });

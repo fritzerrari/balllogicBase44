@@ -45,6 +45,50 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Aggregate player statistics (distance, sprints, etc.)
+    try {
+      const statsResult = await base44.asServiceRole.functions.invoke('aggregatePlayerStats', {
+        session_id: sessionId,
+      });
+      console.log(`✅ Player Stats aggregated:`, statsResult?.data?.player_count || 0);
+      generated.push('player_stats');
+    } catch (statsErr) {
+      console.warn(`⚠️ Player Stats aggregation failed:`, statsErr.message);
+    }
+
+    // Aggregate duel statistics (wins, losses, etc.)
+    try {
+      const duelResult = await base44.asServiceRole.functions.invoke('aggregateDuelStats', {
+        session_id: sessionId,
+      });
+      console.log(`✅ Duel Stats aggregated:`, duelResult?.data?.duel_events || 0);
+      generated.push('duel_stats');
+    } catch (duelErr) {
+      console.warn(`⚠️ Duel Stats aggregation failed:`, duelErr.message);
+    }
+
+    // Calculate possession percentages
+    try {
+      const possResult = await base44.asServiceRole.functions.invoke('calculatePossession', {
+        session_id: sessionId,
+      });
+      console.log(`✅ Possession calculated:`, possResult?.data?.possession);
+      generated.push('possession');
+    } catch (possErr) {
+      console.warn(`⚠️ Possession calculation failed:`, possErr.message);
+    }
+
+    // Log possession metrics
+    try {
+      const metricsResult = await base44.asServiceRole.functions.invoke('logPossessionMetrics', {
+        session_id: sessionId,
+      });
+      console.log(`✅ Possession metrics logged:`, metricsResult?.data?.possession_metrics);
+      generated.push('possession_metrics');
+    } catch (metricsErr) {
+      console.warn(`⚠️ Possession metrics logging failed:`, metricsErr.message);
+    }
+
     // Also generate heatmaps via the dedicated function (both periods, all types)
     for (const team of ['home', 'away']) {
       for (const heatmap_type of ['player_density', 'ball_possession']) {
