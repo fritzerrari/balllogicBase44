@@ -229,7 +229,7 @@ function classifyPlayerTeam(playerX, playerY, playerW, playerH, teamReferences) 
  * 2. Position relative zu Anstoß-Kalibrierung (wenn verfügbar)
  * 3. Fallback: tracker_id Parität
  */
-async function assignTeams(players, teamReferences, kickoffData) {
+function assignTeams(players, teamReferences, kickoffData) {
   return players.map(p => {
     // 1. Farbbasiert
     const classified = classifyPlayerTeam(p.x, p.y, p.width, p.height, teamReferences);
@@ -275,6 +275,30 @@ function getTrackingStatus(players, balls) {
     ballDetected: hasBall,
     teams: { teamA, teamB, referee },
   };
+}
+
+/**
+ * Detect sprints — Geschwindigkeitsspitzen
+ * Nutzt tracker_id & Position um Bewegungsgeschwindigkeit zu berechnen
+ * (echte Multi-Frame-Analyse würde in separater Funktion laufen, hier nur Stub)
+ */
+function detectSprints(players, prevPlayerMap = null) {
+  const sprints = [];
+  if (!prevPlayerMap) return sprints; // Erste Frame = keine History
+
+  players.forEach(p => {
+    if (p.tracker_id === null) return;
+    const prev = prevPlayerMap.get(p.tracker_id);
+    if (!prev) return;
+
+    const dist = Math.sqrt((p.x - prev.x) ** 2 + (p.y - prev.y) ** 2);
+    // Schwelle: Bewegung > 8% des Feldes pro Frame = Sprint (kann kalibriert werden)
+    if (dist > 8) {
+      sprints.push({ tracker_id: p.tracker_id, team: p.team, intensity: Math.min(100, dist * 10) });
+    }
+  });
+
+  return sprints;
 }
 
 /**
@@ -364,7 +388,7 @@ Deno.serve(async (req) => {
     const { players: rawPlayers, balls, goals } = parsePredictions(predictions, imageWidth, imageHeight);
 
     // Assign teams
-    const players = await assignTeams(rawPlayers, teamReferences, kickoffData);
+    const players = assignTeams(rawPlayers, teamReferences, kickoffData);
 
     // Ball position (best confidence)
     const ballPos = balls.length > 0
@@ -400,6 +424,21 @@ Deno.serve(async (req) => {
 
     // Auto-events
     const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds);
+
+    // Sprints erkennen (benötigt History — hier nur Stub)
+    const sprints = detectSprints(players);
+
+    // Formation erkennen (live, alle 30 Frames)
+    let formationChange = null;
+    if (frame_number % 30 === 0) {
+      try {
+        formationChange = await base44.functions.invoke('detectFormation', {
+          players,
+          session_id,
+          frame_number,
+        });
+      } catch (_) {}
+    }
 
     // ── Save TrackingData ──────────────────────────────────────────────────
     let trackingData = null;
@@ -459,11 +498,14 @@ Deno.serve(async (req) => {
       ball_detected: ballPos !== null,
       goals_detected: goals.length,
       auto_events: savedAutoEvents.length,
+      sprints_detected: sprints.length,
       // Quality
       quality_score: qualityScore,
       source,
       processing_time_ms: Date.now() - startTime,
       error: detectionError,
+      // Formation
+      formation_change: formationChange,
       // Field calibration status
       field_calibrated: fieldKeypoints.length >= 4,
       field_keypoints_count: fieldKeypoints.length,

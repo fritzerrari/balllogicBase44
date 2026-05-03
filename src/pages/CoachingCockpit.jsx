@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import useFrameCapture from '@/hooks/useFrameCapture';
 import useStreamHealth from '@/hooks/useStreamHealth';
+import useRealTimeTracking from '@/hooks/useRealTimeTracking';
 import StreamMonitor from '@/components/live/StreamMonitor';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -188,6 +189,20 @@ export default function CoachingCockpit() {
     trackingMode === 'roboflow' && isDetecting
   );
 
+  // Real-time tracking hook — synced mit echten TrackingData aus DB
+  const realTimeData = useRealTimeTracking(
+    activeSession?.id,
+    trackingMode === 'roboflow' && isDetecting
+  );
+
+  // Im Roboflow-Modus: echte Daten verwenden, sonst Simulation
+  const displayDetections = trackingMode === 'roboflow' && realTimeData.detections.length > 0
+    ? realTimeData.detections
+    : detections;
+  const displayBall = trackingMode === 'roboflow' && realTimeData.ballPos
+    ? realTimeData.ballPos
+    : ball;
+
   // ❌ REMOVED: Frontend should NOT call detectFrame() or startRoboflowTracking()
   // useFrameCapture hook handles Roboflow integration via processFrame backend
   // This prevents double-setup, CORS errors, and keeps tracking logic on server side
@@ -248,13 +263,21 @@ export default function CoachingCockpit() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const ball = detections.find(d => d.class === 'ball') || null;
-  const playerList = detections.filter(d => d.class !== 'ball');
+  const playerList = trackingMode === 'roboflow' && displayDetections.length > 0
+    ? displayDetections
+    : detections.filter(d => d.class !== 'ball');
   const stats = computeStats(statsHistory);
-  const playerCounts = {
-    home: detections.filter(d => d.team === 'home').length,
-    away: detections.filter(d => d.team === 'away').length,
-    referee: detections.filter(d => d.class === 'referee').length,
-  };
+  const playerCounts = trackingMode === 'roboflow' && displayDetections.length > 0
+    ? {
+        home: displayDetections.filter(d => d.team === 'home').length,
+        away: displayDetections.filter(d => d.team === 'away').length,
+        referee: 0,
+      }
+    : {
+        home: detections.filter(d => d.team === 'home').length,
+        away: detections.filter(d => d.team === 'away').length,
+        referee: detections.filter(d => d.class === 'referee').length,
+      };
 
   // ── Chat ───────────────────────────────────────────────────────────────────
   const sendMessage = (camId) => {
@@ -480,8 +503,8 @@ export default function CoachingCockpit() {
               Video + Overlay
             </div>
             <VideoOverlayPlayer
-              detections={playerList}
-              ball={ball}
+              detections={displayDetections.length > 0 ? displayDetections : playerList}
+              ball={displayBall || ball}
             />
           </div>
 
@@ -511,14 +534,14 @@ export default function CoachingCockpit() {
             <div className="relative aspect-[3/2] max-h-[300px]">
               <FootballPitch
                 players={playerList}
-                dangerZones={ball ? [{ x: ball.x, y: ball.y, intensity: 0.8, team: 'home' }] : []}
+                dangerZones={displayBall ? [{ x: displayBall.x, y: displayBall.y, intensity: 0.8, team: 'home' }] : []}
                 showGrid
                 pitchType={pitchType}
               />
-              {playerList.length > 0 && (
+              {displayDetections.length > 0 && (
                 <TrackingOverlay
-                  players={playerList}
-                  ball={ball}
+                  players={displayDetections}
+                  ball={displayBall}
                   events={events.slice(0, 3)}
                 />
               )}

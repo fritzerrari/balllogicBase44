@@ -1,0 +1,72 @@
+/**
+ * useRealTimeTracking Hook — Verbindet CoachingCockpit mit echten TrackingData
+ * 
+ * Anstelle von Simulation: Poll TrackingData-Entity direkt
+ * Nutzt WebSocket-ähnliche Echtzeit-Updates (falls verfügbar)
+ */
+import { useEffect, useRef, useState } from 'react';
+import { base44 } from '@/api/base44Client';
+
+export default function useRealTimeTracking(sessionId, enabled = true) {
+  const [detections, setDetections] = useState([]);
+  const [ballPos, setBallPos] = useState(null);
+  const [trackingStatus, setTrackingStatus] = useState(null);
+  const [formationData, setFormationData] = useState(null);
+  const [sprints, setSprints] = useState([]);
+  const pollRef = useRef(null);
+  const lastFrameRef = useRef(-1);
+
+  useEffect(() => {
+    if (!sessionId || !enabled) return;
+
+    const pollTracking = async () => {
+      try {
+        // Poll latest TrackingData für diese Session (sortiert nach frame_number desc)
+        const tracking = await base44.entities.TrackingData.filter(
+          { session_id: sessionId },
+          '-frame_number', // Neueste zuerst
+          1
+        );
+
+        if (!tracking?.[0]) return;
+
+        const latest = tracking[0];
+
+        // Skip wenn gleicher Frame
+        if (latest.frame_number === lastFrameRef.current) return;
+        lastFrameRef.current = latest.frame_number;
+
+        // Parse player_positions
+        const players = (latest.player_positions || []).map(p => ({
+          x: p.x,
+          y: p.y,
+          team: p.team,
+          tracker_id: p.tracker_id,
+          confidence: p.confidence,
+          number: p.player_number, // Falls verfügbar
+        }));
+
+        setDetections(players);
+        setBallPos(latest.ball_position);
+
+        // Tracking Status (für Badge im Cockpit)
+        setTrackingStatus({
+          quality: latest.detection_quality,
+          playerCount: players.length,
+          source: latest.source,
+        });
+
+      } catch (err) {
+        console.warn('⚠️ useRealTimeTracking poll failed:', err.message);
+      }
+    };
+
+    // Initial poll + 1s interval (schneller als default 15s)
+    pollTracking();
+    pollRef.current = setInterval(pollTracking, 1000);
+
+    return () => clearInterval(pollRef.current);
+  }, [sessionId, enabled]);
+
+  return { detections, ballPos, trackingStatus, formationData, sprints };
+}
