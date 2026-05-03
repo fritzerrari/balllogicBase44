@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
   Search, Dumbbell, ChevronDown, ChevronUp, BookOpen, Users, Shield, ClipboardList,
-  Calendar, Tv2
+  Calendar, Tv2, AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -44,7 +44,8 @@ const bottomItems = [
   { label: 'Admin-Demo', icon: Tv2, path: '/admin/demo', adminOnly: true },
   { label: 'Example Report', icon: FileText, path: '/admin/example-report', adminOnly: true },
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
-];
+  { label: 'Credits-Audit', icon: AlertTriangle, path: '/admin/credits-audit', adminOnly: true, badge: '⚠️' },
+  ];
 
 function NavLink({ label, icon: Icon, path, badge }) {
   const location = useLocation();

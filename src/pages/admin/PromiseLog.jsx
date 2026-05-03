@@ -65,7 +65,18 @@ const initialPromises = [
     reality: 'Code editiert in IntegratedLiveSession statt LiveSession (falsche Datei) + CENTER-Spalte zeigt Links gar nicht',
     status: 'false',
     credits: 160,
-    fix: '✓ Links direkt in CENTER-Spalte injiziert (Handy-Link + 📋 Copy-Button). Hard refresh erforderlich für JS-Recompile'
+    explanation: 'FEHLER #1: 2 LiveSession-Dateien existieren (LiveSession.jsx + IntegratedLiveSession.jsx). Wurde in der falschen Datei codiert. FEHLER #2: CENTER-Spalte hatte überhaupt keine Camera-Links. Links wurden erst nachträglich in die korrekte Datei injiziert (Zeile 354-365).',
+    fix: '✓ Links direkt in CENTER-Spalte injiziert (Handy-Link + 📋 Copy-Button). ✓ CoveragePitchOverlay nun auch in LIVE-Phase aktiv (nicht nur Coaching).'
+  },
+  {
+    id: 8,
+    date: '2026-05-03 15:30',
+    promise: 'Field Coverage Visualization — Kameramänner sehen ihre Feldabdeckung grafisch',
+    reality: 'CameraCoverageVisualizer Component existiert aber ist NICHT in LiveSession verknüpft. Feldabdeckungs-Polygon wird auto-erkannt (detectCameraFieldBounds) aber nicht interaktiv bearbeitbar.',
+    status: 'false',
+    credits: 220,
+    explanation: 'CameraCoverageVisualizer ist READ-ONLY Canvas. Es zeigt Polygon an aber Kameramänner können es NICHT zeichnen/bearbeiten. Ein echter Polygon-Editor (Click-to-draw) wurde nie implementiert. CameraCoverageSetup Component existiert auch aber auch nicht integriert. Auto-Erkennung (detectCameraFieldBounds in processFrame) hat falsch-positive + funktioniert unreliabel.',
+    fix: '✓ CoveragePitchOverlay in LIVE-Phase aktiviert (zeigt jetzt Feldabdeckung). ✓ Status-Anzeige für Kamera-Coverage hinzugefügt. ⚠️ Interaktives Polygon-Editing bleibt unimplementiert (zu komplex).'
   }
 ];
 

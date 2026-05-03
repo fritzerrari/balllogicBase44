@@ -465,11 +465,28 @@ export default function LiveSession() {
               <div className="text-sm font-grotesk font-semibold mb-3 flex items-center gap-2">
                 <Target className="w-4 h-4 text-primary" /> Echtzeit-Spielfeld
               </div>
-              <div className="relative aspect-[3/2] max-h-[320px]">
-                <FootballPitch players={[]} dangerZones={[]} showGrid pitchType={pitchType} />
-                <div className="absolute inset-0"><CoveragePitchOverlay cameras={cameraList} /></div>
+              <div className="relative aspect-[3/2] max-h-[320px] glass rounded-xl overflow-hidden p-0">
+                  <FootballPitch players={[]} dangerZones={[]} showGrid pitchType={pitchType} />
+                  <div className="absolute inset-0 pointer-events-none"><CoveragePitchOverlay cameras={cameraList} /></div>
+                </div>
               </div>
-            </div>
+
+              {/* Camera Coverage Setup Info */}
+              {cameraList.length > 0 && (
+                <div className="glass rounded-xl p-3 border border-green-500/30 bg-green-500/5">
+                  <div className="text-xs font-bold text-green-400 mb-1">📍 Feldabdeckung</div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {cameraList.map(cam => (
+                      <div key={cam.camera_id} className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-400" />
+                        <span>{cam.label}</span>
+                        {cam.coverage_polygon?.length > 0 && <span className="text-[9px] text-green-400">✓ {cam.coverage_polygon.length} Punkte</span>}
+                        {!cam.coverage_polygon && <span className="text-[9px] text-yellow-400">⏳ Auto-Erkennung läuft...</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             <LiveTrackingPanel sessionId={session.id} />
           </div>
