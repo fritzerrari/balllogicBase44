@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import FootballPitch from '@/components/pitch/FootballPitch';
 import TrackingOverlay from '@/components/live/TrackingOverlay';
+import CoveragePitchOverlay from '@/components/pitch/CoveragePitchOverlay';
 import VideoOverlayPlayer from '@/components/tracking/VideoOverlayPlayer';
 import CameraFeedCard from '@/components/live/CameraFeedCard';
 import ShareCameraLink from '@/components/live/ShareCameraLink';
@@ -555,20 +556,24 @@ export default function CoachingCockpit() {
               </div>
             )}
             <div className="relative aspect-[3/2] max-h-[300px]">
-              <FootballPitch
-                players={playerList}
-                dangerZones={displayBall ? [{ x: displayBall.x, y: displayBall.y, intensity: 0.8, team: 'home' }] : []}
-                showGrid
-                pitchType={pitchType}
-              />
-              {displayDetections.length > 0 && (
-                <TrackingOverlay
-                  players={displayDetections}
-                  ball={displayBall}
-                  events={events.slice(0, 3)}
-                />
-              )}
-            </div>
+               <FootballPitch
+                 players={playerList}
+                 dangerZones={displayBall ? [{ x: displayBall.x, y: displayBall.y, intensity: 0.8, team: 'home' }] : []}
+                 showGrid
+                 pitchType={pitchType}
+               />
+               {/* Coverage-Bereiche der Kameras */}
+               <div className="absolute inset-0">
+                 <CoveragePitchOverlay cameras={cameras} />
+               </div>
+               {displayDetections.length > 0 && (
+                 <TrackingOverlay
+                   players={displayDetections}
+                   ball={displayBall}
+                   events={events.slice(0, 3)}
+                 />
+               )}
+             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
               <span>🟢 Heim · 🔴 Gäste{pitchType === 'full' ? ' · 🟠 SR' : ''} · 🟡 Ball</span>
               <span className="ml-auto capitalize">{pitchType === 'full' ? '11v11' : pitchType === 'small' ? 'Kleines Feld' : pitchType === 'half' ? 'Halbfeld' : 'Training'} · {playersPerTeam}v{playersPerTeam}</span>

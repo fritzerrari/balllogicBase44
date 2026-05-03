@@ -113,6 +113,8 @@ export default function CameraView() {
     clearInterval(frameIntervalRef.current);
 
     let frameNumber = 0;
+    let fieldBoundsDetected = false; // Auto-detect coverage nur einmalig
+
     const capture = async () => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -133,7 +135,7 @@ export default function CameraView() {
           frame_number: frameNumber++,
           elapsed_seconds: elapsedSeconds,
           team: 'home',
-          client_sent_timestamp: clientSentTime, // Track transmission time
+          client_sent_timestamp: clientSentTime,
         });
         if (res?.data?.success) {
           setTrackingStatus(res.data.tracking_status || {
@@ -143,14 +145,38 @@ export default function CameraView() {
             teams: { teamA: 0, teamB: 0, referee: 0 },
           });
         }
+
+        // Auto-detect camera field bounds einmalig
+        if (!fieldBoundsDetected && frameNumber === 1) {
+          fieldBoundsDetected = true;
+          base44.functions.invoke('detectCameraFieldBounds', {
+            frame_base64: base64,
+            camera_id: cameraId,
+            session_id: sessionId,
+          }).then(bounds => {
+            if (bounds?.data?.coverage_polygon) {
+              // Speichere Coverage in Session
+              base44.entities.LiveSession.filter({ id: sessionId }).then(sessions => {
+                if (sessions[0]) {
+                  const updatedStreams = sessions[0].camera_streams.map(s =>
+                    s.camera_id === cameraId
+                      ? { ...s, coverage_polygon: bounds.data.coverage_polygon }
+                      : s
+                  );
+                  base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
+                }
+              });
+            }
+          }).catch(() => {});
+        }
       } catch (e) {
         // silent fail
       }
     };
 
-    frameIntervalRef.current = setInterval(capture, 3000); // every 3s
+    frameIntervalRef.current = setInterval(capture, 3000);
     return () => clearInterval(frameIntervalRef.current);
-  }, [sessionId, elapsedSeconds]);
+  }, [sessionId, elapsedSeconds, cameraId]);
 
   const sendMessage = async () => {
     if (!message.trim() || !sessionId) return;
