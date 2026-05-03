@@ -562,7 +562,7 @@ export default function CoachingCockpit() {
                 {cameras.map((cam) => {
                   // Code aus Session-Daten — KEIN Math.random() hier (würde bei jedem Render neu generieren!)
                   const code = cam.code || cam.camera_id;
-                  const camUrl = `${liveUrl}?session=${activeSession.id}`;
+                  const camUrl = `${liveUrl}?session=${activeSession.id}&cam=${cam.camera_id}`;
                   return (
                     <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1.5">

@@ -452,7 +452,7 @@ export default function LiveSession() {
               </div>
               <div className="space-y-2">
                 {cameras.map((cam) => {
-                  const camLink = `${window.location.origin}/cam?session=${session?.id}`;
+                  const camLink = `${window.location.origin}/cam?session=${session?.id}&cam=${cam.id}`;
                   return (
                     <div key={cam.id} className="bg-muted rounded-lg p-3 flex items-center gap-3">
                       <Camera className="w-4 h-4 text-primary flex-shrink-0" />

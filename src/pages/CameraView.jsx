@@ -10,6 +10,7 @@ import EventButtons from '@/components/live/EventButtons';
 export default function CameraView() {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session');
+  const cameraId = urlParams.get('cam') || '1';
 
   const [session, setSession] = useState(null);
   const [micActive, setMicActive] = useState(false);
@@ -28,19 +29,47 @@ export default function CameraView() {
   const pollRef = useRef(null);
   const frameIntervalRef = useRef(null);
 
-  // Load session
+  // Load session + mark this camera as connected
   useEffect(() => {
     if (!sessionId) return;
     base44.entities.LiveSession.filter({ id: sessionId })
-      .then(sessions => setSession(sessions[0] || null))
+      .then(sessions => {
+        const s = sessions[0] || null;
+        setSession(s);
+        // Mark this specific camera as connected in the session
+        if (s && s.camera_streams) {
+          const updatedStreams = s.camera_streams.map(c =>
+            c.camera_id === cameraId
+              ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
+              : c
+          );
+          base44.entities.LiveSession.update(s.id, { camera_streams: updatedStreams }).catch(() => {});
+        }
+      })
       .catch(() => {});
-  }, [sessionId]);
+  }, [sessionId, cameraId]);
 
   // Timer
   useEffect(() => {
     timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
     return () => clearInterval(timerRef.current);
   }, []);
+
+  // Heartbeat — update camera last_seen every 10s so Cockpit shows connection status
+  useEffect(() => {
+    if (!sessionId || !session) return;
+    const hb = setInterval(() => {
+      const updatedStreams = session.camera_streams?.map(c =>
+        c.camera_id === cameraId
+          ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
+          : c
+      );
+      if (updatedStreams) {
+        base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams }).catch(() => {});
+      }
+    }, 10000);
+    return () => clearInterval(hb);
+  }, [sessionId, session, cameraId]);
 
   // Poll funk messages
   useEffect(() => {
@@ -125,8 +154,8 @@ export default function CameraView() {
     if (!message.trim() || !sessionId) return;
     await base44.entities.FunkMessage.create({
       session_id: sessionId,
-      from: 'camera_1',
-      from_label: 'Kamera',
+      from: `camera_${cameraId}`,
+      from_label: session?.camera_streams?.find(c => c.camera_id === cameraId)?.label || `Kamera ${cameraId}`,
       text: message.trim(),
       is_ptt: false,
       timestamp_ms: Date.now(),
@@ -139,8 +168,8 @@ export default function CameraView() {
     if (!sessionId) return;
     await base44.entities.FunkMessage.create({
       session_id: sessionId,
-      from: 'camera_1',
-      from_label: 'Kamera',
+      from: `camera_${cameraId}`,
+      from_label: session?.camera_streams?.find(c => c.camera_id === cameraId)?.label || `Kamera ${cameraId}`,
       text: active ? '🎙 Kamera spricht...' : '📻 Kamera fertig',
       is_ptt: true,
       ptt_active: active,
@@ -240,7 +269,7 @@ export default function CameraView() {
               sessionId={sessionId}
               matchId={session?.match_id}
               matchTitle={session?.match_title}
-              source="camera_1"
+              source={`camera_${cameraId}`}
               elapsedSeconds={elapsedSeconds}
               compact={true}
             />
