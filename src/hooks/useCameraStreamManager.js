@@ -31,39 +31,36 @@ export default function useCameraStreamManager(sessionId, enabled = true) {
     setGlobalStatus('streaming');
 
     const sendHeartbeat = async () => {
-      try {
-        const session = await base44.entities.LiveSession.filter({ id: sessionId });
-        if (!session?.[0]) return;
+       try {
+         const session = await base44.entities.LiveSession.filter({ id: sessionId });
+         if (!session?.[0]) return;
 
-        const updatedStreams = session[0].camera_streams?.map(cam => ({
-          ...cam,
-          status: 'connected',
-          last_seen: new Date().toISOString(),
-        }));
+         const now = Date.now();
+         const STATUS_TIMEOUT = 12000; // 12s = Kamera gilt als offline wenn kein Update
 
-        if (updatedStreams) {
-          // Update entire session in one operation
-          await base44.entities.LiveSession.update(sessionId, {
-            camera_streams: updatedStreams,
-          }).catch(() => {});
+         // Nur Status LESEN, nicht schreiben — echte Status kommen von CameraView Heartbeats
+         const streams = session[0].camera_streams || [];
 
-          // Update local state
-          const newStates = {};
-          updatedStreams.forEach(cam => {
-            newStates[cam.camera_id] = {
-              status: 'connected',
-              label: cam.label,
-              lastSeen: new Date(cam.last_seen),
-            };
-          });
-          setCameraStates(newStates);
-          lastUpdateRef.current = newStates;
-        }
-      } catch (err) {
-        console.warn('⚠️ Heartbeat failed:', err.message);
-        setGlobalStatus('error');
-      }
-    };
+         // Update local state mit aktuellem Status aus DB
+         const newStates = {};
+         streams.forEach(cam => {
+           const lastSeen = cam.last_seen ? new Date(cam.last_seen).getTime() : 0;
+           const isOnline = (now - lastSeen) < STATUS_TIMEOUT;
+
+           newStates[cam.camera_id] = {
+             status: isOnline ? cam.status : 'offline',
+             label: cam.label,
+             lastSeen: cam.last_seen ? new Date(cam.last_seen) : null,
+           };
+         });
+
+         setCameraStates(newStates);
+         lastUpdateRef.current = newStates;
+       } catch (err) {
+         console.warn('⚠️ Heartbeat poll failed:', err.message);
+         setGlobalStatus('error');
+       }
+     };
 
     // Initial send
     sendHeartbeat();
