@@ -17,7 +17,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
 const WORKFLOW_URL = 'https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/football-tracking-phase-1-1777785537057';
 
-const API_TIMEOUT_MS = 30000;
+const API_TIMEOUT_MS = 35000; // Roboflow Serverless cold-start kann bis zu 30s dauern
 const MAX_RETRIES = 2;
 const CONFIDENCE_MIN = 0.4;
 
@@ -116,29 +116,45 @@ async function callRoboflowWorkflow(base64Frame, sessionId, url = WORKFLOW_URL) 
 
 /**
  * Parse Roboflow Workflow response
- * Workflow may return predictions directly or nested under output key
+ * 
+ * Roboflow Serverless Workflow response structure:
+ * { "outputs": [ { "<block_name>": { "predictions": [...], "image": { "width": ..., "height": ... } } } ] }
+ * 
+ * Block names vary by workflow config — we search all output blocks.
  */
 function parseWorkflowResponse(data) {
-  // Workflow responses can vary — try multiple known structures
-  const predictions = data?.predictions
-    || data?.outputs?.predictions
-    || data?.output?.predictions
-    || [];
+  // Log raw structure for debugging
+  if (data) console.log('🔍 Roboflow response structure:', JSON.stringify(data).slice(0, 500));
 
-  const fieldKeypoints = data?.field_keypoints
-    || data?.outputs?.field_keypoints
-    || data?.output?.field_keypoints
-    || [];
+  let predictions = [];
+  let fieldKeypoints = [];
+  let imageWidth = 1920;
+  let imageHeight = 1080;
 
-  const annotatedImage = data?.annotated_image
-    || data?.outputs?.annotated_image
-    || data?.output?.annotated_image
-    || null;
+  // Roboflow Serverless Workflows: outputs is an array of output objects
+  if (Array.isArray(data?.outputs)) {
+    for (const outputBlock of data.outputs) {
+      for (const blockValue of Object.values(outputBlock)) {
+        if (blockValue?.predictions && Array.isArray(blockValue.predictions)) {
+          predictions = blockValue.predictions;
+        }
+        if (blockValue?.image?.width) imageWidth = blockValue.image.width;
+        if (blockValue?.image?.height) imageHeight = blockValue.image.height;
+        if (blockValue?.keypoints) fieldKeypoints = blockValue.keypoints;
+      }
+    }
+  }
 
-  const imageWidth = data?.image?.width || data?.outputs?.image?.width || 1920;
-  const imageHeight = data?.image?.height || data?.outputs?.image?.height || 1080;
+  // Fallback: flat structure (older Roboflow API / direct inference)
+  if (predictions.length === 0) {
+    predictions = data?.predictions || data?.output?.predictions || [];
+    if (data?.image?.width) imageWidth = data.image.width;
+    if (data?.image?.height) imageHeight = data.image.height;
+  }
 
-  return { predictions, fieldKeypoints, annotatedImage, imageWidth, imageHeight };
+  console.log(`📊 Parsed: ${predictions.length} predictions, ${imageWidth}x${imageHeight}`);
+
+  return { predictions, fieldKeypoints, imageWidth, imageHeight };
 }
 
 /**
@@ -287,7 +303,13 @@ Deno.serve(async (req) => {
       const settings = await base44.asServiceRole.entities.AppSetting.list();
       const wfSetting = settings?.find(s => s.key === 'roboflow_workflow_id');
       if (wfSetting?.value) {
-        workflowUrl = wfSetting.value; // Vollständige URL aus AppSettings
+        const val = wfSetting.value.trim();
+        // If it's a full URL, use it directly; otherwise build the URL from the workflow ID
+        if (val.startsWith('http')) {
+          workflowUrl = val;
+        } else {
+          workflowUrl = `https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/${val}`;
+        }
       }
       const teamSetting = settings?.find(s => s.key === 'team_references');
       if (teamSetting?.value) teamReferences = JSON.parse(teamSetting.value);

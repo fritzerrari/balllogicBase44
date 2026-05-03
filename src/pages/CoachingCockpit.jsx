@@ -144,8 +144,43 @@ export default function CoachingCockpit() {
     };
   }, [trackingMode, playersPerTeam, pitchType]);
 
-  // ── Roboflow mode ──────────────────────────────────────────────────────────
-  // Frame capture hook — sendet alle 2s Frames an processFrame
+  // ── Roboflow mode: draw camera video onto hidden canvas so useFrameCapture gets real pixels ──
+  useEffect(() => {
+    if (trackingMode !== 'roboflow' || !isDetecting) return;
+    // Try to grab the first connected camera's video stream
+    const setupVideo = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      } catch (e) {
+        console.warn('⚠️ No camera for cockpit capture:', e.message);
+      }
+    };
+    setupVideo();
+
+    // Draw video frames to canvas every 2s
+    const drawInterval = setInterval(() => {
+      const video = videoRef.current;
+      const canvas = hiddenCanvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      canvas.getContext('2d')?.drawImage(video, 0, 0);
+    }, 2000);
+
+    return () => {
+      clearInterval(drawInterval);
+      videoRef.current?.srcObject?.getTracks().forEach(t => t.stop());
+    };
+  }, [trackingMode, isDetecting]);
+
+  // Frame capture hook — sendet alle 3s Frames an processFrame backend
   const { status: trackingStreamStatus, stats: trackingStats } = useFrameCapture(
     hiddenCanvasRef,
     activeSession?.id,
@@ -160,7 +195,6 @@ export default function CoachingCockpit() {
   // useFrameCapture hook handles tracking lifecycle — no manual video setup needed
 
   const handleActivateRoboflow = () => {
-     if (!apiKeyInput.trim()) return;
      const pendingConsent = players.filter(p =>
        !p.tracking_consent || p.tracking_consent === 'pending' || p.tracking_consent === 'guardian_required'
      );
@@ -176,26 +210,21 @@ export default function CoachingCockpit() {
      setDetections([]);
 
      // Switch to Roboflow mode (useFrameCapture hook handles streaming via processFrame backend)
-     setApiKey(apiKeyInput.trim());
      setTrackingMode('roboflow');
      setShowApiSetup(false);
-     setIsDetecting(true); // Trigger useFrameCapture hook
+     setIsDetecting(true);
    };
 
   const handleDsgvoConfirm = () => {
     setTrackingUnlocked(true);
     setShowDsgvo(false);
-    if (apiKeyInput.trim()) {
-      clearInterval(simIntervalRef.current);
-      setTrackTick(0);
-      setEvents([]);
-      setDetections([]);
-
-      setApiKey(apiKeyInput.trim());
-      setTrackingMode('roboflow');
-      setShowApiSetup(false);
-      setIsDetecting(true);
-    }
+    clearInterval(simIntervalRef.current);
+    setTrackTick(0);
+    setEvents([]);
+    setDetections([]);
+    setTrackingMode('roboflow');
+    setShowApiSetup(false);
+    setIsDetecting(true);
   };
 
   const handleSwitchToSim = () => {
@@ -301,7 +330,7 @@ export default function CoachingCockpit() {
         </div>
       </div>
 
-      {/* Roboflow API Setup Panel */}
+      {/* Roboflow Tracking Setup Panel */}
       <AnimatePresence>
         {showApiSetup && (
           <motion.div
@@ -312,36 +341,24 @@ export default function CoachingCockpit() {
           >
             <div className="text-sm font-grotesk font-semibold text-foreground mb-2 flex items-center gap-2">
               <Zap className="w-4 h-4 text-primary" />
-              Roboflow RF-DETR Live-Tracking aktivieren
+              Roboflow Live-Tracking aktivieren
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              Kostenlos registrieren auf{' '}
-              <a href="https://roboflow.com" target="_blank" rel="noopener" className="text-primary hover:underline">roboflow.com</a>
-              {' '}→ API Key kopieren → hier einfügen.
-              Das Modell erkennt Spieler, Torwart, Schiedsrichter & Ball automatisch mit RF-DETR/YOLOv11.
+              Verwendet den hinterlegten API-Key und Workflow <span className="font-mono text-primary/80">football-tracking-phase-1</span>.
+              Die Kamera dieses Geräts wird für die Frame-Erfassung genutzt.
             </p>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                value={apiKeyInput}
-                onChange={e => setApiKeyInput(e.target.value)}
-                placeholder="rf_xxxxxxxxxxxxxxxxxxxxxxxx"
-                className="bg-muted border-border font-mono text-sm flex-1"
-                onKeyDown={e => e.key === 'Enter' && handleActivateRoboflow()}
-              />
-              <Button
-                onClick={handleActivateRoboflow}
-                disabled={!apiKeyInput.trim()}
-                className="bg-primary text-primary-foreground gap-2"
-              >
-                <Play className="w-4 h-4" /> Aktivieren
-              </Button>
-            </div>
-            {apiError && (
-              <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
-                <WifiOff className="w-3.5 h-3.5" /> {apiError}
+            {!activeSession && (
+              <div className="mb-3 text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-lg border border-yellow-500/20">
+                ⚠️ Keine aktive Session — starte zuerst eine Live-Session.
               </div>
             )}
+            <Button
+              onClick={handleActivateRoboflow}
+              disabled={!activeSession}
+              className="bg-primary text-primary-foreground gap-2"
+            >
+              <Play className="w-4 h-4" /> Tracking starten
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
