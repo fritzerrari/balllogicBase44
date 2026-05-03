@@ -451,6 +451,27 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* Fallback zu anderen Methoden */ }
 
+    // ── ACQUIRE FRAME LOCK — Multi-Camera Sync (CRITICAL) ──────────────────
+    let lockAcquired = false;
+    try {
+      const lockRes = await base44.asServiceRole.functions.invoke('acquireFrameLock', {
+        session_id,
+        camera_id: body.camera_id || 'default',
+        frame_number,
+        timeout_ms: 10000,
+      });
+      lockAcquired = lockRes?.data?.acquired === true;
+      if (!lockAcquired) {
+        console.warn(`⚠️ Frame ${frame_number} lock denied — duplicate prevention`);
+        return Response.json({
+          success: false,
+          error: 'Lock denied — duplicate prevention active',
+        }, { status: 429 });
+      }
+    } catch (lockErr) {
+      console.warn(`⚠️ Lock error: ${lockErr.message}`);
+    }
+
     // ── Call Roboflow Workflow ──────────────────────────────────────────────
     let workflowResult = null;
     let source = 'roboflow';

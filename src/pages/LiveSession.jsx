@@ -122,11 +122,15 @@ export default function LiveSession() {
   const handleStart = async () => {
     if (!sessionTitle) return;
 
-    // ⚠️ SICHERHEIT: Prüfe auf aktive Sessions — müssen erst beendet werden
-    const activeSessions = sessions.filter(s => s.status === 'active');
-    if (activeSessions.length > 0) {
-      alert(`🛑 Eine Session läuft noch:\n\n${activeSessions.map(s => `• ${s.match_title} (Minute ${Math.floor((Date.now() - new Date(s.started_at).getTime()) / 60000)})`).join('\n')}\n\nBeende diese zuerst mit "Beenden & Report erstellen" bevor du eine neue startest.`);
-      return;
+    // ⚠️ CRITICAL: Server-side check (Race Condition Fix)
+    try {
+      const serverActiveSessions = await base44.entities.LiveSession.filter({ status: 'active' });
+      if (serverActiveSessions.length > 0) {
+        alert(`🛑 Eine Session läuft noch:\n\n${serverActiveSessions.map(s => `• ${s.match_title}`).join('\n')}\n\nBeende diese zuerst mit "Beenden & Report erstellen"`);
+        return;
+      }
+    } catch (err) {
+      console.error('Session check failed:', err);
     }
 
     let matchId = null;
@@ -193,9 +197,19 @@ export default function LiveSession() {
 
 
   // ── Add/Remove Cameras ────────────────────────────────────────────────────
-  const addCamera = () => {
-    const newCam = { id: cameras.length + 1, label: `Kamera ${cameras.length + 1}` };
+  const addCamera = async () => {
+    const newCamId = cameras.length + 1;
+    const newCam = { id: newCamId, label: `Kamera ${newCamId}` };
     setCameras([...cameras, newCam]);
+    if (session && sessionActive) {
+      const newStream = { camera_id: newCamId.toString(), label: newCam.label, stream_url: '', status: 'waiting', code: Math.random().toString(36).substring(2, 8).toUpperCase() };
+      try {
+        await updateSession.mutateAsync({ id: session.id, data: { camera_streams: [...(session.camera_streams || []), newStream] } });
+      } catch (err) {
+        console.error('❌ Camera add failed:', err);
+        alert('⚠️ Kamera-Hinzufügung fehlgeschlagen');
+      }
+    }
   };
 
   const deleteCamera = (id) => {
