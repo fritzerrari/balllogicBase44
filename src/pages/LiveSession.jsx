@@ -46,6 +46,13 @@ export default function LiveSession() {
     queryFn: () => base44.entities.Match.list('-date', 5),
   });
 
+  const { data: sessions = [] } = useQuery({
+    queryKey: ['liveSessions'],
+    queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
+    refetchInterval: 3000,
+    staleTime: 1000,
+  });
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [sessionTitle, setSessionTitle] = useState('');
   const [sessionActive, setSessionActive] = useState(false);
@@ -114,6 +121,13 @@ export default function LiveSession() {
   // ── Start: Create Session ────────────────────────────────────────────────
   const handleStart = async () => {
     if (!sessionTitle) return;
+
+    // ⚠️ SICHERHEIT: Prüfe auf aktive Sessions — müssen erst beendet werden
+    const activeSessions = sessions.filter(s => s.status === 'active');
+    if (activeSessions.length > 0) {
+      alert(`🛑 Eine Session läuft noch:\n\n${activeSessions.map(s => `• ${s.match_title} (Minute ${Math.floor((Date.now() - new Date(s.started_at).getTime()) / 60000)})`).join('\n')}\n\nBeende diese zuerst mit "Beenden & Report erstellen" bevor du eine neue startest.`);
+      return;
+    }
 
     let matchId = null;
     try {
