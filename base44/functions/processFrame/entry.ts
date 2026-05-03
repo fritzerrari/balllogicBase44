@@ -2,7 +2,7 @@
  * processFrame — Roboflow Workflow Integration
  * 
  * Workflow: Football Tracking Phase 1
- * Workflow-ID: hEJyatdTWBc5ITV4SGVz
+ * Workflow-ID: football-tracking-phase-1-1777785537057
  * 
  * Pipeline:
  *  1. Send frame to Roboflow Workflow (Object Detection + ByteTracker + Keypoints)
@@ -17,7 +17,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
 const WORKFLOW_URL = 'https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/football-tracking-phase-1-1777785537057';
 
-const API_TIMEOUT_MS = 8000;
+const API_TIMEOUT_MS = 30000;
 const MAX_RETRIES = 2;
 const CONFIDENCE_MIN = 0.4;
 
