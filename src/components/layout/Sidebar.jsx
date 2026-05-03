@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
   Search, Dumbbell, ChevronDown, ChevronUp, BookOpen, Users, Shield, ClipboardList,
-  Calendar, Tv2, AlertTriangle
+  Calendar, Tv2, AlertTriangle, Code, Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -46,6 +46,8 @@ const bottomItems = [
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
   { label: 'Credits-Audit', icon: AlertTriangle, path: '/admin/credits-audit', adminOnly: true, badge: '⚠️' },
   { label: 'Error Log', icon: AlertTriangle, path: '/admin/error-log', adminOnly: true },
+  { label: 'Camera Stream Debug', icon: AlertTriangle, path: '/admin/camera-stream-debug', adminOnly: true, badge: '🎥' },
+  { label: 'Build Guide', icon: Code, path: '/admin/build-guide', adminOnly: true, badge: '📖' },
   ];
 
 function NavLink({ label, icon: Icon, path, badge }) {
