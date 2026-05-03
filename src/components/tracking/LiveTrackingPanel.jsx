@@ -18,12 +18,12 @@ export default function LiveTrackingPanel({ sessionId }) {
   const [selectedTeam, setSelectedTeam] = useState('home');
   const [heatmapType, setHeatmapType] = useState('player_density');
 
-  // Auto-Events laden (Poll alle 15s um Cloudflare Challenge zu vermeiden)
+  // Auto-Events laden (Poll alle 2-3s für Real-time Feel)
   const { data: autoEvents = [], isLoading: eventsLoading } = useQuery({
     queryKey: ['auto-events', sessionId],
-    queryFn: () => base44.entities.AutoEvent.filter({ session_id: sessionId }),
-    refetchInterval: 15000,
-    staleTime: 10000,
+    queryFn: () => base44.entities.AutoEvent.filter({ session_id: sessionId }, '-timestamp_ms', 50),
+    refetchInterval: 2500, // Increased from 15s to 2.5s (Fast!)
+    staleTime: 1000, // Always refetch for real-time
   });
 
   // TrackingData laden für Stats
@@ -34,7 +34,7 @@ export default function LiveTrackingPanel({ sessionId }) {
     staleTime: 15000,
   });
 
-  // Heatmap-Cache laden
+  // Heatmap-Cache laden (Real-time every 10 frames ~ 3s)
   const { data: heatmapCache, isLoading: heatmapLoading } = useQuery({
     queryKey: ['heatmap', sessionId, selectedTeam, heatmapType],
     queryFn: async () => {
@@ -45,8 +45,8 @@ export default function LiveTrackingPanel({ sessionId }) {
       });
       return caches[0] || null;
     },
-    refetchInterval: 20000,
-    staleTime: 15000,
+    refetchInterval: 3000, // Increased from 20s to 3s
+    staleTime: 500,
   });
 
   // Approval Mutations

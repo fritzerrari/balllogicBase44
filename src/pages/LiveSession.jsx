@@ -31,8 +31,8 @@ import LiveTrackingPanel from '@/components/tracking/LiveTrackingPanel';
 import TrackingOverlay from '@/components/live/TrackingOverlay';
 import CoveragePitchOverlay from '@/components/pitch/CoveragePitchOverlay';
 import SessionHealthCheck from '@/components/live/SessionHealthCheck';
-import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
-import LiveStats from '@/components/live/LiveStats';
+import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
+import LiveStatsEnhanced from '@/components/live/LiveStatsEnhanced';
 import EventLog from '@/components/live/EventLog';
 import CameraReadinessPanel from '@/components/live/CameraReadinessPanel';
 
@@ -301,7 +301,9 @@ export default function LiveSession() {
   // ── RENDER LIVE ────────────────────────────────────────────────────
   if (phase === 'live' && session) {
     return (
-      <div className="p-4 lg:p-8 min-h-screen">
+      <>
+        <DsgvoGatekeeper sessionId={session.id} onReadyToStart={() => {}} />
+        <div className="p-4 lg:p-8 min-h-screen">
         <div className="grid lg:grid-cols-3 gap-4">
           {/* LEFT: TIMER + CONTROLS */}
           <div className="space-y-4">
@@ -433,6 +435,7 @@ export default function LiveSession() {
           </AnimatePresence>
         </div>
       </div>
+      </>
     );
   }
 
@@ -504,7 +507,7 @@ export default function LiveSession() {
 
           {/* RIGHT: STATS + EVENTS + CONTROLS */}
           <div className="lg:col-span-4 space-y-4">
-            <LiveStats stats={{ possession: { home: 55, away: 45 } }} playerCounts={{ home: 11, away: 11, referee: 1 }} />
+           <LiveStatsEnhanced sessionId={session.id} playerCounts={{ home: 11, away: 11, referee: 1 }} qualityScore={75} pressureIntensity={{ home: 45, away: 38 }} />
             
             <div className="glass rounded-xl p-3">
               <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2">

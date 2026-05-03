@@ -18,13 +18,13 @@ const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
 const WORKFLOW_URL = 'https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/football-tracking-phase-1-1777785537057';
 
 const API_TIMEOUT_MS = 35000; // Roboflow Serverless cold-start kann bis zu 30s dauern
-const MAX_RETRIES = 2;
-const CONFIDENCE_MIN = 0.4;
+const MAX_RETRIES = 3; // Increased from 2
+const CONFIDENCE_MIN = 0.35; // Lowered to catch more weak detections
 
 // Circuit breaker per session
 const circuitBreakerBySession = new Map();
-const CIRCUIT_BREAKER_THRESHOLD = 8;
-const CIRCUIT_BREAKER_RESET_MS = 30000;
+const CIRCUIT_BREAKER_THRESHOLD = 10; // Increased tolerance
+const CIRCUIT_BREAKER_RESET_MS = 15000; // Faster reset (was 30s)
 
 // Multi-Frame History cache (in-memory, last N frames per session for sprint detection)
 // Note: Für Produktion sollte SessionState DB-Entity genutzt werden (siehe sessionState.last_20_frames)
@@ -458,7 +458,7 @@ Deno.serve(async (req) => {
         session_id,
         camera_id: body.camera_id || 'default',
         frame_number,
-        timeout_ms: 10000,
+        timeout_ms: 30000, // Increased from 10s for cold-start Roboflow
       });
       lockAcquired = lockRes?.data?.acquired === true;
       if (!lockAcquired) {
@@ -542,23 +542,34 @@ Deno.serve(async (req) => {
     // ── Multi-Frame History (INIT EARLY — before possession checks) ────────
     let frameHistory = frameHistoryBySession.get(session_id) || [];
 
-    // ── Possession Change Detection ────────────────────────────────────────
+    // ── Possession Change Detection (using SessionState for persistency) ───
     let possessionChangeEvent = null;
-    if (frameHistory.length >= 2) {
-      const prevFrame = frameHistory[frameHistory.length - 2];
-      const currBallOwner = ballPossession?.player_id;
-      const prevBallOwner = prevFrame.ball_possession?.player_id;
-      
-      if (currBallOwner && prevBallOwner && currBallOwner !== prevBallOwner) {
-        possessionChangeEvent = {
-          type: 'possession_change',
-          team: ballPossession.team,
-          confidence: ballPossession.confidence,
-          minute,
-          elapsed_seconds: elapsedSeconds,
-          from_player: prevBallOwner,
-          to_player: currBallOwner,
-        };
+    let sessionStates = [];
+    try {
+      sessionStates = await base44.asServiceRole.entities.SessionState.filter({ session_id });
+    } catch (_) {}
+    
+    const lastPossessionOwner = sessionStates?.[0]?.last_possession_owner;
+    const currBallOwner = ballPossession?.player_id;
+    
+    // Detect change: compare to LAST stored owner (not just previous frame)
+    if (lastPossessionOwner && currBallOwner && lastPossessionOwner !== currBallOwner) {
+      // Debounce: only create if confidence high AND different for 2+ frames
+      if (frameHistory.length >= 2) {
+        const prevFrame = frameHistory[frameHistory.length - 1];
+        const sameAsPrev = prevFrame.ball_possession?.player_id === currBallOwner;
+        
+        if (sameAsPrev && ballPossession.confidence >= 50) { // Lowered threshold
+          possessionChangeEvent = {
+            type: 'possession_change',
+            team: ballPossession.team,
+            confidence: Math.min(100, ballPossession.confidence + 10), // Boost confidence
+            minute,
+            elapsed_seconds: elapsedSeconds,
+            from_player: lastPossessionOwner,
+            to_player: currBallOwner,
+          };
+        }
       }
     }
 
@@ -652,6 +663,20 @@ Deno.serve(async (req) => {
       base44.functions.invoke('aggregatePlayerStats', { session_id }).catch(() => {});
     }
 
+    // Update possession streaming (alle 30 frames für Real-time Stats)
+    if (frame_number % 30 === 0) {
+      base44.functions.invoke('calculatePossessionStreaming', { session_id, lookback_frames: 50 }).catch(() => {});
+    }
+
+    // Multi-Camera Merge (wenn > 1 Kamera aktiv)
+    if (frame_number % 15 === 0) {
+      base44.functions.invoke('mergeMultiCameraDetections', { 
+        session_id, 
+        frame_number,
+        lookback_frames: 5
+      }).catch(() => {});
+    }
+
     // ── Save TrackingData ──────────────────────────────────────────────────
     let trackingData = null;
     try {
@@ -687,9 +712,12 @@ Deno.serve(async (req) => {
     allEvents.push(...duels);
     
     for (const evt of allEvents) {
-      if (evt.confidence >= 60) {
+      // Lowered confidence threshold for possession_change to 50%
+      const minConfidence = evt.type === 'possession_change' ? 50 : 60;
+      
+      if (evt.confidence >= minConfidence) {
         try {
-          await base44.entities.AutoEvent.create({
+          const autoEvent = await base44.entities.AutoEvent.create({
             session_id,
             match_id: matchId,
             tracking_data_id: trackingData?.id,
@@ -698,13 +726,21 @@ Deno.serve(async (req) => {
             minute: evt.minute,
             elapsed_seconds: evt.elapsed_seconds,
             confidence: evt.confidence,
-            description: `Auto-detected: ${evt.type}`,
+            description: `Auto-detected: ${evt.type}${evt.from_player ? ` (${evt.from_player} → ${evt.to_player})` : ''}`,
             data: evt,
             approved_by_trainer: false,
             rejected: false,
             timestamp_ms: Date.now(),
           });
           savedAutoEvents.push(evt.type);
+          
+          // Update SessionState with latest possession owner
+          if (evt.type === 'possession_change' && sessionStates?.[0]) {
+            await base44.asServiceRole.entities.SessionState.update(sessionStates[0].id, {
+              last_possession_owner: evt.to_player,
+              last_possession_team: evt.team,
+            });
+          }
         } catch (e) {
           console.warn(`⚠️ Auto-event save failed: ${e.message}`);
         }
@@ -735,6 +771,9 @@ Deno.serve(async (req) => {
       // Possession & Duels
       possession_change_detected: possessionChangeEvent !== null,
       duels_detected: duels.length,
+      // Latency tracking (echo client timestamp for roundtrip calculation)
+      client_sent_timestamp: body.client_sent_timestamp,
+      server_processed_timestamp: Date.now(),
     });
 
   } catch (error) {

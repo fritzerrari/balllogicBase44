@@ -40,6 +40,7 @@ import AdminCreditsAudit from './pages/admin/AdminCreditsAudit.jsx';
 import AdminErrorLog from './pages/admin/AdminErrorLog.jsx';
 import CameraStreamDebug from './pages/admin/CameraStreamDebug.jsx';
 import AdminBuildGuide from './pages/admin/AdminBuildGuide.jsx';
+import SystemRobustnessTest from './pages/admin/SystemRobustnessTest.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -96,6 +97,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/error-log" element={<AdminErrorLog />} />
         <Route path="/admin/camera-stream-debug" element={<CameraStreamDebug />} />
         <Route path="/admin/build-guide" element={<AdminBuildGuide />} />
+        <Route path="/admin/robustness-test" element={<SystemRobustnessTest />} />
       </Route>
       {/* Public routes — no login required */}
       <Route path="/cam" element={<CameraView />} />

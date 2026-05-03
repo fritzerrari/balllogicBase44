@@ -8,6 +8,7 @@ import { Camera, Mic, MicOff, Send, Radio, ZoomIn, ZoomOut, MapPin } from 'lucid
 import { motion, AnimatePresence } from 'framer-motion';
 import EventButtons from '@/components/live/EventButtons';
 import CameraCoverageVisualizer from '@/components/live/CameraCoverageVisualizer';
+import CameraCoverageEditor from '@/components/live/CameraCoverageEditor';
 
 export default function CameraView() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -24,6 +25,7 @@ export default function CameraView() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [trackingStatus, setTrackingStatus] = useState(null); // {status, playerCount, ballDetected, teams}
   const [showCoverage, setShowCoverage] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -118,7 +120,9 @@ export default function CameraView() {
     clearInterval(frameIntervalRef.current);
 
     let frameNumber = 0;
-    let fieldBoundsDetected = false; // Auto-detect coverage nur einmalig
+    let fieldBoundsDetected = false;
+    let fieldBoundsRetryCount = 0;
+    const MAX_FIELD_DETECTION_RETRIES = 30; // Retry bis Frame 30
 
     const capture = async () => {
       const video = videoRef.current;
@@ -144,36 +148,47 @@ export default function CameraView() {
         });
         frameNumber++;
         if (res?.data?.success) {
+          // Calculate network latency
+          const networkLatency = Date.now() - (res.data.client_sent_timestamp || clientSentTime);
+          
           setTrackingStatus(res.data.tracking_status || {
             status: res.data.ball_detected ? 'active' : 'partial',
             playerCount: res.data.players_detected || 0,
             ballDetected: res.data.ball_detected || false,
             teams: { teamA: 0, teamB: 0, referee: 0 },
+            networkLatency: networkLatency,
+            processingTime: res.data.processing_time_ms || 0,
           });
         }
 
-        // Auto-detect camera field bounds einmalig
-        if (!fieldBoundsDetected && frameNumber === 1) {
-          fieldBoundsDetected = true;
+        // Auto-detect camera field bounds — RETRY bis Frame 30
+        if (!fieldBoundsDetected && fieldBoundsRetryCount < MAX_FIELD_DETECTION_RETRIES) {
+          fieldBoundsRetryCount++;
           const camIdStr = String(cameraId);
+          
           base44.functions.invoke('detectCameraFieldBounds', {
             frame_base64: base64,
             camera_id: cameraId,
             session_id: sessionId,
           }).then(bounds => {
-            if (bounds?.data?.coverage_polygon) {
+            if (bounds?.data?.coverage_polygon && bounds.data.coverage_polygon.length >= 3) {
+              fieldBoundsDetected = true; // Mark as detected
               base44.entities.LiveSession.filter({ id: sessionId }).then(sessions => {
                 if (sessions[0]) {
                   const updatedStreams = sessions[0].camera_streams.map(s =>
                     String(s.camera_id) === camIdStr
-                      ? { ...s, coverage_polygon: bounds.data.coverage_polygon }
+                      ? { 
+                          ...s, 
+                          coverage_polygon: bounds.data.coverage_polygon,
+                          coverage_confidence: bounds.data.confidence || 80
+                        }
                       : s
                   );
                   base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
                 }
               });
             }
-          }).catch(() => {});
+          }).catch(() => {}); // Silent retry
         }
       } catch (e) {
         // silent fail
@@ -307,12 +322,31 @@ export default function CameraView() {
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> Feldabdeckung dieser Kamera
               </h3>
-              <button onClick={() => setShowCoverage(false)} className="text-white/60 hover:text-white">✕</button>
+              <button onClick={() => { setShowCoverage(false); setEditMode(false); }} className="text-white/60 hover:text-white">✕</button>
             </div>
-            <CameraCoverageVisualizer
-              cameras={session.camera_streams || []}
-              readOnly={true}
-            />
+            
+            {!editMode ? (
+              <div className="space-y-2">
+                <CameraCoverageVisualizer
+                  cameras={session.camera_streams || []}
+                  readOnly={true}
+                />
+                <button
+                  onClick={() => setEditMode(true)}
+                  className="w-full py-2 rounded-lg bg-primary/20 text-primary text-xs font-bold hover:bg-primary/30 transition-all"
+                >
+                  ✏️ Feldabdeckung bearbeiten
+                </button>
+              </div>
+            ) : (
+              <CameraCoverageEditor
+                sessionId={sessionId}
+                cameraId={cameraId}
+                initialPolygon={session.camera_streams?.find(c => c.camera_id === cameraId)?.coverage_polygon || []}
+                onSave={() => { setEditMode(false); setShowCoverage(false); }}
+                onCancel={() => setEditMode(false)}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

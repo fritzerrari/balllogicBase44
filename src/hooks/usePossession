@@ -1,0 +1,67 @@
+/**
+ * usePossession — Real-time Possession % Hook
+ * Subscribes to TrackingData + SessionState für Live-Updates
+ */
+import { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+
+export default function usePossession(sessionId) {
+  const [possession, setPossession] = useState({ home: 50, away: 50 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    setLoading(true);
+    
+    // Initial load + subscribe to updates
+    const fetchPossession = async () => {
+      try {
+        const sessions = await base44.entities.SessionState.filter({ session_id: sessionId });
+        const state = sessions?.[0];
+        
+        if (state?.possession_percentage) {
+          setPossession({
+            home: Math.round(state.possession_percentage.home || 50),
+            away: Math.round(state.possession_percentage.away || 50),
+          });
+        } else {
+          // Calculate from recent tracking data
+          const tracking = await base44.entities.TrackingData.filter(
+            { session_id: sessionId },
+            '-timestamp_ms',
+            100
+          );
+          
+          if (tracking.length > 0) {
+            const homePoss = tracking.filter(t => 
+              t.ball_possession?.team === 'home'
+            ).length;
+            const awayPoss = tracking.filter(t => 
+              t.ball_possession?.team === 'away'
+            ).length;
+            
+            const total = homePoss + awayPoss || 1;
+            setPossession({
+              home: Math.round((homePoss / total) * 100),
+              away: Math.round((awayPoss / total) * 100),
+            });
+          }
+        }
+        setLoading(false);
+      } catch (err) {
+        console.warn('Possession fetch error:', err);
+        setLoading(false);
+      }
+    };
+    
+    fetchPossession();
+    
+    // Poll every 5 frames (processFrame is ~300ms interval)
+    const interval = setInterval(fetchPossession, 1500);
+    
+    return () => clearInterval(interval);
+  }, [sessionId]);
+
+  return { possession, loading };
+}

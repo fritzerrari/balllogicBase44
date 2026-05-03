@@ -1,0 +1,84 @@
+/**
+ * useLiveTracking — Real-time Tracking Subscription Hook
+ * WebSocket-fallback mit Polling für Live Updates (< 2s latency)
+ */
+import { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+
+const WS_POLL_INTERVAL_MS = 1500; // Fallback polling wenn kein WebSocket
+const LAST_FRAME_CACHE = new Map(); // Cache last frame per session
+
+export default function useLiveTracking(sessionId) {
+  const [tracking, setTracking] = useState({
+    players: [],
+    ball: null,
+    events: [],
+    stats: { possession: { home: 50, away: 50 }, quality: 0 },
+  });
+  const [status, setStatus] = useState('idle'); // 'idle' | 'connecting' | 'connected' | 'error'
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    // WebSocket connection (future enhancement)
+    // For now: use fast polling
+    setStatus('connecting');
+
+    const pollTracking = async () => {
+      try {
+        // Load LATEST frame only (most recent)
+        const latestFrames = await base44.entities.TrackingData.filter(
+          { session_id: sessionId },
+          '-timestamp_ms',
+          1
+        );
+
+        const latestFrame = latestFrames?.[0];
+        if (!latestFrame) return;
+
+        // Check if new frame (not duplicate)
+        const cached = LAST_FRAME_CACHE.get(sessionId);
+        if (cached?.id === latestFrame.id) return; // No update
+
+        LAST_FRAME_CACHE.set(sessionId, latestFrame);
+
+        // Load latest auto-events (only new ones)
+        const autoEvents = await base44.entities.AutoEvent.filter(
+          { session_id: sessionId },
+          '-timestamp_ms',
+          10
+        );
+
+        setTracking({
+          players: latestFrame.player_positions || [],
+          ball: latestFrame.ball_position || null,
+          events: autoEvents || [],
+          stats: {
+            possession: {
+              home: 50, // Will be updated by LiveStats hook
+              away: 50,
+            },
+            quality: latestFrame.detection_quality || 0,
+          },
+        });
+
+        setStatus('connected');
+      } catch (err) {
+        console.warn('Live tracking poll error:', err);
+        setStatus('error');
+      }
+    };
+
+    // Initial poll
+    pollTracking();
+
+    // Poll at fast interval
+    const interval = setInterval(pollTracking, WS_POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [sessionId]);
+
+  return { tracking, status };
+}

@@ -23,8 +23,9 @@ export const ALL_EVENTS = [
   { key: 'offside',      label: 'Abseits',      icon: '🚩', color: 'bg-gray-500/20 text-gray-300 border border-gray-500/40', team: true },
 ];
 
-// Deduplizierungs-Fenster: 10 Sekunden
-const DEDUP_WINDOW_MS = 10000;
+// Deduplizierungs-Fenster: Smart Context-Based (nicht nur Zeit)
+const DEDUP_WINDOW_MS = 20000; // 20 Sekunden base window
+const DEDUP_MIN_POSITION_CHANGE = 20; // Min 20% Feldbreite für Position-Change
 
 /**
  * @param {object} props
@@ -48,13 +49,30 @@ export default function EventButtons({ sessionId, matchId, matchTitle, source = 
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const checkDuplicate = (type, team = 'unknown', minute = 0) => {
-    // Key: type + team + minute (robust gegen false positives)
+    // Smart context-based deduplication
+    // Key: type + team + minute
     const key = `${type}_${team}_${minute}`;
     const now = Date.now();
     const last = recentRef.current[key];
-    if (last && now - last < DEDUP_WINDOW_MS) return true;
-    recentRef.current[key] = now;
-    return false;
+    
+    // No dedup if time window expired
+    if (!last || (now - last >= DEDUP_WINDOW_MS)) {
+      recentRef.current[key] = now;
+      return false;
+    }
+    
+    // For CORNER events: allow multiple in same minute if Ball moved significantly
+    // (indicates different corner kick)
+    if (type === 'corner' || type === 'freekick') {
+      // If we had tracking data, we could check ball position delta
+      // For now: be more lenient with time window
+      if (now - last >= 8000) { // 8 seconds instead of 10
+        recentRef.current[key] = now;
+        return false;
+      }
+    }
+    
+    return true; // Is duplicate
   };
 
   const tapEvent = async (evt, team = 'unknown') => {

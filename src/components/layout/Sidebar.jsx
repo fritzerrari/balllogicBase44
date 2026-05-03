@@ -48,6 +48,7 @@ const bottomItems = [
   { label: 'Error Log', icon: AlertTriangle, path: '/admin/error-log', adminOnly: true },
   { label: 'Camera Stream Debug', icon: AlertTriangle, path: '/admin/camera-stream-debug', adminOnly: true, badge: '🎥' },
   { label: 'Build Guide', icon: Code, path: '/admin/build-guide', adminOnly: true, badge: '📖' },
+  { label: 'Robustness Test', icon: Code, path: '/admin/robustness-test', adminOnly: true, badge: '🧪' },
   ];
 
 function NavLink({ label, icon: Icon, path, badge }) {
