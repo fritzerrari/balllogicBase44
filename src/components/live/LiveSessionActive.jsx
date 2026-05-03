@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import EventButtons from '@/components/live/EventButtons';
 import CameraQuickShare from './CameraQuickShare';
 import LiveSessionStats from './LiveSessionStats';
+import AutomationControlPanel from './AutomationControlPanel';
+import EventApprovalPanel from './EventApprovalPanel';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -134,23 +136,28 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
 
       {/* MAIN CONTENT */}
       <div className="p-4 lg:p-6 max-w-6xl mx-auto">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* LEFT: EVENTS PANEL */}
-          <div className="glass rounded-xl p-4 border border-border">
-            <h2 className="text-sm font-bold mb-3">⚽ Event Tippen</h2>
-            <EventButtons
-              sessionId={session.id}
-              matchId={session.match_id}
-              matchTitle={session.match_title}
-              source="coach"
-              elapsedSeconds={elapsedSeconds}
-              compact
-              onEventLogged={() => setEventCount(c => c + 1)}
-            />
+        <div className="grid lg:grid-cols-4 gap-4">
+          {/* LEFT: AUTOMATION + EVENTS */}
+          <div className="space-y-4">
+            <div className="glass rounded-xl p-4 border border-border">
+              <h2 className="text-sm font-bold mb-3">⚽ Event Tippen</h2>
+              <EventButtons
+                sessionId={session.id}
+                matchId={session.match_id}
+                matchTitle={session.match_title}
+                source="coach"
+                elapsedSeconds={elapsedSeconds}
+                compact
+                onEventLogged={() => setEventCount(c => c + 1)}
+              />
+            </div>
+
+            <AutomationControlPanel sessionId={session.id} matchId={session.match_id} />
+            <EventApprovalPanel sessionId={session.id} />
           </div>
 
           {/* CENTER: CAMERA LINKS */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             {cameraList.length > 0 ? (
               cameraList.map(cam => (
                 <CameraQuickShare

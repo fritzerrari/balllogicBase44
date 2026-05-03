@@ -1,0 +1,58 @@
+{
+  "name": "TrackingCorrection",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Session f\u00fcr die Korrektur"
+    },
+    "match_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "possession_manual_override",
+        "team_reassign",
+        "player_id_correction",
+        "formation_override",
+        "event_rejection",
+        "event_approval",
+        "ball_position_correction"
+      ],
+      "description": "Art der Korrektur"
+    },
+    "frame_number": {
+      "type": "number"
+    },
+    "timestamp_ms": {
+      "type": "number"
+    },
+    "original_value": {
+      "type": "object",
+      "description": "Original-Wert vor Korrektur"
+    },
+    "corrected_value": {
+      "type": "object",
+      "description": "Korrigierter Wert"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Warum wurde korrigiert"
+    },
+    "corrected_by": {
+      "type": "string",
+      "description": "Email des Trainers der korrigiert hat"
+    },
+    "applied": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wurde Korrektur bereits auf Tracking angewendet"
+    }
+  },
+  "required": [
+    "session_id",
+    "type",
+    "timestamp_ms"
+  ]
+}
