@@ -15,13 +15,13 @@ import useStreamHealth from '@/hooks/useStreamHealth';
 import useRealTimeTracking from '@/hooks/useRealTimeTracking';
 import useCameraConnections from '@/hooks/useCameraConnections';
 import StreamMonitor from '@/components/live/StreamMonitor';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Radio, Camera, Mic, MicOff,
   Zap, Circle, Target, Shield,
   Copy, Check, Smartphone, Share2, Play,
-  Eye, EyeOff, Wifi, WifiOff, Video
+  Eye, EyeOff, Wifi, WifiOff, Video, Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EventButtons from '@/components/live/EventButtons';
@@ -111,6 +111,14 @@ export default function CoachingCockpit() {
   const activeSession = sessions[0];
   // Kameras NUR aus aktiver Session — keine Demo-Fallback-Daten
   const cameras = activeSession?.camera_streams || [];
+
+  // Mutation for updating session (add camera)
+  const updateSessionMutation = useMutation({
+    mutationFn: (data) => base44.entities.LiveSession.update(activeSession.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['liveSessions'] });
+    },
+  });
 
   // Camera Stream Manager — zentrale Verwaltung aller Kamera-Verbindungen
   const { cameraStates, globalStatus, connectedCount, totalCount } = useCameraStreamManager(activeSession?.id, true);
@@ -618,6 +626,19 @@ export default function CoachingCockpit() {
 
           {/* Auto Event Log */}
           <EventLog events={events} />
+
+          {/* Add Camera Button */}
+          {activeSession && (
+            <button onClick={() => {
+              const newCamId = (activeSession.camera_streams?.length || 0) + 1;
+              const newStream = { camera_id: newCamId.toString(), label: `Kamera ${newCamId}`, stream_url: '', status: 'waiting', code: Math.random().toString(36).substring(2, 8).toUpperCase() };
+              updateSessionMutation.mutate({ camera_streams: [...(activeSession.camera_streams || []), newStream] });
+            }}
+              disabled={updateSessionMutation.isPending}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/15 border border-primary/30 text-primary text-xs font-bold hover:bg-primary/20 transition-all disabled:opacity-50">
+              <Plus className="w-4 h-4" /> Neue Kamera hinzufügen
+            </button>
+          )}
 
           {/* Camera codes — Codes kommen aus Session-DB, keine Random-Generierung */}
           {activeSession?.camera_streams?.length > 0 && (

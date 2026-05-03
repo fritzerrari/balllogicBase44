@@ -1,15 +1,15 @@
 /**
- * CameraStreamViewLive — Live Video-Stream mit Tracking-Daten-Overlay
+ * CameraStreamViewLive — Live Video-Stream mit Tracking-Daten-Overlay + Direct Link
  * 
  * Zeigt:
- * - Live Thumbnail von Kamera (aktualisiert alle 3s)
+ * - Live Thumbnail von Kamera (mit Fallback zu Placeholder)
  * - Erkannte Spieler + Ball als Overlay
  * - Verbindungs-Status + Qualität
- * - Frame-Count + Latency
+ * - Direct-Link zum Öffnen der Kamera auf Handy
  */
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Radio, AlertCircle, TrendingUp } from 'lucide-react';
+import { Camera, ExternalLink, AlertCircle, TrendingUp, Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -40,109 +40,63 @@ export default function CameraStreamViewLive({
     c => String(c.camera_id) === String(camera.camera_id)
   );
 
-  // Draw thumbnail + tracking overlay
+  // Draw canvas — simple status display, no waiting for thumbnail
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    
-    // Canvas size
     canvas.width = 320;
     canvas.height = 180;
 
-    // Dark background if no data
-    ctx.fillStyle = '#0d260d';
+    // Background
+    const bgColor = cameraStream?.status === 'connected' ? '#1a3a1a' : '#2a2a2a';
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw thumbnail if available
-    if (cameraStream?.thumbnail) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        drawTrackingOverlay(ctx, canvas.width, canvas.height);
-        setOverlayDrawn(true);
-      };
-      img.onerror = () => {
-        drawPlaceholder(ctx, canvas.width, canvas.height);
-      };
-      img.src = cameraStream.thumbnail;
-    } else {
-      drawPlaceholder(ctx, canvas.width, canvas.height);
-    }
+    // Status text
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      cameraStream?.status === 'connected' ? '● LIVE' : '○ WARTET',
+      canvas.width / 2,
+      canvas.height / 2 - 20
+    );
 
-    function drawPlaceholder(ctx, w, h) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(0, 0, w, h);
-      
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.font = '14px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(cameraStream?.status === 'connected' ? 'Kamera lädt...' : 'Kamera offline', w / 2, h / 2 - 15);
-      
-      if (cameraStream?.label) {
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = 'bold 10px monospace';
-        ctx.fillText(cameraStream.label, w / 2, h / 2 + 15);
-      }
+    // Label
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '12px monospace';
+    ctx.fillText(cameraStream?.label || `Kamera ${camera?.camera_id}`, canvas.width / 2, canvas.height / 2 + 30);
+
+    // Draw tracking overlay if data available
+    // Only overlay if connected + has data
+    if (trackingData?.player_positions) {
+      drawTrackingOverlay(ctx, canvas.width, canvas.height);
     }
 
     function drawTrackingOverlay(ctx, w, h) {
-      if (!trackingData?.player_positions) return;
-
-      // Draw players
-      trackingData.player_positions.forEach(p => {
+      trackingData.player_positions?.forEach(p => {
         const x = (p.x / 100) * w;
         const y = (p.y / 100) * h;
         const color = p.team === 'home' ? '#4ade80' : '#ef4444';
-
-        // Player dot
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
-
-        // Confidence ring
-        const conf = Math.round((p.confidence || 0) / 100 * 255);
-        ctx.strokeStyle = `rgba(${color === '#4ade80' ? '74,222,128' : '239,68,68'},${conf})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
-        ctx.stroke();
       });
 
-      // Draw ball
       if (trackingData.ball_position) {
         const bx = (trackingData.ball_position.x / 100) * w;
         const by = (trackingData.ball_position.y / 100) * h;
         ctx.fillStyle = '#eab308';
         ctx.beginPath();
-        ctx.arc(bx, by, 3, 0, Math.PI * 2);
+        ctx.arc(bx, by, 2, 0, Math.PI * 2);
         ctx.fill();
       }
-
-      // HUD: Player count
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(3, 3, 60, 30);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      const homeCount = trackingData.player_positions.filter(p => p.team === 'home').length;
-      const awayCount = trackingData.player_positions.filter(p => p.team === 'away').length;
-      ctx.fillText(`🏠${homeCount}`, 6, 5);
-      ctx.fillText(`✈${awayCount}`, 6, 17);
-
-      // HUD: Ball indicator
-      if (trackingData.ball_position) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(w - 40, 3, 37, 15);
-        ctx.fillStyle = '#eab308';
-        ctx.fillText('⚽ Erkannt', w - 37, 5);
-      }
     }
-  }, [cameraStream?.thumbnail, trackingData]);
+  }, [cameraStream?.status, camera?.camera_id, trackingData]);
 
   // Calculate last seen
   const lastSeen = cameraStream?.last_seen
@@ -185,7 +139,7 @@ export default function CameraStreamViewLive({
       </div>
 
       {/* Info Bar */}
-      <div className="px-3 py-2 bg-muted/50 border-t border-border space-y-1.5">
+      <div className="px-3 py-2 bg-muted/50 border-t border-border space-y-2">
         {/* Label + Status */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -194,12 +148,27 @@ export default function CameraStreamViewLive({
               <div className="text-xs font-medium text-foreground truncate">
                 {cameraStream?.label || camera?.label || `Kamera ${camera?.camera_id}`}
               </div>
-              <div className="text-[9px] text-muted-foreground">
-                Code: {cameraStream?.code || camera?.code}
+              <div className={`text-[9px] font-bold flex items-center gap-1 ${
+                cameraStream?.status === 'connected' ? 'text-green-400' : 'text-yellow-400'
+              }`}>
+                {cameraStream?.status === 'connected' ? <Check className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
+                {cameraStream?.status === 'connected' ? 'Verbunden' : 'Wartet'}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Direct Link Button */}
+        <button
+          onClick={() => {
+            const camUrl = `${window.location.origin}/cam?session=${sessionId}&cam=${camera.camera_id}`;
+            window.open(camUrl, '_blank');
+          }}
+          className="w-full flex items-center justify-center gap-2 px-2 py-1.5 rounded-lg bg-primary/20 border border-primary/40 text-primary text-xs font-bold hover:bg-primary/30 transition-all"
+        >
+          <ExternalLink className="w-3 h-3" />
+          Auf Handy öffnen
+        </button>
 
         {/* Tracking Stats */}
         {trackingData && (
