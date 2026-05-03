@@ -231,13 +231,12 @@ export default function IntegratedLiveSession() {
 
     try {
       const serverActiveSessions = await base44.entities.LiveSession.filter({ status: 'active' });
-      if (serverActiveSessions?.length > 0) {
+      if (serverActiveSessions?.length > 0 && serverActiveSessions[0]?.status === 'active') {
         alert(`🛑 Eine Session läuft noch:\n\n${serverActiveSessions.map(s => `• ${s.match_title || 'Unbekannt'}`).join('\n')}\n\nBeende diese zuerst.`);
         return;
       }
     } catch (err) {
       console.error('❌ Session check failed:', err);
-      return;
     }
 
     let matchId = null;
@@ -264,7 +263,7 @@ export default function IntegratedLiveSession() {
         camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', status: 'waiting', code: Math.random().toString(36).substring(2, 8).toUpperCase() })),
       });
       setSession(s);
-      setPhase('live');
+      setPhase('analysis');
       setElapsedTime(0);
     } catch (err) {
       console.error('❌ Session creation failed:', err);
