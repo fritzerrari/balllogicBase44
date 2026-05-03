@@ -19,11 +19,14 @@ export default function CameraView() {
   const [showChat, setShowChat] = useState(false);
   const [zoom, setZoom] = useState(1.0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [trackingStatus, setTrackingStatus] = useState(null); // {players, ball, quality}
 
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const pollRef = useRef(null);
+  const frameIntervalRef = useRef(null);
 
   // Load session
   useEffect(() => {
@@ -71,8 +74,51 @@ export default function CameraView() {
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
+      clearInterval(frameIntervalRef.current);
     };
   }, []);
+
+  // Frame capture + tracking — only when session active
+  useEffect(() => {
+    if (!sessionId) return;
+    clearInterval(frameIntervalRef.current);
+
+    let frameNumber = 0;
+    const capture = async () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 360;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+      if (!base64 || base64.length < 100) return;
+
+      try {
+        const res = await base44.functions.invoke('processFrame', {
+          session_id: sessionId,
+          frame_base64: base64,
+          frame_number: frameNumber++,
+          elapsed_seconds: elapsedSeconds,
+          team: 'home',
+        });
+        if (res?.data?.success) {
+          setTrackingStatus({
+            players: res.data.players_detected || 0,
+            ball: res.data.ball_detected || false,
+            quality: res.data.quality_score || 0,
+          });
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+
+    frameIntervalRef.current = setInterval(capture, 3000); // every 3s
+    return () => clearInterval(frameIntervalRef.current);
+  }, [sessionId, elapsedSeconds]);
 
   const sendMessage = async () => {
     if (!message.trim() || !sessionId) return;
@@ -124,6 +170,9 @@ export default function CameraView() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
+      {/* Hidden canvas for frame capture */}
+      <canvas ref={canvasRef} className="hidden" />
+
       {/* Full-screen video */}
       <video
         ref={videoRef}
@@ -141,9 +190,24 @@ export default function CameraView() {
           <span className="text-white text-xs font-bold">LIVE</span>
           {session && <span className="text-white/60 text-xs">{session.match_title}</span>}
         </div>
-        <span className="text-white/60 text-xs font-mono">
-          {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Tracking indicator */}
+          {trackingStatus !== null && (
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              trackingStatus.players > 0 || trackingStatus.ball
+                ? 'bg-green-500/30 text-green-400 border border-green-500/40'
+                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${trackingStatus.players > 0 || trackingStatus.ball ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+              {trackingStatus.players > 0 || trackingStatus.ball
+                ? `👥${trackingStatus.players} ${trackingStatus.ball ? '⚽' : ''}`
+                : 'Kein Tracking'}
+            </div>
+          )}
+          <span className="text-white/60 text-xs font-mono">
+            {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+          </span>
+        </div>
       </div>
 
       {/* Zoom controls — right side */}
