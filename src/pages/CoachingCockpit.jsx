@@ -621,14 +621,13 @@ export default function CoachingCockpit() {
           <EventLog events={events} />
 
           {/* Camera codes — Codes kommen aus Session-DB, keine Random-Generierung */}
-          {cameras.length > 0 && (
+          {activeSession?.camera_streams?.length > 0 && (
             <div className="glass rounded-xl p-4">
               <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
                 <Smartphone className="w-3.5 h-3.5" /> Kameras einladen
               </div>
               <div className="space-y-2">
-                {cameras.map((cam) => {
-                  // Code aus Session-Daten — KEIN Math.random() hier (würde bei jedem Render neu generieren!)
+                {activeSession?.camera_streams?.map((cam) => {
                   const code = cam.code || cam.camera_id;
                   const camUrl = `${liveUrl}?session=${activeSession.id}&cam=${cam.camera_id}`;
                   return (

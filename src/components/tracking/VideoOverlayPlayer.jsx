@@ -14,95 +14,55 @@ import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 export default function VideoOverlayPlayer({ videoStream, detections, ball, teamColors = {} }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [playing, setPlaying] = useState(true);
+  const [muted, setMuted] = useState(true);
   const animFrameRef = useRef(null);
+
+  // Auto-draw even if no video source (simulation mode)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const redraw = () => {
+      canvas.width = canvas.width || 640;
+      canvas.height = canvas.height || 360;
+      ctx.fillStyle = '#0d260d';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Always draw overlay even without video
+      if (detections?.length > 0) {
+        detections.forEach(player => {
+          if (player.class === 'ball') return;
+          const x = (player.x / 100) * canvas.width;
+          const y = (player.y / 100) * canvas.height;
+          const color = player.team === 'home' ? { r: 52, g: 211, b: 153 } : { r: 239, g: 68, b: 68 };
+          ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`;
+          ctx.beginPath();
+          ctx.arc(x, y, 8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      if (ball) {
+        const bx = (ball.x / 100) * canvas.width;
+        const by = (ball.y / 100) * canvas.height;
+        ctx.fillStyle = 'rgba(234, 179, 8, 0.9)';
+        ctx.beginPath();
+        ctx.arc(bx, by, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      animFrameRef.current = requestAnimationFrame(redraw);
+    };
+    redraw();
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [detections, ball]);
 
   const defaultColors = {
     home: { r: 52, g: 211, b: 153 }, // primary grün
     away: { r: 239, g: 68, b: 68 }, // red
   };
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video) return;
 
-    const ctx = canvas.getContext('2d');
-    const drawFrame = () => {
-      // Video auf Canvas zeichnen
-      if (video.readyState >= 2) {
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 360;
-        ctx.drawImage(video, 0, 0);
-
-        // Overlay: Spieler
-        if (detections?.length > 0) {
-          detections.forEach(player => {
-            if (player.class === 'ball') return;
-
-            const x = (player.x / 100) * canvas.width;
-            const y = (player.y / 100) * canvas.height;
-            const color = player.team === 'home' ? defaultColors.home : defaultColors.away;
-
-            // Spieler-Kreis
-            ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`;
-            ctx.beginPath();
-            ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Kontur
-            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 1)`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Confidence-Label
-            const confPercent = Math.round(player.confidence);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(x - 12, y - 18, 24, 14);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.font = 'bold 9px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${confPercent}%`, x, y - 11);
-          });
-        }
-
-        // Ball
-        if (ball) {
-          const bx = (ball.x / 100) * canvas.width;
-          const by = (ball.y / 100) * canvas.height;
-          ctx.fillStyle = 'rgba(234, 179, 8, 0.9)'; // gold
-          ctx.beginPath();
-          ctx.arc(bx, by, 6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(234, 179, 8, 1)';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-
-        // HUD-Info oben links
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(10, 10, 150, 50);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '12px monospace';
-        ctx.fillText(`Players: ${detections?.length || 0}`, 15, 30);
-        ctx.fillText(`Ball: ${ball ? '●' : '○'}`, 15, 50);
-      }
-
-      animFrameRef.current = requestAnimationFrame(drawFrame);
-    };
-
-    if (playing) {
-      drawFrame();
-    } else if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-    }
-
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [detections, ball, playing]);
 
   return (
     <div className="space-y-3">
