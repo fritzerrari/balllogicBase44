@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
-const CAPTURE_INTERVAL_BASE_MS = 2000; // 2s standard
+const CAPTURE_INTERVAL_BASE_MS = 3000; // 3s wie vom Workflow empfohlen
 const CAPTURE_INTERVAL_MAX_MS = 10000; // max 10s wenn Fehler
 const FRAME_QUALITY = 0.65;
 const MAX_CONSECUTIVE_ERRORS = 10;

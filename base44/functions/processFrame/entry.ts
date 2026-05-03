@@ -15,8 +15,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
-const WORKFLOW_ID = 'hEJyatdTWBc5ITV4SGVz';
-const WORKFLOW_URL = `https://detect.roboflow.com/infer/workflows/football-tracking-phase-1-1777785537057/${WORKFLOW_ID}`;
+const WORKFLOW_URL = 'https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/football-tracking-phase-1-1777785537057';
 
 const API_TIMEOUT_MS = 8000;
 const MAX_RETRIES = 2;
@@ -78,9 +77,16 @@ async function callRoboflowWorkflow(base64Frame, sessionId, url = WORKFLOW_URL) 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ROBOFLOW_API_KEY}`,
         },
-        body: JSON.stringify({ image: base64Frame }),
+        body: JSON.stringify({
+          api_key: ROBOFLOW_API_KEY,
+          inputs: {
+            image: {
+              type: 'base64',
+              value: base64Frame,
+            },
+          },
+        }),
         signal: controller.signal,
       });
 
@@ -281,7 +287,7 @@ Deno.serve(async (req) => {
       const settings = await base44.asServiceRole.entities.AppSetting.list();
       const wfSetting = settings?.find(s => s.key === 'roboflow_workflow_id');
       if (wfSetting?.value) {
-        workflowUrl = `https://detect.roboflow.com/infer/workflows/football-tracking-phase-1-1777785537057/${wfSetting.value}`;
+        workflowUrl = wfSetting.value; // Vollständige URL aus AppSettings
       }
       const teamSetting = settings?.find(s => s.key === 'team_references');
       if (teamSetting?.value) teamReferences = JSON.parse(teamSetting.value);
