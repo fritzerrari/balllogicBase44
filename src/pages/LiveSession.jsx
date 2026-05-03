@@ -346,32 +346,25 @@ export default function LiveSession() {
             </div>
           </div>
 
-          {/* CENTER: FIELD + VIDEO */}
+          {/* CENTER: LIVE CAMERA FEEDS */}
           <div className="space-y-4">
-            <div className="glass rounded-xl p-4">
-              <div className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
-                <Eye className="w-3.5 h-3.5" /> Live-Spielfeld
+            {cameraList.length > 0 ? (
+              <div className="space-y-3">
+                {cameraList.map(cam => (
+                  <CameraStreamViewLive
+                    key={cam.camera_id}
+                    camera={cam}
+                    sessionId={session.id}
+                  />
+                ))}
               </div>
-              <div className="aspect-[3/2] max-h-[280px]">
-                <FootballPitch players={[]} dangerZones={[]} showGrid pitchType="full" />
-              </div>
-            </div>
-
-            {cameraList.length > 0 && (
-              <div className="glass rounded-xl p-3">
-                <div className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
-                  <Camera className="w-3.5 h-3.5" /> Kamera-Links
-                </div>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {cameraList.map(cam => {
-                    const link = `${window.location.origin}/cam?session=${session.id}&cam=${cam.camera_id}`;
-                    return (
-                      <button key={cam.camera_id} onClick={() => { navigator.clipboard.writeText(link); alert('✓'); }} className="w-full text-left p-2 rounded-lg bg-muted hover:bg-muted/80 text-xs font-mono text-muted-foreground">
-                        {cam.label}: {link.split('/').pop()}
-                      </button>
-                    );
-                  })}
-                </div>
+            ) : (
+              <div className="glass rounded-xl p-4 text-center">
+                <Camera className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                <div className="text-xs text-muted-foreground">Keine Kameras verbunden</div>
+                <button onClick={() => addCamera()} className="mt-2 px-3 py-1 text-xs rounded-lg bg-primary/20 text-primary">
+                  <Plus className="w-3 h-3 inline mr-1" /> Hinzufügen
+                </button>
               </div>
             )}
           </div>
@@ -446,14 +439,20 @@ export default function LiveSession() {
         <SessionHealthCheck session={session} />
 
         <div className="grid lg:grid-cols-12 gap-4 mt-4">
-          {/* MAIN: FIELD + VIDEO + TRACKING */}
+          {/* MAIN: LIVE CAMERAS */}
           <div className="lg:col-span-8 space-y-4">
-            <div className="glass rounded-xl p-4">
-              <div className="text-sm font-grotesk font-semibold mb-3 flex items-center gap-2">
-                <Video className="w-4 h-4 text-primary" /> Video + Tracking
+            {cameraList.length > 0 ? (
+              <div className="space-y-3">
+                {cameraList.slice(0, 2).map(cam => (
+                  <CameraStreamViewLive key={cam.camera_id} camera={cam} sessionId={session.id} />
+                ))}
               </div>
-              <VideoOverlayPlayer detections={[]} ball={null} />
-            </div>
+            ) : (
+              <div className="glass rounded-xl p-8 text-center">
+                <Camera className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <div className="text-sm text-muted-foreground">Starten Sie eine Live-Session um Kameras zu verbinden</div>
+              </div>
+            )}
 
             <div className="glass rounded-xl p-4">
               <div className="text-sm font-grotesk font-semibold mb-3 flex items-center gap-2">
