@@ -494,6 +494,52 @@ Deno.serve(async (req) => {
     // ── Ball Possession ────────────────────────────────────────────────────
     const ballPossession = calculateBallPossession(ballPos, playerPositions);
 
+    // ── Possession Change Detection ────────────────────────────────────────
+    let possessionChangeEvent = null;
+    if (frameHistory.length >= 2) {
+      const prevFrame = frameHistory[frameHistory.length - 2];
+      const currBallOwner = ballPossession?.player_id;
+      const prevBallOwner = prevFrame.ball?.possession?.player_id;
+      
+      if (currBallOwner && prevBallOwner && currBallOwner !== prevBallOwner) {
+        possessionChangeEvent = {
+          type: 'possession_change',
+          team: ballPossession.team,
+          confidence: ballPossession.confidence,
+          minute,
+          elapsed_seconds: elapsedSeconds,
+          from_player: prevBallOwner,
+          to_player: currBallOwner,
+        };
+      }
+    }
+
+    // ── Duel Detection (zwei Spieler nah beieinander) ────────────────────
+    const duels = [];
+    for (let i = 0; i < playerPositions.length; i++) {
+      for (let j = i + 1; j < playerPositions.length; j++) {
+        const p1 = playerPositions[i];
+        const p2 = playerPositions[j];
+        
+        // Nur wenn unterschiedliche Teams
+        if (p1.team === p2.team) continue;
+        
+        const dist = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+        // Duel wenn weniger als 5% Feldbreite entfernt
+        if (dist < 5) {
+          duels.push({
+            type: 'duel',
+            team: ballPos && Math.sqrt((p1.x - ballPos.x) ** 2 + (p1.y - ballPos.y) ** 2) < Math.sqrt((p2.x - ballPos.x) ** 2 + (p2.y - ballPos.y) ** 2) ? p1.team : p2.team,
+            player_ids: [p1.player_id, p2.player_id],
+            distance: Math.round(dist * 100) / 100,
+            confidence: 75,
+            minute,
+            elapsed_seconds: elapsedSeconds,
+          });
+        }
+      }
+    }
+
     // ── Multi-Frame History ────────────────────────────────────────────────
     let frameHistory = frameHistoryBySession.get(session_id) || [];
     frameHistory.push({
@@ -540,6 +586,11 @@ Deno.serve(async (req) => {
       } catch (_) {}
     }
 
+    // Spieler-Statistiken aggregieren (alle 10 Frames um DB-Last zu sparen)
+    if (frame_number % 10 === 0) {
+      base44.functions.invoke('aggregatePlayerStats', { session_id }).catch(() => {});
+    }
+
     // ── Save TrackingData ──────────────────────────────────────────────────
     let trackingData = null;
     try {
@@ -564,7 +615,17 @@ Deno.serve(async (req) => {
 
     // ── Save Auto-Events ───────────────────────────────────────────────────
     const savedAutoEvents = [];
-    for (const evt of autoEvents) {
+    const allEvents = [...autoEvents];
+    
+    // Add possession change events
+    if (possessionChangeEvent) {
+      allEvents.push(possessionChangeEvent);
+    }
+    
+    // Add duel events
+    allEvents.push(...duels);
+    
+    for (const evt of allEvents) {
       if (evt.confidence >= 60) {
         try {
           await base44.entities.AutoEvent.create({
@@ -572,12 +633,12 @@ Deno.serve(async (req) => {
             match_id: matchId,
             tracking_data_id: trackingData?.id,
             type: evt.type,
-            team: 'unknown',
+            team: evt.team || 'unknown',
             minute: evt.minute,
             elapsed_seconds: evt.elapsed_seconds,
             confidence: evt.confidence,
             description: `Auto-detected: ${evt.type}`,
-            data: { ball: ballPos, players: playerPositions },
+            data: evt,
             approved_by_trainer: false,
             rejected: false,
             timestamp_ms: Date.now(),
@@ -610,6 +671,9 @@ Deno.serve(async (req) => {
       // Field calibration status
       field_calibrated: fieldKeypoints.length >= 4,
       field_keypoints_count: fieldKeypoints.length,
+      // Possession & Duels
+      possession_change_detected: possessionChangeEvent !== null,
+      duels_detected: duels.length,
     });
 
   } catch (error) {

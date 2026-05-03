@@ -90,20 +90,28 @@ Deno.serve(async (req) => {
       let sprints = 0;
       let sumX = 0, sumY = 0;
 
+      // Field dimensions (in meters)
+      const fieldWidthM = 105;
+      const fieldHeightM = 68;
+
       for (let i = 1; i < player.positions.length; i++) {
         const p1 = player.positions[i - 1];
         const p2 = player.positions[i];
-        const dx = ((p2.x - p1.x) / 100) * 105; // meters
-        const dy = ((p2.y - p1.y) / 100) * 68;  // meters
+
+        // Convert from percentage coordinates (0-100) to meters
+        const dx = ((p2.x - p1.x) / 100) * fieldWidthM;
+        const dy = ((p2.y - p1.y) / 100) * fieldHeightM;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const timeDiff = (p2.timestamp - p1.timestamp) / 1000; // seconds
 
         distance += dist;
-        // Sprint: > 5m/s (18 km/h) in realistic timeframe
-        if (timeDiff > 0) {
+
+        // Sprint detection: > 5 m/s (18 km/h) — aber nur wenn zeitliche Differenz plausibel (< 2 Sekunden)
+        if (timeDiff > 0 && timeDiff < 2) {
           const speed = dist / timeDiff;
-          if (speed > 5 && timeDiff < 2) sprints++;
+          if (speed > 5) sprints++;
         }
+
         sumX += p2.x;
         sumY += p2.y;
       }
