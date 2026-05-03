@@ -4,8 +4,10 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Camera, Mic, MicOff, Send, Radio, ZoomIn, ZoomOut } from 'lucide-react';
+import { Camera, Mic, MicOff, Send, Radio, ZoomIn, ZoomOut, MapPin } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import EventButtons from '@/components/live/EventButtons';
+import CameraCoverageVisualizer from '@/components/live/CameraCoverageVisualizer';
 
 export default function CameraView() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -21,6 +23,7 @@ export default function CameraView() {
   const [zoom, setZoom] = useState(1.0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [trackingStatus, setTrackingStatus] = useState(null); // {status, playerCount, ballDetected, teams}
+  const [showCoverage, setShowCoverage] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -291,10 +294,33 @@ export default function CameraView() {
         </button>
       </div>
 
+      {/* Coverage Panel */}
+      <AnimatePresence>
+        {showCoverage && session && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute inset-4 bottom-24 z-20 bg-black/90 backdrop-blur rounded-xl p-4 overflow-y-auto max-h-96"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <MapPin className="w-4 h-4" /> Feldabdeckung dieser Kamera
+              </h3>
+              <button onClick={() => setShowCoverage(false)} className="text-white/60 hover:text-white">✕</button>
+            </div>
+            <CameraCoverageVisualizer
+              cameras={session.camera_streams || []}
+              readOnly={true}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Bottom controls */}
       <div className="absolute bottom-0 left-0 right-0 z-10">
-        {/* Events panel */}
-        {showEvents && (
+       {/* Events panel */}
+       {showEvents && (
           <div className="bg-black/80 backdrop-blur p-3 mx-2 mb-2 rounded-xl border border-white/10">
             <EventButtons
               sessionId={sessionId}
@@ -333,9 +359,20 @@ export default function CameraView() {
         )}
 
         {/* Action bar */}
-        <div className="flex items-center gap-2 px-3 pb-4 pt-2 bg-gradient-to-t from-black/70 to-transparent">
-          {/* PTT */}
-          <button
+         <div className="flex items-center gap-2 px-3 pb-4 pt-2 bg-gradient-to-t from-black/70 to-transparent">
+           {/* Coverage Button */}
+           <button
+             onClick={() => setShowCoverage(s => !s)}
+             className={`w-12 h-12 rounded-full flex items-center justify-center select-none touch-manipulation transition-all ${
+               showCoverage ? 'bg-primary scale-110 neon-glow' : 'bg-white/20 border border-white/30'
+             }`}
+             title="Feldabdeckung anzeigen"
+           >
+             <MapPin className="w-5 h-5 text-white" />
+           </button>
+
+           {/* PTT */}
+           <button
             onMouseDown={() => handlePTT(true)}
             onMouseUp={() => handlePTT(false)}
             onTouchStart={e => { e.preventDefault(); handlePTT(true); }}

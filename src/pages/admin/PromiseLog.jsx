@@ -41,6 +41,22 @@ const initialPromises = [
     reality: 'CameraStreamViewLive zeigt nur Canvas-Placeholder',
     status: 'false',
     credits: 280
+  },
+  {
+    id: 5,
+    date: '2026-05-03 14:00',
+    promise: 'Camera-1-Link wird in LiveSession angezeigt + kopierbar',
+    reality: 'Camera-Link fehlte komplett in der UI, Kameras nicht einladbar',
+    status: 'false',
+    credits: 120
+  },
+  {
+    id: 6,
+    date: '2026-05-03 14:00',
+    promise: 'Feldabdeckungs-Grafik in CameraView zeigt alle Kameras',
+    reality: 'Grafik komplett in CameraView, Kamerassistent sah nichts',
+    status: 'false',
+    credits: 180
   }
 ];
 

@@ -14,7 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Radio, Camera, Play, Square, Plus, Clock, Mic, MicOff,
-  CheckCircle2, Loader2, Check, X, Eye, EyeOff, Wifi, Video, Target, Circle, Shield
+  CheckCircle2, Loader2, Check, X, Eye, EyeOff, Wifi, Video, Target, Circle, Shield, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -498,7 +498,7 @@ export default function IntegratedLiveSession() {
             </div>
 
             {cameraList.length > 0 && (
-              <div className="glass rounded-xl p-4 mt-3">
+              <div className="glass rounded-xl p-4 mt-3 space-y-3">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-grotesk font-semibold"><Camera className="w-4 h-4 inline mr-1" /> Kameras</span>
                   <button onClick={addCamera} className="text-xs px-3 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary font-bold"><Plus className="w-3.5 h-3.5 inline mr-1" /> Kamera</button>
@@ -507,13 +507,23 @@ export default function IntegratedLiveSession() {
                   {cameraList.map((cam) => {
                     const camLink = `${window.location.origin}/cam?session=${session.id}&cam=${cam.camera_id}`;
                     return (
-                      <div key={cam.camera_id} className="bg-muted rounded-lg p-3 flex items-center justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-foreground">{cam.label}</div>
-                          <div className="text-[10px] text-muted-foreground truncate">{camLink.replace('http://', '').replace('https://', '')}</div>
+                      <motion.div key={cam.camera_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`bg-muted rounded-lg p-3 border transition-all ${cam.status === 'connected' ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                              {cam.label}
+                              <span className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate">{camLink.replace('http://', '').replace('https://', '')}</div>
+                          </div>
+                          <button onClick={() => { navigator.clipboard.writeText(camLink); setActiveNotification({ type: 'success', message: '✓ Link kopiert!' }); setTimeout(() => setActiveNotification(null), 2000); }} className="px-2 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold flex-shrink-0 hover:bg-primary/20 transition-all active:scale-95">Kopieren</button>
                         </div>
-                        <button onClick={() => { navigator.clipboard.writeText(camLink); alert('Kopiert!'); }} className="px-2 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold flex-shrink-0">Kopieren</button>
-                      </div>
+                        <a href={camLink} target="_blank" rel="noopener noreferrer" className="inline-block w-full">
+                          <button className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Auf separatem Handy öffnen
+                          </button>
+                        </a>
+                      </motion.div>
                     );
                   })}
                 </div>
