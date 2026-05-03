@@ -15,9 +15,9 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Radio, Camera, Play, Square, Plus, Minus,
-  Clock, Zap, Video, Mic, MicOff,
-  AlertTriangle, CheckCircle2, Loader2, Pencil, Check, X
+  Radio, Camera, Play, Square, Plus,
+  Clock, Mic, MicOff, ExternalLink,
+  CheckCircle2, Loader2, Check, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -352,88 +352,7 @@ export default function LiveSession() {
         </div>
       )}
 
-      {/* ── SETUP PHASE (Kamera Konfiguration) ── */}
-      {!sessionActive && !session && (
-        <div className="max-w-lg mx-auto space-y-3">
-          {/* Step 1: Title — auto-filled */}
-          <div className="glass rounded-xl p-5 space-y-3">
-            <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">1</span>
-              Spiel benennen
-              <span className="text-[10px] text-primary font-normal ml-auto">✓ automatisch vorbelegt</span>
-            </h2>
-            <Input
-              value={sessionTitle}
-              onChange={e => setSessionTitle(e.target.value)}
-              placeholder="z.B. FC Bayern vs BVB"
-              className="bg-muted border-border text-base"
-            />
-            {recentMatches.length > 1 && (
-              <div className="flex gap-2 flex-wrap">
-                {recentMatches.slice(0, 3).map(m => (
-                  <button key={m.id} onClick={() => setSessionTitle(m.title)}
-                    className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${sessionTitle === m.title ? 'bg-primary/15 border-primary/40 text-primary' : 'bg-muted border-border text-muted-foreground hover:text-foreground'}`}>
-                    {m.title}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Step 2: Cameras */}
-          <div className="glass rounded-xl p-5 space-y-4">
-            <h2 className="font-grotesk font-semibold text-foreground flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">2</span>
-              Kameras
-            </h2>
-            <p className="text-xs text-muted-foreground">Kameramann öffnet den Session-Link direkt nach Session-Start.</p>
-
-            <div className="space-y-2">
-              {cameras.map((cam) => (
-                <div key={cam.id} className="bg-muted rounded-lg p-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                      <Camera className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      {editingCamId === cam.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            value={editingCamLabel}
-                            onChange={e => setEditingCamLabel(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') { setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, label: editingCamLabel } : c)); setEditingCamId(null); } }}
-                            className="flex-1 bg-background border border-primary/40 rounded px-2 py-0.5 text-sm text-foreground focus:outline-none"
-                            autoFocus
-                          />
-                          <button onClick={() => { setCameras(prev => prev.map(c => c.id === cam.id ? { ...c, label: editingCamLabel } : c)); setEditingCamId(null); }} className="text-primary"><Check className="w-3.5 h-3.5" /></button>
-                        </div>
-                      ) : (
-                        <div className="font-medium text-foreground">{cam.label}</div>
-                      )}
-                    </div>
-                  </div>
-                  <button onClick={() => deleteCamera(cam.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <Button onClick={addCamera} variant="outline" className="w-full gap-2">
-              <Plus className="w-4 h-4" /> Kamera hinzufügen
-            </Button>
-          </div>
-
-          <Button
-            onClick={handleStart}
-            disabled={!sessionTitle || createSession.isPending}
-            className="w-full bg-red-500 hover:bg-red-600 text-white gap-2 h-14 text-lg font-bold"
-          >
-            {createSession.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            Weiter
-          </Button>
-        </div>
-      )}
 
       {/* ── LIVE PHASE ── */}
       {sessionActive && (
@@ -494,6 +413,14 @@ export default function LiveSession() {
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Bericht wird erstellt...</>
                   : <><Square className="w-3.5 h-3.5" /> Beenden & Report erstellen</>}
               </Button>
+
+              {/* Zum Cockpit wechseln — gleiche Session, gleiche Kameras */}
+              <button
+                onClick={() => navigate('/cockpit')}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-primary/30 bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Coaching Cockpit öffnen
+              </button>
 
               {/* Funk Button — nur wenn Session aktiv */}
               {session && (

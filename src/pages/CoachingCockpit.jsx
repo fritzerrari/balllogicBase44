@@ -16,13 +16,15 @@ import StreamMonitor from '@/components/live/StreamMonitor';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Radio, Camera, Mic, MicOff, MessageSquare, Send,
-  Zap, Users, Circle, Target, Shield,
-  Copy, Check, Smartphone, Share2, Settings, Play, Pause,
+  Radio, Camera, Mic, MicOff,
+  Zap, Circle, Target, Shield,
+  Copy, Check, Smartphone, Share2, Play,
   Eye, EyeOff, Wifi, WifiOff, Video
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import EventButtons from '@/components/live/EventButtons';
 import SessionHealthCheck from '@/components/live/SessionHealthCheck';
+import FunkPanel from '@/components/live/FunkPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,10 +38,7 @@ import LiveStats from '@/components/live/LiveStats';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import NotificationBanner from '@/components/live/NotificationBanner';
 import {
-  detectFrame,
-  assignTeamsByColor,
   detectEvents,
-  smoothDetections,
   simulateDetections,
   computeStats,
 } from '@/lib/footballTracker';
@@ -101,11 +100,8 @@ export default function CoachingCockpit() {
   });
 
   const activeSession = sessions[0];
-  const cameras = activeSession?.camera_streams || [
-    { camera_id: '1', label: 'Tribüne Mitte', code: '382741', status: 'connected' },
-    { camera_id: '2', label: 'Torlinie Heim', code: '194822', status: 'connected' },
-    { camera_id: '3', label: 'Torlinie Gäste', code: '571039', status: 'waiting' },
-  ];
+  // Kameras NUR aus aktiver Session — keine Demo-Fallback-Daten
+  const cameras = activeSession?.camera_streams || [];
 
   const liveUrl = `${window.location.origin}/cam`;
 
@@ -378,11 +374,16 @@ export default function CoachingCockpit() {
       {/* Session Health Check */}
       {activeSession && <SessionHealthCheck session={activeSession} />}
 
-      {/* No session warning */}
+      {/* No session warning — mit Link zu Live-Session */}
       {!activeSession && (
-        <div className="glass rounded-xl p-3 mb-4 border border-yellow-500/20 bg-yellow-500/5 text-xs text-yellow-400 flex items-center gap-2">
-          <Radio className="w-3.5 h-3.5" />
-          Keine aktive Live-Session — Demo-Daten werden angezeigt
+        <div className="glass rounded-xl p-3 mb-4 border border-yellow-500/20 bg-yellow-500/5 text-sm text-yellow-400 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 flex-shrink-0" />
+            <span>Keine aktive Live-Session. Starte zuerst eine Session um Kameras und Tracking zu nutzen.</span>
+          </div>
+          <a href="/live" className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-xs font-bold hover:bg-yellow-500/30 transition-all">
+            → Live-Session starten
+          </a>
         </div>
       )}
 
@@ -400,34 +401,35 @@ export default function CoachingCockpit() {
             </div>
           </div>
 
-          {/* Camera grid */}
-          <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
-            {cameras.map((cam) => (
-              <CameraFeedCard
-                key={cam.camera_id}
-                cam={cam}
-                isSelected={selectedCam === cam.camera_id}
-                onSelect={() => setSelectedCam(selectedCam === cam.camera_id ? null : cam.camera_id)}
-                onShare={() => setShowShare(cam)}
-                onCopyCode={() => copyCode(cam.code || cam.camera_id)}
-                copied={copiedCode === (cam.code || cam.camera_id)}
-                liveUrl={liveUrl}
-                messages={messages[cam.camera_id] || []}
-                inputMsg={inputMsg[cam.camera_id] || ''}
-                onInputChange={(v) => setInputMsg(prev => ({ ...prev, [cam.camera_id]: v }))}
-                onSend={() => sendMessage(cam.camera_id)}
-                micActive={!!micActive[cam.camera_id]}
-                onMicToggle={() => setMicActive(prev => ({ ...prev, [cam.camera_id]: !prev[cam.camera_id] }))}
-              />
-            ))}
-            <div
-              className="aspect-video rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/30 cursor-pointer transition-all group"
-              onClick={() => setShowShare({ camera_id: 'new', label: 'Neue Kamera', code: Math.floor(100000 + Math.random() * 900000).toString() })}
-            >
-              <Camera className="w-6 h-6 group-hover:text-primary transition-colors" />
-              <span className="text-xs">+ Kamera</span>
+          {/* Camera grid — nur echte Kameras aus Session */}
+          {cameras.length === 0 ? (
+            <div className="glass rounded-xl p-8 text-center border border-dashed border-border">
+              <Camera className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Keine Kameras in dieser Session</p>
+              <p className="text-xs text-muted-foreground mt-1">Füge Kameras in der Live-Session-Einrichtung hinzu</p>
             </div>
-          </div>
+          ) : (
+            <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
+              {cameras.map((cam) => (
+                <CameraFeedCard
+                  key={cam.camera_id}
+                  cam={cam}
+                  isSelected={selectedCam === cam.camera_id}
+                  onSelect={() => setSelectedCam(selectedCam === cam.camera_id ? null : cam.camera_id)}
+                  onShare={() => setShowShare(cam)}
+                  onCopyCode={() => copyCode(cam.code || cam.camera_id)}
+                  copied={copiedCode === (cam.code || cam.camera_id)}
+                  liveUrl={liveUrl}
+                  messages={messages[cam.camera_id] || []}
+                  inputMsg={inputMsg[cam.camera_id] || ''}
+                  onInputChange={(v) => setInputMsg(prev => ({ ...prev, [cam.camera_id]: v }))}
+                  onSend={() => sendMessage(cam.camera_id)}
+                  micActive={!!micActive[cam.camera_id]}
+                  onMicToggle={() => setMicActive(prev => ({ ...prev, [cam.camera_id]: !prev[cam.camera_id] }))}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Training Config */}
           <div className="glass rounded-xl p-3 flex flex-wrap items-center gap-3">
@@ -543,69 +545,50 @@ export default function CoachingCockpit() {
           {/* Auto Event Log */}
           <EventLog events={events} />
 
-          {/* Team Broadcast */}
-          <div className="glass rounded-xl p-4">
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
-              <MessageSquare className="w-3.5 h-3.5" /> Team-Broadcast
+          {/* Funk-Kanal — echte DB-basierte Kommunikation (gleiche Session wie LiveSession) */}
+          {activeSession && (
+            <div className="glass rounded-xl overflow-hidden" style={{ height: 320 }}>
+              <FunkPanel sessionId={activeSession.id} />
             </div>
-            <div className="bg-muted rounded-lg p-3 mb-3 max-h-28 overflow-y-auto space-y-1.5">
-              {(messages['broadcast'] || []).length === 0
-                ? <div className="text-xs text-muted-foreground text-center">Nachrichten an alle Assistenten</div>
-                : (messages['broadcast'] || []).map((m, i) => (
-                  <div key={i} className="bg-primary/10 rounded-lg px-3 py-1.5 text-xs text-foreground flex justify-between">
-                    <span>{m.text}</span><span className="text-muted-foreground">{m.time}</span>
-                  </div>
-                ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nachricht an alle..."
-                value={inputMsg['broadcast'] || ''}
-                onChange={e => setInputMsg(prev => ({ ...prev, broadcast: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && sendMessage('broadcast')}
-                className="bg-muted border-border text-xs flex-1"
-              />
-              <Button size="sm" onClick={() => sendMessage('broadcast')} className="bg-primary text-primary-foreground px-3">
-                <Send className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
+          )}
 
-          {/* Camera codes */}
-          <div className="glass rounded-xl p-4">
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
-              <Smartphone className="w-3.5 h-3.5" /> Kameras einladen
-            </div>
-            <div className="space-y-2">
-              {cameras.map((cam) => {
-                 // Code: 6-stelliger Code oder neu generieren
-                 const code = cam.code || String(100000 + Math.floor(Math.random() * 900000)).slice(0, 6);
-                 const camUrl = activeSession?.id ? `${liveUrl}?session=${activeSession.id}` : '#';
-                return (
-                  <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-foreground">{cam.label || `Kamera ${cam.camera_id}`}</span>
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-primary' : 'bg-yellow-400'} animate-pulse`} />
-                        <span className={`text-[10px] ${cam.status === 'connected' ? 'text-primary' : 'text-yellow-400'}`}>
-                          {cam.status === 'connected' ? 'Verbunden' : 'Wartet'}
-                        </span>
+          {/* Camera codes — Codes kommen aus Session-DB, keine Random-Generierung */}
+          {cameras.length > 0 && (
+            <div className="glass rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                <Smartphone className="w-3.5 h-3.5" /> Kameras einladen
+              </div>
+              <div className="space-y-2">
+                {cameras.map((cam) => {
+                  // Code aus Session-Daten — KEIN Math.random() hier (würde bei jedem Render neu generieren!)
+                  const code = cam.code || cam.camera_id;
+                  const camUrl = `${liveUrl}?session=${activeSession.id}`;
+                  return (
+                    <div key={cam.camera_id} className="bg-muted rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-foreground">{cam.label || `Kamera ${cam.camera_id}`}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-primary' : 'bg-yellow-400'} animate-pulse`} />
+                          <span className={`text-[10px] ${cam.status === 'connected' ? 'text-primary' : 'text-yellow-400'}`}>
+                            {cam.status === 'connected' ? 'Verbunden' : 'Wartet'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-base font-grotesk font-bold text-primary tracking-[0.15em] flex-1 truncate">{camUrl}</div>
+                        <button onClick={() => copyCode(camUrl)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors flex-shrink-0">
+                          {copiedCode === camUrl ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                        <button onClick={() => setShowShare(cam)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors flex-shrink-0">
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-lg font-grotesk font-bold text-primary tracking-[0.2em] flex-1">{code}</div>
-                      <button onClick={() => copyCode(code)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
-                        {copiedCode === code ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => setShowShare(cam)} className="p-1.5 rounded-lg bg-background border border-border text-muted-foreground hover:text-primary transition-colors">
-                        <Share2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>
