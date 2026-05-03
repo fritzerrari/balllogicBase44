@@ -42,8 +42,9 @@ function getCircuitBreakerState(sessionId) {
 
 const THRESHOLDS = {
   CONFIDENCE_MIN: 0.5,
-  BALL_IN_PENALTY: { x_min: 0.75, x_max: 1.0, y_min: 0.2, y_max: 0.8 },
-  BALL_IN_GOAL_AREA: { x_min: 0.88, x_max: 1.0, y_min: 0.3, y_max: 0.7 },
+  // Coordinates are 0-100 (normalized from image pixels)
+  BALL_IN_PENALTY: { x_min: 75, x_max: 100, y_min: 20, y_max: 80 },
+  BALL_IN_GOAL_AREA: { x_min: 88, x_max: 100, y_min: 30, y_max: 70 },
 };
 
 /**
@@ -280,8 +281,8 @@ Deno.serve(async (req) => {
     // Load active model from AppSetting (with fallback to default)
     let activeModel = DEFAULT_MODEL;
     try {
-    const settings = await base44.asServiceRole.entities.AppSetting.filter({ key: 'roboflow_model' });
-    if (settings?.[0]?.value) activeModel = settings[0].value;
+      const settings = await base44.asServiceRole.entities.AppSetting.filter({ key: 'roboflow_model' });
+      if (settings?.[0]?.value) activeModel = settings[0].value;
     } catch (_) { /* use default */ }
 
     detections = await callRoboflowWithRetry(frame_base64, session_id, activeModel);
