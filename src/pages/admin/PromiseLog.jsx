@@ -57,6 +57,14 @@ const initialPromises = [
     reality: 'Grafik komplett in CameraView, Kamerassistent sah nichts',
     status: 'false',
     credits: 180
+  },
+  {
+    id: 7,
+    date: '2026-05-03 14:30',
+    promise: 'Camera-Links mit Copy-Button + "Auf Handy öffnen" in LiveSession angezeigt',
+    reality: 'Links sind NICHT sichtbar in der UI — wieder Halluzinationen',
+    status: 'false',
+    credits: 160
   }
 ];
 
