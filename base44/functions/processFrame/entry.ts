@@ -421,6 +421,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing session_id or frame_base64' }, { status: 400 });
     }
 
+    // Auto-ensure SessionState exists (one-time per session)
+    try {
+      const stateCheck = await base44.asServiceRole.entities.SessionState.filter({ session_id });
+      if (stateCheck.length === 0) {
+        await base44.asServiceRole.entities.SessionState.create({
+          session_id,
+          frame_count: 0,
+          last_frame_number: 0,
+          possession_percentage: { home: 50, away: 50, last_updated_frame: 0 },
+          detection_quality_avg: 0,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
     // Load settings from AppSettings (workflow ID + team references)
     let teamReferences = null;
     let workflowUrl = WORKFLOW_URL;

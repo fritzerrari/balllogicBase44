@@ -16,6 +16,20 @@ import LiveSessionStats from './LiveSessionStats';
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export default function LiveSessionActive({ session, onStop, isFinishing }) {
+  // Auto-create SessionState if missing
+  const [_sessionStateInit] = useState(() => {
+    if (session) {
+      base44.entities.SessionState.create({
+        session_id: session.id,
+        frame_count: 0,
+        last_frame_number: 0,
+        possession_percentage: { home: 50, away: 50, last_updated_frame: 0 },
+        detection_quality_avg: 0,
+        updated_at: new Date().toISOString(),
+      }).catch(() => {}); // Silent if already exists
+    }
+    return null;
+  });
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [eventCount, setEventCount] = useState(0);
   const [halfTime, setHalfTime] = useState(1);
