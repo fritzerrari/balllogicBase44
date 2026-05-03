@@ -12,7 +12,9 @@ import { base44 } from '@/api/base44Client';
 
 const CAPTURE_INTERVAL_BASE_MS = 3000; // 3s wie vom Workflow empfohlen
 const CAPTURE_INTERVAL_MAX_MS = 10000; // max 10s wenn Fehler
-const FRAME_QUALITY = 0.65;
+const FRAME_QUALITY_HIGH = 0.75;  // Good network
+const FRAME_QUALITY_MEDIUM = 0.65; // Normal network (default)
+const FRAME_QUALITY_LOW = 0.45;   // Poor network
 const MAX_CONSECUTIVE_ERRORS = 10;
 const RECONNECT_DELAY_MS = 3000;
 
@@ -65,10 +67,15 @@ export default function useFrameCapture(
           return;
         }
 
-        // Canvas → Base64 (schnell)
+        // Canvas → Base64 (adaptive quality based on error rate)
         let base64Frame;
         try {
-          base64Frame = canvas.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1];
+          const quality = errorCountRef.current > 5 
+            ? FRAME_QUALITY_LOW 
+            : errorCountRef.current > 2 
+            ? FRAME_QUALITY_MEDIUM 
+            : FRAME_QUALITY_HIGH;
+          base64Frame = canvas.toDataURL('image/jpeg', quality).split(',')[1];
         } catch (e) {
           console.warn('⚠️ Canvas encode error');
           return;

@@ -27,8 +27,12 @@ const CIRCUIT_BREAKER_THRESHOLD = 8;
 const CIRCUIT_BREAKER_RESET_MS = 30000;
 
 // Multi-Frame History cache (in-memory, last N frames per session for sprint detection)
+// Note: Für Produktion sollte SessionState DB-Entity genutzt werden (siehe sessionState.last_20_frames)
 const frameHistoryBySession = new Map();
 const FRAME_HISTORY_SIZE = 10;
+
+// Auto-sync to DB every 30 frames (optional, für Restart-Resilienz)
+const PERSIST_HISTORY_INTERVAL = 30;
 
 function getCB(sessionId) {
   if (!circuitBreakerBySession.has(sessionId)) {
@@ -216,14 +220,14 @@ function rgbDistance(r1, g1, b1, r2, g2, b2) {
 }
 
 function classifyPlayerTeam(playerX, playerY, playerW, playerH, teamReferences) {
-  // Without actual pixel data here, we use tracker_id parity as fallback
-  // Real color classification happens when reference colors are stored in AppSettings
-  if (!teamReferences || !teamReferences.team_a_color) return 'home';
-
-  // teamReferences: { team_a_color: {r,g,b}, team_b_color: {r,g,b}, referee_color: {r,g,b} }
-  // Without canvas pixel access in Deno, we return 'home'/'away' based on tracker_id
-  // Full color classification would require passing cropped pixel data from frontend
-  return null; // signals to use tracker_id fallback
+  // FALLBACK: Ohne echte Pixeldaten können wir nur Position nutzen
+  // Team-Zuordnung: HOME meist links (x < 50), AWAY meist rechts (x >= 50)
+  // Die echte Klassifizierung geschieht durch Anstoß-Erkennung in LiveSession
+  if (!teamReferences) return null; // Signals to use position-based fallback
+  
+  // Wenn Team-Referenzen vorhanden: color-based classification (zukünftige Enhancement)
+  // For now: position-based heuristic für initiale Zuweisung
+  return null; // Let assignTeams() use kickoffData position-based matching
 }
 
 /**
@@ -367,18 +371,34 @@ function detectSprints(players, prevPlayerMap = null) {
 
 /**
  * Auto-event detection from ball position
+ * 
+ * Noise filter: Events nur triggern wenn Ball Bereich BETRITT, nicht bei jedem Frame IN area
+ * Tracking: lastBallZone speichert last 5 Frames
  */
-function detectAutoEvents(ballPos, minute, elapsedSeconds) {
+const lastBallZoneBySession = new Map(); // session_id -> { zone, frameCount }
+function detectAutoEvents(ballPos, minute, elapsedSeconds, sessionId) {
   const events = [];
   if (!ballPos || ballPos.confidence < 50) return events;
 
-  // Ball in penalty area (right side: x > 75, y between 20-80)
-  if (ballPos.x >= 75 && ballPos.y >= 20 && ballPos.y <= 80) {
-    events.push({ type: 'ball_in_penalty_area', confidence: ballPos.confidence, minute, elapsed_seconds: elapsedSeconds });
+  const ballZone = ballPos.x > 88 ? 'goal' : ballPos.x >= 75 ? 'penalty' : 'midfield';
+  const lastZone = lastBallZoneBySession.get(sessionId) || { zone: 'midfield', frameCount: 0 };
+
+  // nur triggern bei NEUER Zone (zone change detection)
+  if (ballZone !== lastZone.zone) {
+    if (ballZone === 'goal' && ballPos.y >= 30 && ballPos.y <= 70) {
+      events.push({ type: 'ball_in_goal_area', confidence: Math.min(100, ballPos.confidence * 1.1), minute, elapsed_seconds: elapsedSeconds });
+    } else if (ballZone === 'penalty' && ballPos.y >= 20 && ballPos.y <= 80) {
+      events.push({ type: 'ball_in_penalty_area', confidence: ballPos.confidence, minute, elapsed_seconds: elapsedSeconds });
+    }
   }
-  // Ball in goal area (right side: x > 88, y between 30-70)
-  if (ballPos.x >= 88 && ballPos.y >= 30 && ballPos.y <= 70) {
-    events.push({ type: 'ball_in_goal_area', confidence: Math.min(100, ballPos.confidence * 1.1), minute, elapsed_seconds: elapsedSeconds });
+
+  // Update tracker
+  lastBallZoneBySession.set(sessionId, { zone: ballZone, frameCount: (lastZone.frameCount || 0) + 1 });
+
+  // Cleanup old entries
+  if (lastBallZoneBySession.size > 500) {
+    const arr = [...lastBallZoneBySession.keys()];
+    arr.slice(0, 100).forEach(k => lastBallZoneBySession.delete(k));
   }
 
   return events;
@@ -591,8 +611,8 @@ Deno.serve(async (req) => {
 
     const minute = Math.floor(elapsed_seconds / 60);
 
-    // Auto-events
-    const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds);
+    // Auto-events (with noise filtering)
+    const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds, session_id);
 
     // Formation erkennen (live, alle 30 Frames)
     let formationChange = null;
