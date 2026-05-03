@@ -14,8 +14,7 @@ import { useNavigate } from 'react-router-dom';
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'Spiele', icon: Video, path: '/matches' },
-  { label: 'Live-Analyse', icon: Radio, path: '/live', badge: 'LIVE' },
-  { label: 'Coaching Cockpit', icon: Tv2, path: '/cockpit' },
+  { label: 'Live-Session', icon: Radio, path: '/live', badge: 'LIVE' },
   { label: 'Taktik-Board', icon: BarChart3, path: '/tactics', hideOnSidebar: true },
   { label: 'Reports', icon: FileText, path: '/reports' },
 ];
