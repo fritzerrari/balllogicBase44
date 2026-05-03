@@ -26,6 +26,10 @@ const circuitBreakerBySession = new Map();
 const CIRCUIT_BREAKER_THRESHOLD = 8;
 const CIRCUIT_BREAKER_RESET_MS = 30000;
 
+// Multi-Frame History cache (in-memory, last N frames per session for sprint detection)
+const frameHistoryBySession = new Map();
+const FRAME_HISTORY_SIZE = 10;
+
 function getCB(sessionId) {
   if (!circuitBreakerBySession.has(sessionId)) {
     circuitBreakerBySession.set(sessionId, { open: false, failures: 0, lastFailTime: 0 });
@@ -220,6 +224,66 @@ function classifyPlayerTeam(playerX, playerY, playerW, playerH, teamReferences) 
   // Without canvas pixel access in Deno, we return 'home'/'away' based on tracker_id
   // Full color classification would require passing cropped pixel data from frontend
   return null; // signals to use tracker_id fallback
+}
+
+/**
+ * Calculate Ball Possession — wer hat den Ball (nächster Spieler)
+ */
+function calculateBallPossession(ballPos, players) {
+  if (!ballPos || players.length === 0) return null;
+  
+  let closestPlayer = null;
+  let minDist = Infinity;
+  
+  players.forEach(p => {
+    const dist = Math.sqrt((p.x - ballPos.x) ** 2 + (p.y - ballPos.y) ** 2);
+    if (dist < minDist && dist < 8) { // Max 8% des Feldes Distanz
+      minDist = dist;
+      closestPlayer = p;
+    }
+  });
+  
+  return closestPlayer ? {
+    player_id: closestPlayer.player_id || closestPlayer.tracker_id,
+    team: closestPlayer.team,
+    distance_to_ball: Math.round(minDist * 100) / 100,
+    confidence: Math.max(0, 100 - minDist * 10),
+  } : null;
+}
+
+/**
+ * Detect sprints from multi-frame history
+ * Nutzt letzten N Frames pro tracker_id um echte Geschwindigkeit zu berechnen
+ */
+function detectSprintsFromHistory(sessionId, currentPlayers, frameHistory) {
+  const sprints = [];
+  if (frameHistory.length < 3) return sprints; // Mindestens 3 Frames für Trend
+  
+  const currentFrame = frameHistory[frameHistory.length - 1];
+  const prevFrame = frameHistory[frameHistory.length - 2];
+  if (!prevFrame) return sprints;
+  
+  currentPlayers.forEach(p => {
+    const trackerId = p.tracker_id;
+    if (trackerId === null) return;
+    
+    const prev = prevFrame.players?.find(pp => pp.tracker_id === trackerId);
+    if (!prev) return;
+    
+    // Bewegung in Prozent des Feldes pro Frame (50ms = 0.05s)
+    const dist = Math.sqrt((p.x - prev.x) ** 2 + (p.y - prev.y) ** 2);
+    // Schwelle: > 5% Feldbreite pro Frame = ~10 m/s = Sprint
+    if (dist > 5) {
+      sprints.push({
+        tracker_id: trackerId,
+        team: p.team,
+        distance_per_frame: Math.round(dist * 100) / 100,
+        intensity: Math.min(100, dist * 15),
+      });
+    }
+  });
+  
+  return sprints;
 }
 
 /**
@@ -427,6 +491,23 @@ Deno.serve(async (req) => {
       };
     });
 
+    // ── Ball Possession ────────────────────────────────────────────────────
+    const ballPossession = calculateBallPossession(ballPos, playerPositions);
+
+    // ── Multi-Frame History ────────────────────────────────────────────────
+    let frameHistory = frameHistoryBySession.get(session_id) || [];
+    frameHistory.push({
+      timestamp_ms: Date.now(),
+      frame_number,
+      players: playerPositions,
+      ball: ballPos,
+    });
+    frameHistory = frameHistory.slice(-FRAME_HISTORY_SIZE);
+    frameHistoryBySession.set(session_id, frameHistory);
+
+    // Sprint detection from history
+    const sprints = detectSprintsFromHistory(session_id, playerPositions, frameHistory);
+
     // Quality score
     const qualityScore = Math.round(
       (ballPos ? 50 : 0) + Math.min(50, (players.length / 22) * 50)
@@ -446,9 +527,6 @@ Deno.serve(async (req) => {
 
     // Auto-events
     const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds);
-
-    // Sprints erkennen (benötigt History — hier nur Stub)
-    const sprints = detectSprints(players);
 
     // Formation erkennen (live, alle 30 Frames)
     let formationChange = null;
@@ -472,6 +550,7 @@ Deno.serve(async (req) => {
         timestamp_ms: Date.now(),
         elapsed_seconds,
         ball_position: ballPos,
+        ball_possession: ballPossession,
         player_positions: playerPositions,
         detection_quality: qualityScore,
         source,

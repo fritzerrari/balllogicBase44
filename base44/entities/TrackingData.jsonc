@@ -37,6 +37,30 @@
         }
       }
     },
+    "ball_possession": {
+      "type": "object",
+      "description": "Wer hat den Ball (n\u00e4chster Spieler)",
+      "properties": {
+        "player_id": {
+          "type": "string"
+        },
+        "team": {
+          "type": "string",
+          "enum": [
+            "home",
+            "away"
+          ]
+        },
+        "distance_to_ball": {
+          "type": "number",
+          "description": "Distanz zum Ball in % des Feldes"
+        },
+        "confidence": {
+          "type": "number",
+          "description": "0-100 Ballbesitz-Konfidenz"
+        }
+      }
+    },
     "player_positions": {
       "type": "array",
       "description": "Array aller erkannten Spieler",
@@ -61,6 +85,10 @@
           },
           "confidence": {
             "type": "number"
+          },
+          "tracker_id": {
+            "type": "number",
+            "description": "Roboflow tracker ID f\u00fcr Multi-Frame-Matching"
           }
         }
       }
