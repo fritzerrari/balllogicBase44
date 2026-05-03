@@ -36,11 +36,8 @@ import CoveragePitchOverlay from '@/components/pitch/CoveragePitchOverlay';
 import SessionHealthCheck from '@/components/live/SessionHealthCheck';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import NotificationBanner from '@/components/live/NotificationBanner';
-import useCameraConnections from '@/hooks/useCameraConnections';
 import useFrameCapture from '@/hooks/useFrameCapture';
-import useStreamHealth from '@/hooks/useStreamHealth';
 import useRealTimeTracking from '@/hooks/useRealTimeTracking';
-import useCameraStreamManager from '@/hooks/useCameraStreamManager';
 import {
   detectEvents,
   simulateDetections,
@@ -103,15 +100,15 @@ export default function IntegratedLiveSession() {
   const { data: sessions = [] } = useQuery({
     queryKey: ['liveSessions'],
     queryFn: () => base44.entities.LiveSession.filter({ status: 'active' }),
-    refetchInterval: 3000,
-    staleTime: 1000,
+    refetchInterval: 5000,
+    staleTime: 2000,
   });
 
   const { data: players = [] } = useQuery({
     queryKey: ['players'],
     queryFn: () => base44.entities.Player.list('-created_date', 100),
-    refetchInterval: 30000,
-    staleTime: 20000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   const activeSession = sessions[0];
@@ -121,10 +118,7 @@ export default function IntegratedLiveSession() {
   const createSession = useMutation({ mutationFn: (data) => base44.entities.LiveSession.create(data) });
   const updateSession = useMutation({ mutationFn: ({ id, data }) => base44.entities.LiveSession.update(id, data) });
 
-  // ── HOOKS ──────────────────────────────────────────────────────────
-  const { cameraHealth, globalHealth } = useStreamHealth();
-  const { cameraStates, globalStatus, connectedCount, totalCount } = useCameraStreamManager(activeSession?.id, true);
-  const { readyToTrack } = useCameraConnections(activeSession?.id, true);
+  // ── HOOKS (REDUCED POLLING) ────────────────────────────────────────
   const { status: trackingStreamStatus, stats: trackingStats } = useFrameCapture(
     hiddenCanvasRef,
     activeSession?.id,
@@ -172,7 +166,7 @@ export default function IntegratedLiveSession() {
         setStatsHistory(prev => [...prev.slice(-30), players]);
         prevPlayers = players;
 
-        if (newTick % 40 === 0) {
+        if (newTick % 80 === 0) {
           const simEvents = detectEvents(players, [], { left: 2, right: 98, top: 2, bottom: 98 });
           if (simEvents.length > 0) {
             setEvents(prev => [
@@ -279,19 +273,21 @@ export default function IntegratedLiveSession() {
           id: session.id,
           data: { status: 'ended', ended_at: new Date().toISOString() },
         });
-        await base44.functions.invoke('finalizeSession', { session_id: session.id });
+        base44.functions.invoke('finalizeSession', { session_id: session.id }).catch(() => {});
       }
     } catch (err) {
-      console.error('❌ Session finalization failed:', err);
+      console.warn('⚠️ Session stop warning:', err.message);
     }
 
     setFinishing(false);
     setPhase('setup');
     setSession(null);
     queryClient.invalidateQueries({ queryKey: ['liveSessions'] });
-    if (session?.match_id) {
-      navigate(`/analytics?match=${session.match_id}`);
-    }
+    setTimeout(() => {
+      if (session?.match_id) {
+        navigate(`/analytics?match=${session.match_id}`);
+      }
+    }, 500);
   };
 
   const handleStartHalfTwo = () => {
@@ -483,8 +479,8 @@ export default function IntegratedLiveSession() {
             </div>
 
             <div className="glass rounded-xl p-3">
-              <div className="text-xs text-muted-foreground uppercase font-bold mb-2">Event tippen</div>
-              <EventButtons sessionId={session.id} matchId={session.match_id} matchTitle={sessionTitle} source="coach" elapsedSeconds={elapsedTime} compact onEventLogged={() => setEventCount(c => c + 1)} />
+            <div className="text-xs text-muted-foreground uppercase font-bold mb-2">Event tippen</div>
+            <EventButtons sessionId={session.id} matchId={session.match_id} matchTitle={sessionTitle} source="coach" elapsedSeconds={elapsedTime} compact onEventLogged={() => setEventCount(c => c + 1)} onError={() => null} />
             </div>
           </div>
 
@@ -598,10 +594,9 @@ export default function IntegratedLiveSession() {
 
             <div className="lg:col-span-5 space-y-4">
               <LiveStats stats={stats} playerCounts={playerCounts} />
-              <StreamMonitor cameraHealth={cameraHealth} globalHealth={globalHealth} />
               {session && <LiveTrackingPanel sessionId={session.id} />}
               {session && <div className="glass rounded-xl overflow-hidden" style={{ height: 360 }}><FunkPanel sessionId={session.id} /></div>}
-              <div className="glass rounded-xl p-4"><div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3"><Target className="w-3.5 h-3.5 inline mr-2" /> Ereignis tippen</div><EventButtons sessionId={session.id} matchId={session.match_id} matchTitle={sessionTitle} source="coach_analysis" elapsedSeconds={0} compact /></div>
+              <div className="glass rounded-xl p-4"><div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3"><Target className="w-3.5 h-3.5 inline mr-2" /> Ereignis tippen</div><EventButtons sessionId={session.id} matchId={session.match_id} matchTitle={sessionTitle} source="coach_analysis" elapsedSeconds={0} compact onError={() => null} /></div>
               <EventLog events={events} />
             </div>
           </div>
