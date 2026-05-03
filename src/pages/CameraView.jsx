@@ -38,8 +38,9 @@ export default function CameraView() {
         setSession(s);
         // Mark this specific camera as connected in the session
         if (s && s.camera_streams) {
+          const camIdStr = String(cameraId);
           const updatedStreams = s.camera_streams.map(c =>
-            c.camera_id === cameraId
+            String(c.camera_id) === camIdStr
               ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
               : c
           );
@@ -58,16 +59,17 @@ export default function CameraView() {
   // Heartbeat — update camera last_seen every 3s for faster connection feedback
   useEffect(() => {
     if (!sessionId || !session) return;
+    const camIdStr = String(cameraId);
     const hb = setInterval(() => {
       const updatedStreams = session.camera_streams?.map(c =>
-        c.camera_id === cameraId
+        String(c.camera_id) === camIdStr
           ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
           : c
       );
       if (updatedStreams) {
         base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams }).catch(() => {});
       }
-    }, 3000); // Schneller Heartbeat für schnellere Verbindungserkennung
+    }, 3000);
     return () => clearInterval(hb);
   }, [sessionId, session, cameraId]);
 
@@ -128,15 +130,16 @@ export default function CameraView() {
       if (!base64 || base64.length < 100) return;
 
       try {
-        const clientSentTime = Date.now(); // Frame latency tracking
+        const clientSentTime = Date.now();
         const res = await base44.functions.invoke('processFrame', {
           session_id: sessionId,
           frame_base64: base64,
-          frame_number: frameNumber++,
+          frame_number: frameNumber,
           elapsed_seconds: elapsedSeconds,
-          team: 'home',
+          camera_id: cameraId,
           client_sent_timestamp: clientSentTime,
         });
+        frameNumber++;
         if (res?.data?.success) {
           setTrackingStatus(res.data.tracking_status || {
             status: res.data.ball_detected ? 'active' : 'partial',
@@ -149,17 +152,17 @@ export default function CameraView() {
         // Auto-detect camera field bounds einmalig
         if (!fieldBoundsDetected && frameNumber === 1) {
           fieldBoundsDetected = true;
+          const camIdStr = String(cameraId);
           base44.functions.invoke('detectCameraFieldBounds', {
             frame_base64: base64,
             camera_id: cameraId,
             session_id: sessionId,
           }).then(bounds => {
             if (bounds?.data?.coverage_polygon) {
-              // Speichere Coverage in Session
               base44.entities.LiveSession.filter({ id: sessionId }).then(sessions => {
                 if (sessions[0]) {
                   const updatedStreams = sessions[0].camera_streams.map(s =>
-                    s.camera_id === cameraId
+                    String(s.camera_id) === camIdStr
                       ? { ...s, coverage_polygon: bounds.data.coverage_polygon }
                       : s
                   );

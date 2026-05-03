@@ -125,12 +125,14 @@ export default function LiveSession() {
     // ⚠️ CRITICAL: Server-side check (Race Condition Fix)
     try {
       const serverActiveSessions = await base44.entities.LiveSession.filter({ status: 'active' });
-      if (serverActiveSessions.length > 0) {
-        alert(`🛑 Eine Session läuft noch:\n\n${serverActiveSessions.map(s => `• ${s.match_title}`).join('\n')}\n\nBeende diese zuerst mit "Beenden & Report erstellen"`);
+      if (serverActiveSessions && Array.isArray(serverActiveSessions) && serverActiveSessions.length > 0) {
+        alert(`🛑 Eine Session läuft noch:\n\n${serverActiveSessions.map(s => `• ${s.match_title || 'Unbekannt'}`).join('\n')}\n\nBeende diese zuerst mit "Beenden & Report erstellen"`);
         return;
       }
     } catch (err) {
-      console.error('Session check failed:', err);
+      console.error('❌ Session check failed:', err);
+      alert('⚠️ Konnte aktive Sessions nicht prüfen. Versuche erneut.');
+      return;
     }
 
     let matchId = null;
