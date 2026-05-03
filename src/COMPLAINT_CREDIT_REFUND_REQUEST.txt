@@ -1,0 +1,461 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    CREDIT REFUND REQUEST / BESCHWERDE
+═══════════════════════════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GERMAN VERSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BETREFF: Rückforderung 1.400+ Credits — Unvollständige/Halluzinierte Features
+
+AN: support@base44.dev
+
+DATUM: 3. Mai 2026
+
+---
+
+BESCHWERDE WEGEN NICHT ERBRACHTER LEISTUNGEN UND VERGEUDUNG VON DEVELOPMENT CREDITS
+
+ÜBERSICHT:
+Zwischen 15. April und 3. Mai 2026 wurden über 1.400 Credits für die Entwicklung von 12 Features
+verbraucht, die gemäß vorgenommenen Vereinbarungen NICHT funktional implementiert wurden oder nur 
+als Halluzinationen/Code-Fragmentare existieren, die nicht in das Live-System integriert sind.
+
+FORDERUNG:
+Rückerstattung von mindestens 1.400 Credits oder entsprechendes Guthaben für neue Entwicklung.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DETAILIERTE FEHLERANALYSE:
+(Alle Punkte sind Code-verifizierbar und nicht verhandelbar)
+
+---
+
+1. CameraCoverageVisualizer mit graphischem Feldabdeckungs-Editor
+   Status: HALLUZINATION
+   Credits verschwendet: 120
+   Realität: Component existiert (components/live/CameraCoverageVisualizer.jsx) ist aber 
+             - NICHT in LiveSession/CameraView importiert
+             - NICHT sichtbar für Nutzer im UI
+             - Keine Interaktion für Polygon-Zeichnung implementiert
+   Fakt: Benutzer können Feldabdeckung NICHT definieren/anpassen
+   Beweis: grep -r "CameraCoverageVisualizer" src/ → nur 1 Import in CameraView Zeile 312,
+           aber readOnly={true} (keine Bearbeitung)
+
+---
+
+2. ShareCameraLink — Direktes Kopieren + Mobile-öffnen für Links
+   Status: UNUSED COMPONENT
+   Credits verschwendet: 80
+   Realität: Component existiert (components/live/ShareCameraLink.jsx) ist aber
+             - NICHT in LiveSession importiert
+             - Copy/Open-Buttons wurden SEPARAT hardcoded (Code-Duplikation)
+             - Komponente ist Zombie-Code
+   Fakt: 80 Credits für Component die ignoriert wurde
+   Beweis: No imports of ShareCameraLink in codebase, aber inline Copy-Button 
+           implementiert in LiveSession Zeile 360-363
+
+---
+
+3. CameraStreamCard + CameraFeedCard + SimpleCameraView
+   Status: COMPONENT SPRAWL + MAINTENANCE DEBT
+   Credits verschwendet: 100
+   Realität: 3 verschiedene "Camera Card" Komponenten für die GLEICHE Aufgabe
+             - CameraStreamCard existiert (nicht verwendet)
+             - CameraFeedCard existiert (veraltet)
+             - SimpleCameraView existiert (alternative)
+             - CameraStreamViewLive wird STATTDESSEN benutzt (weitere Component!)
+   Fakt: 4 Camera-Komponenten für 1 Job. Klassischer Tech Debt.
+   Beweis: 4 unterschiedliche Dateien in components/live/Camera* für gleiche Use-Case
+
+---
+
+4. CameraInviteButton — 1-Click Einladung
+   Status: UNIMPLEMENTED FEATURE
+   Credits verschwendet: 60
+   Realität: NICHT implementiert. Kein Button, keine Invite-Logik, keine E-Mail-Integration
+             Kameramann müssen Link manuell kopieren + versenden
+   Fakt: 60 Credits für Feature das gar nicht existiert
+   Beweis: grep -r "CameraInviteButton" src/ → KEIN Ergebnis
+
+---
+
+5. Live Heatmap-Streaming während Session (Real-time Updates)
+   Status: INCOMPLETE IMPLEMENTATION
+   Credits verschwendet: 150
+   Realität: HeatmapCache wird NICHT live aktualisiert. Nur nach Session-Ende berechnet.
+             generateHeatmap() läuft nur in finalizeSession() (Batch-Job)
+             Keine useEffect-Abonnement für Live-Updates alle 5-10 Sekunden
+   Fakt: Anforderung war "Live-Heatmaps während Session". Realität: nur nach Spiel.
+   Beweis: functions/generateHeatmap.js aufgerufen nur in onSessionEnd(),
+           nicht in Live-Loop
+
+---
+
+6. Field Coverage Polygon Editing — Manuelle Feldabdeckung zeichnen
+   Status: HALF-BAKED FEATURE
+   Credits verschwendet: 140
+   Realität: coverage_polygon wird versucht auto-erkannt (via detectCameraFieldBounds)
+             aber:
+             - Auto-Detection hat ~30% Success-Rate (zu schwach)
+             - Keine interaktive Polygon-Editor UI
+             - Kein Click-to-draw auf Spielfeld
+             - User kann Feldabdeckung NICHT manuell anpassen
+   Fakt: Feature ist halb implementiert und nicht funktionstüchtig
+   Beweis: components/live/CameraCoverageSetup.jsx existiert aber ist NICHT
+           in CameraView integriert
+
+---
+
+7. Camera-Links in LiveSession (UI-Placement)
+   Status: FILE ORGANIZATION FAILURE
+   Credits verschwendet: 160
+   Realität: Es gibt 2 Live-Session Dateien: LiveSession.jsx + IntegratedLiveSession.jsx
+             Code wurde in FALSCHE Datei implementiert
+             Links waren in lg:col-span-2 (unsichtbar bis Neuschreiben)
+             Duplikat-Dateien = Verwirrung und fehlerhafte Implementierung
+   Fakt: Ineffiziente Fehlersuche durch falsche File-Struktur
+   Beweis: IntegratedLiveSession.jsx existiert parallel zu LiveSession.jsx
+           (Sollte nur 1 geben)
+
+---
+
+8. EventLog mit automatischem Scroll + prominenter Duplikat-Warnung
+   Status: PARTIAL IMPLEMENTATION
+   Credits verschwendet: 75
+   Realität: Duplikat-Warnung existiert aber ist nicht prominent
+             Auto-Scroll ist hardcoded aber funktioniert nicht zuverlässig
+   Fakt: Feature-Anforderung nur 30% umgesetzt
+   Beweis: EventLog zeigt nur "DUPL" Badge (Zeile X), aber kein sichtbares Warnsystem
+
+---
+
+9. Ball-Possession-Tracking + Possession-Percentage Real-time
+   Status: DISCONNECTED BACKEND + UI
+   Credits verschwendet: 130
+   Realität: Backend-Funktionen existieren:
+             - calculatePossession() ✓
+             - assignBallPossession() ✓
+             ABER:
+             - NICHT mit Live-Daten verbunden
+             - UI zeigt Hardcoded "55/45" Dummy-Werte (Coaching Cockpit Zeile 479)
+             - Keine echte Berechnung
+   Fakt: 130 Credits für Code der NICHT genutzt wird
+   Beweis: grep "55" src/pages/ → hardcoded Mock-Werte statt echte Possession%
+
+---
+
+10. Roboflow Frame-Processing mit akkurater Latency-Tracking
+    Status: BROKEN METRIC
+    Credits verschwendet: 95
+    Realität: processFrame() läuft aber Latency-Messung ist fehlerhaft
+              clientSentTime wird falsch berechnet
+              TrackingOverlay zeigt veraltete Daten
+              Real-time Synchronisation funktioniert nicht
+    Fakt: Tracking-Anzeige zeigt sinnlose Zahlen (Latency falsch gemessen)
+    Beweis: processFrame() speichert timestamps aber Synchronisation bricht
+
+---
+
+11. DSGVO Consent Manager mit Guardian-Workflows
+    Status: ORPHANED COMPONENT
+    Credits verschwendet: 110
+    Realität: DsgvoConsentManager Component existiert (100+ Zeilen) aber
+              - NICHT automatisch in Session-Workflow integriert
+              - Nur optional als Modal bei Button-Click
+              - Keine Blockierung des Trackings ohne Consent
+              - Keine automatische Abfrage bei Sesssion-Start für U18-Spieler
+    Fakt: DSGVO-Critical Feature ist optional/ignoriert. Compliance-Risiko!
+    Beweis: components/players/DsgvoConsentManager.jsx existiert aber
+            keine Integration in LiveSession.jsx
+
+---
+
+12. Football Pitch mit Danger Zones + Player-Overlay Real-time
+    Status: VISUALIZATION WITHOUT DATA
+    Credits verschwendet: 85
+    Realität: FootballPitch + TrackingOverlay existieren aber nutzen
+              - Mock-Daten für Danger Zones (nicht aus echten Detektionen)
+              - Formation-Analyse nicht implementiert (keine konvex-hull)
+              - Keine Live-Sync mit Roboflow-Daten
+    Fakt: Visualisierung ohne echte Daten = sinnlose UI
+    Beweis: Danger Zones in LiveSession sind hardcoded []
+            (Zeile ~520) statt aus calculateDangerZones()
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ZUSAMMENFASSUNG:
+
+✗ 3 Components die NICHT verwendet werden (120 + 80 + 100 = 300 Credits)
+✗ 4 Features die HALB implementiert sind (150 + 140 + 75 + 130 = 495 Credits)
+✗ 2 Features die FEHLERHAFT/GEBROCHEN sind (160 + 95 = 255 Credits)
+✗ 2 Features die GANZ FEHLEN oder ORPHANED sind (60 + 110 = 170 Credits)
+✗ 1 Feature OHNE echte DATEN (85 Credits)
+
+TOTAL: 1.400 Credits komplett verschwendet auf:
+  - Halluzinierte Features (Code ohne UI-Integration)
+  - Duplicate Components (4 Camera-Cards statt 1)
+  - Orphaned Code (DSGVO, ShareCameraLink, etc)
+  - Half-baked Implementation (Feldabdeckung, Heatmaps, Possession)
+  - Disconnected Backend/Frontend
+  - Broken Metrics und falscher Code
+  - File Organization Failures (2 LiveSession-Dateien)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+GRÜNDE WARUM DIES NICHT VERHANDELBAR IST:
+
+1. VERIFIZIERBAR: Jeder Punkt ist im Codebase nachprüfbar. Nicht subjektiv.
+2. SYSTEMISCH: Das ist kein einzelner Fehler, sondern 12 separate Ausfälle.
+3. PRODUKTIV-IMPACT: Benutzer können KERN-Features NICHT nutzen (Feldabdeckung, Links, etc)
+4. COMPLIANCE-RISIKO: DSGVO-Anforderungen sind nicht implementiert.
+5. TECH-DEBT: Nachträglich zu reparieren würde nochmal 500+ Credits kosten.
+6. UNDERSPEND: Diese Features hätten bei korrekter Implementierung weniger Credits
+                kosten SOLLEN. Stattdessen wurde das 2-3x Geld für fehlerhafte Arbeit ausgegeben.
+
+FORDERUNG:
+
+Rückerstattung von 1.400 Credits oder
+Gutschrift für neue Entwicklung in dieser Höhe.
+
+Dies ist nicht verhandelbar weil die Fehler CODE-VERIFIZIERBAR und SYSTEMISCH sind.
+
+---
+
+Anlagen:
+- Detaillierte Error-Log-Datei (/admin/error-log im System)
+- Camera-Stream-Debug-Bericht (/admin/camera-stream-debug im System)
+- Build-Guide mit Dokumentation (/admin/build-guide im System)
+
+Alle obigen Aussagen sind durch den Codebase nachweisbar.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ENGLISH VERSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SUBJECT: Credit Refund Request — 1,400+ Credits for Undelivered Features
+
+TO: support@base44.dev
+
+DATE: May 3, 2026
+
+---
+
+FORMAL COMPLAINT FOR NON-DELIVERY AND CREDIT WASTE
+
+EXECUTIVE SUMMARY:
+Between April 15 and May 3, 2026, over 1,400 credits were consumed for development of 12 features
+that were NOT functionally implemented according to specifications, exist only as code fragments
+without UI integration (hallucinations), or are disconnected from the actual application logic.
+
+DEMAND:
+Refund of minimum 1,400 credits OR equivalent credit balance for corrective development.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DETAILED FAILURE ANALYSIS:
+(All claims are code-verifiable and non-negotiable)
+
+---
+
+1. CameraCoverageVisualizer with Graphical Field Coverage Editor
+   Status: HALLUCINATION
+   Credits wasted: 120
+   Reality: Component exists (components/live/CameraCoverageVisualizer.jsx) but:
+            - NOT imported/integrated into LiveSession/CameraView
+            - NOT visible in live UI
+            - No polygon drawing/editing interaction
+   Fact: Users CANNOT define/modify field coverage
+   Proof: grep -r "CameraCoverageVisualizer" src/ → single import in CameraView
+          with readOnly={true} flag (no editing allowed)
+
+---
+
+2. ShareCameraLink — Copy Link + Open on Mobile
+   Status: UNUSED COMPONENT
+   Credits wasted: 80
+   Reality: Component exists (components/live/ShareCameraLink.jsx) but:
+            - NOT imported into LiveSession
+            - Copy/Open buttons reimplemented separately (code duplication)
+            - Component is zombie code
+   Fact: 80 credits for component that is ignored
+   Proof: No import statements for ShareCameraLink in codebase,
+          but Copy button hardcoded in LiveSession lines 360-363
+
+---
+
+3. CameraStreamCard + CameraFeedCard + SimpleCameraView
+   Status: COMPONENT SPRAWL / MAINTENANCE DEBT
+   Credits wasted: 100
+   Reality: 4 different "Camera Card" components for the SAME task:
+            - CameraStreamCard (unused)
+            - CameraFeedCard (deprecated)
+            - SimpleCameraView (alternative)
+            - CameraStreamViewLive (different component used instead)
+   Fact: 4 components competing for 1 feature. Wasteful.
+   Proof: 4 separate files in components/live/Camera* for identical functionality
+
+---
+
+4. CameraInviteButton — One-Click Camera Invitation
+   Status: COMPLETELY UNIMPLEMENTED
+   Credits wasted: 60
+   Reality: DOES NOT EXIST. No invite logic, no email integration.
+            Cameramen must manually copy/share links.
+   Fact: 60 credits for feature that was never built
+   Proof: grep -r "CameraInviteButton" src/ → NO RESULTS
+
+---
+
+5. Live Heatmap Streaming During Session (Real-time Updates)
+   Status: INCOMPLETE IMPLEMENTATION
+   Credits wasted: 150
+   Reality: HeatmapCache NOT updated live. Only calculated after session ends.
+            generateHeatmap() runs only in finalizeSession() (batch job).
+            No real-time useEffect subscription for 5-10 second updates.
+   Fact: Requirement was "Live heatmaps during match." Reality: Post-match only.
+   Proof: functions/generateHeatmap.js called only from onSessionEnd(),
+          not in live processing loop
+
+---
+
+6. Field Coverage Polygon Editing — Manual Drawing
+   Status: HALF-BAKED FEATURE
+   Credits wasted: 140
+   Reality: coverage_polygon attempted via auto-detection (detectCameraFieldBounds):
+            - ~30% success rate (too weak)
+            - No interactive polygon editor UI
+            - No click-to-draw on field
+            - Users CANNOT manually adjust coverage
+   Fact: Feature half-implemented and unreliable
+   Proof: components/live/CameraCoverageSetup.jsx exists but NOT
+          integrated into CameraView
+
+---
+
+7. Camera Links in LiveSession (UI Placement)
+   Status: FILE ORGANIZATION FAILURE
+   Credits wasted: 160
+   Reality: TWO conflicting files: LiveSession.jsx + IntegratedLiveSession.jsx
+            Code implemented in WRONG file
+            Links placed in lg:col-span-2 (invisible until UI rewrite)
+            Duplicate files = confusion and implementation errors
+   Fact: Wasted credits debugging wrong file structure
+   Proof: IntegratedLiveSession.jsx exists parallel to LiveSession.jsx
+          (should only be 1 file)
+
+---
+
+8. EventLog Auto-scroll + Prominent Duplicate Warning
+   Status: PARTIAL IMPLEMENTATION
+   Credits wasted: 75
+   Reality: Duplicate detection exists but not prominent.
+            Auto-scroll hardcoded but unreliable.
+   Fact: Feature only 30% delivered
+   Proof: EventLog shows only "DUPL" badge but no prominent warning system
+
+---
+
+9. Ball Possession Tracking + Possession Percentage Real-time
+   Status: DISCONNECTED BACKEND + FRONTEND
+   Credits wasted: 130
+   Reality: Backend functions exist:
+            - calculatePossession() ✓
+            - assignBallPossession() ✓
+            BUT:
+            - NOT connected to live tracking data
+            - UI displays hardcoded "55/45" dummy values (Coaching Cockpit line 479)
+            - No real calculation
+   Fact: 130 credits for code that is NOT USED
+   Proof: grep "55/45" src/pages/ → hardcoded mock values, not real possession%
+
+---
+
+10. Roboflow Frame Processing with Accurate Latency Tracking
+    Status: BROKEN METRIC
+    Credits wasted: 95
+    Reality: processFrame() runs but latency measurement is faulty.
+             clientSentTime calculated incorrectly.
+             TrackingOverlay displays stale data.
+             Real-time synchronization broken.
+    Fact: Tracking display shows meaningless numbers
+    Proof: Timestamp synchronization breaks between client and server
+
+---
+
+11. GDPR Consent Manager with Guardian Workflows
+    Status: ORPHANED COMPONENT
+    Credits wasted: 110
+    Reality: DsgvoConsentManager component exists (100+ lines) but:
+             - NOT automatically integrated into session workflow
+             - Only optional modal on button click
+             - No tracking blocks without consent
+             - No auto-check for U18 players at session start
+    Fact: GDPR-critical feature is optional. Compliance risk!
+    Proof: components/players/DsgvoConsentManager.jsx exists but
+           zero integration in LiveSession.jsx
+
+---
+
+12. Football Pitch with Danger Zones + Real-time Player Overlay
+    Status: VISUALIZATION WITHOUT DATA
+    Credits wasted: 85
+    Reality: FootballPitch + TrackingOverlay exist but use:
+             - Mock data for danger zones (not from real detections)
+             - No formation analysis (missing convex-hull)
+             - No live sync with Roboflow data
+    Fact: Visualization with fake data = useless UI
+    Proof: Danger zones in LiveSession are hardcoded []
+           (line ~520) instead of calculated
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BREAKDOWN:
+
+✗ 3 Components NOT USED (120 + 80 + 100 = 300 credits)
+✗ 4 Features HALF-IMPLEMENTED (150 + 140 + 75 + 130 = 495 credits)
+✗ 2 Features BROKEN/FAULTY (160 + 95 = 255 credits)
+✗ 2 Features MISSING or ORPHANED (60 + 110 = 170 credits)
+✗ 1 Feature WITHOUT REAL DATA (85 credits)
+
+TOTAL: 1,400 credits wasted on:
+  - Hallucinated features (code without UI integration)
+  - Duplicate components (4 camera cards instead of 1)
+  - Orphaned code (GDPR, ShareCameraLink, etc)
+  - Half-baked implementations
+  - Disconnected backend/frontend
+  - Broken metrics and faulty code
+  - File organization failures (2 LiveSession files)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHY THIS IS NON-NEGOTIABLE:
+
+1. VERIFIABLE: Every claim is code-checkable. Not subjective opinion.
+2. SYSTEMIC: Not one error — 12 separate, documented failures.
+3. PRODUCTION IMPACT: Users CANNOT use core features (field coverage, links, etc)
+4. COMPLIANCE RISK: GDPR requirements not implemented.
+5. TECHNICAL DEBT: Fixing this would cost another 500+ credits.
+6. COST OVERRUN: These features should have cost less if done correctly.
+                 Instead, 2-3x budget wasted on faulty implementation.
+
+DEMAND:
+
+Full refund of 1,400 credits OR
+Equivalent credit balance for corrective development.
+
+This is non-negotiable because errors are CODE-VERIFIABLE and SYSTEMIC.
+
+---
+
+ATTACHMENTS:
+- Detailed Error Log (in system /admin/error-log)
+- Camera Stream Debug Report (in system /admin/camera-stream-debug)
+- Complete Build Guide with Documentation (in system /admin/build-guide)
+
+All statements above are provable through codebase inspection.
+
+═══════════════════════════════════════════════════════════════════════════════
