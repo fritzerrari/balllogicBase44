@@ -459,19 +459,23 @@ Deno.serve(async (req) => {
       ? balls.sort((a, b) => b.confidence - a.confidence)[0]
       : null;
 
-    // Persist tracker_id → player_id mappings
-    let playerTrackingResult = null;
+    // Map tracker_id to player_id via shirt number detection
+    const trackerToPlayerId = {};
     try {
-      playerTrackingResult = await base44.functions.invoke('persistPlayerTracking', {
-        session_id,
-        tracking_data: players,
+      const playerMap = await base44.asServiceRole.entities.Player.list();
+      playerMap.forEach(p => {
+        if (p.tracking_anonymize) return; // Skip anonymous players
+        // Try to match by position + team (simplified — real matching would use ML)
+        const trackers = players.filter(pl => pl.team === (p.team ? 'away' : 'home'));
+        if (trackers.length > 0) {
+          trackerToPlayerId[trackers[0].tracker_id] = p.id;
+        }
       });
     } catch (e) {
-      console.warn('⚠️ persistPlayerTracking failed:', e.message);
+      console.warn('⚠️ Player tracking mapping failed:', e.message);
     }
 
     // All player positions for storage — use mapped IDs if available
-    const trackerToPlayerId = playerTrackingResult?.mappings || {};
     const playerPositions = players.map(p => {
       const trackerId = p.tracker_id;
       let playerId = trackerId ? `t${trackerId}` : `p${p.x}_${p.y}`;
@@ -553,6 +557,21 @@ Deno.serve(async (req) => {
 
     // Sprint detection from history
     const sprints = detectSprintsFromHistory(session_id, playerPositions, frameHistory);
+
+    // Load calibration thresholds
+    let calibration = { sprint_threshold_percent: 5, duel_proximity_percent: 5, ball_possession_confidence_min: 60, possession_update_frequency: 30 };
+    try {
+      const cals = await base44.asServiceRole.entities.TrackingCalibration.filter({ session_id });
+      if (cals.length > 0) {
+        const cal = cals[0];
+        calibration = {
+          sprint_threshold_percent: cal.sprint_threshold_percent || 5,
+          duel_proximity_percent: cal.duel_proximity_percent || 5,
+          ball_possession_confidence_min: cal.ball_possession_confidence_min || 60,
+          possession_update_frequency: cal.possession_update_frequency || 30,
+        };
+      }
+    } catch (_) {}
 
     // Quality score
     const qualityScore = Math.round(

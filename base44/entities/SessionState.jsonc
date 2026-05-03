@@ -1,0 +1,101 @@
+{
+  "name": "SessionState",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Referenz zu LiveSession"
+    },
+    "frame_count": {
+      "type": "number",
+      "description": "Anzahl verarbeiteter Frames"
+    },
+    "last_frame_number": {
+      "type": "number",
+      "description": "Letzter Frame-Index"
+    },
+    "player_position_history": {
+      "type": "array",
+      "description": "Letzte 10 Frames Player-Positionen f\u00fcr Trend-Analyse",
+      "items": {
+        "type": "object",
+        "properties": {
+          "frame_number": {
+            "type": "number"
+          },
+          "timestamp_ms": {
+            "type": "number"
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tracker_id": {
+                  "type": "number"
+                },
+                "player_id": {
+                  "type": "string"
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "team": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "last_possession_owner": {
+      "type": "string",
+      "description": "Letzter Ballbesitzer (player_id) f\u00fcr Change-Detection"
+    },
+    "last_possession_team": {
+      "type": "string",
+      "enum": [
+        "home",
+        "away"
+      ],
+      "description": "Letztes Ballbesitz-Team"
+    },
+    "formation_home": {
+      "type": "string",
+      "description": "Aktuelle erkannte Formation Heimteam (z.B. 4-3-3)"
+    },
+    "formation_away": {
+      "type": "string",
+      "description": "Aktuelle erkannte Formation Gastteam"
+    },
+    "possession_percentage": {
+      "type": "object",
+      "properties": {
+        "home": {
+          "type": "number"
+        },
+        "away": {
+          "type": "number"
+        },
+        "last_updated_frame": {
+          "type": "number"
+        }
+      }
+    },
+    "detection_quality_avg": {
+      "type": "number",
+      "description": "Durchschnittliche Detection-Qualit\u00e4t (0-100)"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "session_id"
+  ]
+}

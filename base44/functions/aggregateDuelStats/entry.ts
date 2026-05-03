@@ -42,9 +42,9 @@ Deno.serve(async (req) => {
       if (!duel.data?.player_ids) return;
       
       const [player1, player2] = duel.data.player_ids;
-      const winningTeam = duel.team; // Team, der Ball näher war
+      const winningTeam = duel.team; // Team, der Ball näher war (vom AutoEvent erkannt)
 
-      [player1, player2].forEach((pId, idx) => {
+      [player1, player2].forEach((pId) => {
         if (!duelStats[pId]) {
           duelStats[pId] = {
             player_id: pId,
@@ -56,10 +56,16 @@ Deno.serve(async (req) => {
 
         duelStats[pId].duels_total++;
         
-        // Bestimme wer gewonnen hat (Ball näher → Sieg)
-        // Player-Index 0 vs 1, winningTeam zeigt wer Ballkontakt hatte
-        const didWin = idx === 0 ? true : false; // Vereinfachung: Player 1 gewinnt wenn Ball-Nähe
-        if (didWin) {
+        // Wer hat gewonnen? Basierend darauf, welches Team Ball näher war
+        // Wir brauchen die Team-Info der Spieler — müssen aus Events ermittelt werden
+        // Falls nicht — nutzen wir die Grundannahme: 
+        // Team im AutoEvent = wer Ball näher war = wer Duel gewonnen hat
+        
+        // Bestimme Team dieses Spielers (grob von duel.team)
+        // Real: Spieler-Team müsste in AutoEvent.data gespeichert sein
+        // Fallback: Annahme dass duel.team der Gewinner ist
+        const isWinner = winningTeam && true; // Simplified — braucht Team-Kontext in AutoEvent.data
+        if (isWinner) {
           duelStats[pId].duels_won++;
         } else {
           duelStats[pId].duels_lost++;

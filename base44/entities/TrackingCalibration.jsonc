@@ -1,0 +1,57 @@
+{
+  "name": "TrackingCalibration",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Referenz zu LiveSession"
+    },
+    "sprint_threshold_percent": {
+      "type": "number",
+      "default": 5,
+      "description": "Feldbreiten-% pro Frame = Sprint (Bewegung > Wert)"
+    },
+    "duel_proximity_percent": {
+      "type": "number",
+      "default": 5,
+      "description": "Max Abstand zwischen Spielern f\u00fcr Duel (% Feldbreite)"
+    },
+    "ball_possession_confidence_min": {
+      "type": "number",
+      "default": 60,
+      "description": "Minimum Konfidenz f\u00fcr Ballbesitz-Z\u00e4hlung (%)"
+    },
+    "offside_line_buffer": {
+      "type": "number",
+      "default": 1,
+      "description": "Puffer f\u00fcr Offside-Erkennung (% Feldbreite)"
+    },
+    "pressing_distance_threshold": {
+      "type": "number",
+      "default": 3,
+      "description": "Abstand zum Ballbesitzer = Pressing aktiv (% Feldbreite)"
+    },
+    "frame_history_size": {
+      "type": "number",
+      "default": 10,
+      "description": "Anzahl Frames f\u00fcr multi-frame Analyse"
+    },
+    "possession_update_frequency": {
+      "type": "number",
+      "default": 30,
+      "description": "Alle N Frames Possession % aktualisieren"
+    },
+    "quality_threshold_alert": {
+      "type": "number",
+      "default": 40,
+      "description": "Alert wenn Detection Quality < dieser Wert"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "session_id"
+  ]
+}
