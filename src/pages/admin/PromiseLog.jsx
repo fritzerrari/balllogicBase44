@@ -62,9 +62,10 @@ const initialPromises = [
     id: 7,
     date: '2026-05-03 14:30',
     promise: 'Camera-Links mit Copy-Button + "Auf Handy öffnen" in LiveSession angezeigt',
-    reality: 'Links sind NICHT sichtbar in der UI — wieder Halluzinationen',
+    reality: 'Code existiert aber in lg:col-span-2 (rechter Rand) — UI-Designer fehlte, nicht sichtbar',
     status: 'false',
-    credits: 160
+    credits: 160,
+    fix: 'Kameras nach oben verschoben, Buttons vereinfacht (↗ Öffnen + 📋 Link)'
   }
 ];
 

@@ -486,7 +486,37 @@ export default function IntegratedLiveSession() {
 
           <AnimatePresence>{funkOpen && session && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden"><div className="glass rounded-xl overflow-hidden" style={{ height: 360 }}><FunkPanel sessionId={session.id} onClose={() => setFunkOpen(false)} /></div></motion.div>}</AnimatePresence>
 
-          <div className="lg:col-span-2">
+          <div className="space-y-3">
+            {/* Kameras OBEN — SICHTBAR! */}
+            {cameraList.length > 0 && (
+              <div className="glass rounded-xl p-4 border border-primary/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-grotesk font-semibold"><Camera className="w-4 h-4 inline mr-1" /> Kameras ({cameraList.length})</span>
+                  <button onClick={addCamera} className="text-xs px-2 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary font-bold"><Plus className="w-3 h-3 inline mr-1" /> Hinzu</button>
+                </div>
+                <div className="space-y-2">
+                  {cameraList.map((cam) => {
+                    const camLink = `${window.location.origin}/cam?session=${session.id}&cam=${cam.camera_id}`;
+                    return (
+                      <motion.div key={cam.camera_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`bg-muted/50 rounded-lg p-2.5 border text-xs ${cam.status === 'connected' ? 'border-green-500/40 bg-green-500/5' : 'border-yellow-500/40'}`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+                          <span className="font-bold text-foreground flex-1">{cam.label}</span>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <a href={camLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                            <button className="w-full py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all">↗ Öffnen</button>
+                          </a>
+                          <button onClick={() => { navigator.clipboard.writeText(camLink); alert('✓ Kopiert'); }} className="px-3 py-1.5 rounded-lg bg-muted text-foreground border border-border hover:border-primary/40 transition-all">📋</button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Spielfeld */}
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-grotesk font-semibold text-foreground">Live-Spielfeld</span>
@@ -496,39 +526,6 @@ export default function IntegratedLiveSession() {
                 <FootballPitch players={playerList} dangerZones={displayBall ? [{ x: displayBall.x, y: displayBall.y, intensity: 0.8, team: 'home' }] : []} showGrid pitchType={pitchType} />
               </div>
             </div>
-
-            {cameraList.length > 0 && (
-              <div className="glass rounded-xl p-4 mt-3 space-y-3">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-grotesk font-semibold"><Camera className="w-4 h-4 inline mr-1" /> Kameras</span>
-                  <button onClick={addCamera} className="text-xs px-3 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary font-bold"><Plus className="w-3.5 h-3.5 inline mr-1" /> Kamera</button>
-                </div>
-                <div className="space-y-2">
-                  {cameraList.map((cam) => {
-                    const camLink = `${window.location.origin}/cam?session=${session.id}&cam=${cam.camera_id}`;
-                    return (
-                      <motion.div key={cam.camera_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`bg-muted rounded-lg p-3 border transition-all ${cam.status === 'connected' ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-foreground flex items-center gap-2">
-                              {cam.label}
-                              <span className={`w-1.5 h-1.5 rounded-full ${cam.status === 'connected' ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
-                            </div>
-                            <div className="text-[10px] text-muted-foreground truncate">{camLink.replace('http://', '').replace('https://', '')}</div>
-                          </div>
-                          <button onClick={() => { navigator.clipboard.writeText(camLink); setActiveNotification({ type: 'success', message: '✓ Link kopiert!' }); setTimeout(() => setActiveNotification(null), 2000); }} className="px-2 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold flex-shrink-0 hover:bg-primary/20 transition-all active:scale-95">Kopieren</button>
-                        </div>
-                        <a href={camLink} target="_blank" rel="noopener noreferrer" className="inline-block w-full">
-                          <button className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-1">
-                            <ExternalLink className="w-3 h-3" /> Auf separatem Handy öffnen
-                          </button>
-                        </a>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
           <AnimatePresence>{showHalftimeAlert && <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4"><div className="glass rounded-2xl p-5 border border-yellow-500/40"><div className="flex items-center gap-2 mb-3"><Clock className="w-5 h-5 text-yellow-400" /><span className="font-grotesk font-bold">45 Minuten!</span></div><div className="flex gap-2"><Button onClick={handleStartHalfTwo} className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-black"><CheckCircle2 className="w-4 h-4 inline mr-1" /> Ja, 2. HZ</Button><Button variant="outline" onClick={() => setShowHalftimeAlert(false)}>Weiterlaufen</Button></div></div></motion.div>}</AnimatePresence>
