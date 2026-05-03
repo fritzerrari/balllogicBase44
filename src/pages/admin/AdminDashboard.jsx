@@ -365,7 +365,7 @@ export default function AdminDashboard() {
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               {[
-                { label: 'Workflow-ID', value: 'hEJyatdTWBc5ITV4SGVz', mono: true },
+                { label: 'Workflow-ID', value: 'football-tracking-phase-1-1777785537057', mono: true },
                 { label: 'Object Detection', value: 'football-players-detection-3zvbc' },
                 { label: 'Byte Tracker', value: 'Eindeutige Spieler-IDs über Frames', },
                 { label: 'Keypoint Detection', value: 'Spielfeld-Linien Erkennung' },
@@ -545,7 +545,7 @@ function CustomModelInput({ currentModel, knownModels, onSave }) {
 
 function CustomWorkflowInput({ appSettings, onSave }) {
   const existing = appSettings?.find(s => s.key === 'roboflow_workflow_id');
-  const [value, setValue] = useState(existing?.value || 'hEJyatdTWBc5ITV4SGVz');
+  const [value, setValue] = useState(existing?.value || 'football-tracking-phase-1-1777785537057');
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -560,7 +560,7 @@ function CustomWorkflowInput({ appSettings, onSave }) {
       <input
         value={value}
         onChange={e => setValue(e.target.value)}
-        placeholder="Workflow-ID (z.B. hEJyatdTWBc5ITV4SGVz)"
+        placeholder="Workflow-ID (z.B. football-tracking-phase-1-1777785537057)"
         className="flex-1 bg-muted border border-input rounded-md px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-ring"
       />
       <Button onClick={handleSave} disabled={!value.trim()} size="sm" className="bg-primary text-primary-foreground gap-1.5">
