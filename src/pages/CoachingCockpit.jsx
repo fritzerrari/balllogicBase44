@@ -212,12 +212,9 @@ export default function CoachingCockpit() {
   );
 
   // Im Roboflow-Modus: echte Daten verwenden, sonst Simulation
-  const displayDetections = trackingMode === 'roboflow' && realTimeData.detections.length > 0
-    ? realTimeData.detections
-    : detections;
-  const displayBall = trackingMode === 'roboflow' && realTimeData.ballPos
-    ? realTimeData.ballPos
-    : ball;
+   const displayDetections = trackingMode === 'roboflow' && realTimeData.detections.length > 0
+     ? realTimeData.detections
+     : detections;
 
   // ❌ REMOVED: Frontend should NOT call detectFrame() or startRoboflowTracking()
   // useFrameCapture hook handles Roboflow integration via processFrame backend
@@ -271,7 +268,11 @@ export default function CoachingCockpit() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
   // CONSISTENCY: Use displayBall / displayDetections consistently
-  const ball = displayBall || displayDetections.find(d => d.class === 'ball') || null;
+  const displayBall = trackingMode === 'roboflow' && realTimeData.ballPos
+    ? realTimeData.ballPos
+    : detections.find(d => d.class === 'ball') || null;
+  
+  const ball = displayBall;
 
   const playerList = trackingMode === 'roboflow' && displayDetections.length > 0
     ? displayDetections.filter(d => d.class !== 'ball')
@@ -523,7 +524,7 @@ export default function CoachingCockpit() {
             </div>
             <VideoOverlayPlayer
               detections={displayDetections.length > 0 ? displayDetections : playerList}
-              ball={displayBall || ball}
+              ball={ball}
             />
           </div>
 
