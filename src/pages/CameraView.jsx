@@ -1,14 +1,15 @@
 /**
- * CameraView — Mobile Camera Page (Landscape-first)
- * Accessed via /cam?session=SESSION_ID
+ * CameraView — SUPER SIMPLE für Kameramann
+ * Nur: Live Video + Event Buttons + Funk
  */
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Camera, Mic, MicOff, Send, Radio, ZoomIn, ZoomOut, MapPin } from 'lucide-react';
+import { Camera, Mic, MicOff, Send, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EventButtons from '@/components/live/EventButtons';
-import CameraCoverageVisualizer from '@/components/live/CameraCoverageVisualizer';
-import CameraCoverageEditor from '@/components/live/CameraCoverageEditor';
+import FunkPanel from '@/components/live/FunkPanel';
+
+const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export default function CameraView() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -17,39 +18,32 @@ export default function CameraView() {
 
   const [session, setSession] = useState(null);
   const [micActive, setMicActive] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [showEvents, setShowEvents] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [zoom, setZoom] = useState(1.0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [trackingStatus, setTrackingStatus] = useState(null); // {status, playerCount, ballDetected, teams}
-  const [showCoverage, setShowCoverage] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [showEvents, setShowEvents] = useState(false);
+  const [showFunk, setShowFunk] = useState(false);
+  const [trackingStatus, setTrackingStatus] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
-  const pollRef = useRef(null);
   const frameIntervalRef = useRef(null);
 
-  // Load session + mark this camera as connected
+  // Load session + mark as connected
   useEffect(() => {
     if (!sessionId) return;
     base44.entities.LiveSession.filter({ id: sessionId })
       .then(sessions => {
         const s = sessions[0] || null;
         setSession(s);
-        // Mark this specific camera as connected in the session
         if (s && s.camera_streams) {
           const camIdStr = String(cameraId);
-          const updatedStreams = s.camera_streams.map(c =>
+          const updated = s.camera_streams.map(c =>
             String(c.camera_id) === camIdStr
               ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
               : c
           );
-          base44.entities.LiveSession.update(s.id, { camera_streams: updatedStreams }).catch(() => {});
+          base44.entities.LiveSession.update(s.id, { camera_streams: updated }).catch(() => {});
         }
       })
       .catch(() => {});
@@ -60,35 +54,6 @@ export default function CameraView() {
     timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
     return () => clearInterval(timerRef.current);
   }, []);
-
-  // Heartbeat — update camera last_seen every 3s for faster connection feedback
-  useEffect(() => {
-    if (!sessionId || !session) return;
-    const camIdStr = String(cameraId);
-    const hb = setInterval(() => {
-      const updatedStreams = session.camera_streams?.map(c =>
-        String(c.camera_id) === camIdStr
-          ? { ...c, status: 'connected', last_seen: new Date().toISOString() }
-          : c
-      );
-      if (updatedStreams) {
-        base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams }).catch(() => {});
-      }
-    }, 3000);
-    return () => clearInterval(hb);
-  }, [sessionId, session, cameraId]);
-
-  // Poll funk messages
-  useEffect(() => {
-    if (!sessionId) return;
-    const fetch = async () => {
-      const msgs = await base44.entities.FunkMessage.filter({ session_id: sessionId });
-      setMessages(msgs.sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0)).slice(-20));
-    };
-    fetch();
-    pollRef.current = setInterval(fetch, 3000);
-    return () => clearInterval(pollRef.current);
-  }, [sessionId]);
 
   // Start camera
   useEffect(() => {
@@ -114,15 +79,12 @@ export default function CameraView() {
     };
   }, []);
 
-  // Frame capture + tracking — only when session active
+  // Frame capture (3s interval)
   useEffect(() => {
     if (!sessionId) return;
     clearInterval(frameIntervalRef.current);
 
     let frameNumber = 0;
-    let fieldBoundsDetected = false;
-    let fieldBoundsRetryCount = 0;
-    const MAX_FIELD_DETECTION_RETRIES = 30; // Retry bis Frame 30
 
     const capture = async () => {
       const video = videoRef.current;
@@ -137,80 +99,30 @@ export default function CameraView() {
       if (!base64 || base64.length < 100) return;
 
       try {
-        const clientSentTime = Date.now();
         const res = await base44.functions.invoke('processFrame', {
           session_id: sessionId,
           frame_base64: base64,
           frame_number: frameNumber,
           elapsed_seconds: elapsedSeconds,
           camera_id: cameraId,
-          client_sent_timestamp: clientSentTime,
         });
         frameNumber++;
+        
         if (res?.data?.success) {
-          // Calculate network latency
-          const networkLatency = Date.now() - (res.data.client_sent_timestamp || clientSentTime);
-          
-          setTrackingStatus(res.data.tracking_status || {
+          setTrackingStatus({
             status: res.data.ball_detected ? 'active' : 'partial',
             playerCount: res.data.players_detected || 0,
             ballDetected: res.data.ball_detected || false,
-            teams: { teamA: 0, teamB: 0, referee: 0 },
-            networkLatency: networkLatency,
-            processingTime: res.data.processing_time_ms || 0,
           });
         }
-
-        // Auto-detect camera field bounds — RETRY bis Frame 30
-        if (!fieldBoundsDetected && fieldBoundsRetryCount < MAX_FIELD_DETECTION_RETRIES) {
-          fieldBoundsRetryCount++;
-          const camIdStr = String(cameraId);
-          
-          base44.functions.invoke('detectCameraFieldBounds', {
-            frame_base64: base64,
-            camera_id: cameraId,
-            session_id: sessionId,
-          }).then(bounds => {
-            if (bounds?.data?.coverage_polygon && bounds.data.coverage_polygon.length >= 3) {
-              fieldBoundsDetected = true; // Mark as detected
-              base44.entities.LiveSession.filter({ id: sessionId }).then(sessions => {
-                if (sessions[0]) {
-                  const updatedStreams = sessions[0].camera_streams.map(s =>
-                    String(s.camera_id) === camIdStr
-                      ? { 
-                          ...s, 
-                          coverage_polygon: bounds.data.coverage_polygon,
-                          coverage_confidence: bounds.data.confidence || 80
-                        }
-                      : s
-                  );
-                  base44.entities.LiveSession.update(sessionId, { camera_streams: updatedStreams });
-                }
-              });
-            }
-          }).catch(() => {}); // Silent retry
-        }
       } catch (e) {
-        // silent fail
+        console.warn('Frame error:', e);
       }
     };
 
     frameIntervalRef.current = setInterval(capture, 3000);
     return () => clearInterval(frameIntervalRef.current);
   }, [sessionId, elapsedSeconds, cameraId]);
-
-  const sendMessage = async () => {
-    if (!message.trim() || !sessionId) return;
-    await base44.entities.FunkMessage.create({
-      session_id: sessionId,
-      from: `camera_${cameraId}`,
-      from_label: session?.camera_streams?.find(c => c.camera_id === cameraId)?.label || `Kamera ${cameraId}`,
-      text: message.trim(),
-      is_ptt: false,
-      timestamp_ms: Date.now(),
-    });
-    setMessage('');
-  };
 
   const handlePTT = async (active) => {
     setMicActive(active);
@@ -220,19 +132,10 @@ export default function CameraView() {
       from: `camera_${cameraId}`,
       from_label: session?.camera_streams?.find(c => c.camera_id === cameraId)?.label || `Kamera ${cameraId}`,
       text: active ? '🎙 Kamera spricht...' : '📻 Kamera fertig',
-      is_ptt: true,
-      ptt_active: active,
+      is_ppt: true,
+      ppt_active: active,
       timestamp_ms: Date.now(),
     });
-  };
-
-  const adjustZoom = (delta) => {
-    const newZoom = Math.min(3.0, Math.max(0.5, zoom + delta));
-    setZoom(newZoom);
-    if (videoRef.current) {
-      videoRef.current.style.transform = `scale(${newZoom})`;
-      videoRef.current.style.transformOrigin = 'center center';
-    }
   };
 
   if (!sessionId) {
@@ -259,10 +162,9 @@ export default function CameraView() {
         muted
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ transition: 'transform 0.2s' }}
       />
 
-      {/* Top bar — minimal */}
+      {/* TOP BAR */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gradient-to-b from-black/60 to-transparent z-10">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -270,148 +172,67 @@ export default function CameraView() {
           {session && <span className="text-white/60 text-xs">{session.match_title}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {/* Tracking indicator */}
-          {trackingStatus !== null && (
+          {trackingStatus && (
             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
               trackingStatus.status === 'active'
-                ? 'bg-green-500/30 text-green-400 border border-green-500/40'
-                : trackingStatus.status === 'partial'
-                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                ? 'bg-green-500/30 text-green-400'
+                : 'bg-yellow-500/20 text-yellow-400'
             }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                trackingStatus.status === 'active' ? 'bg-green-400 animate-pulse' :
-                trackingStatus.status === 'partial' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
-              }`} />
-              {trackingStatus.status === 'active'
-                ? `👥${trackingStatus.playerCount} ⚽`
-                : trackingStatus.status === 'partial'
-                  ? `👥${trackingStatus.playerCount} ❌`
-                  : 'Kein Tracking'}
+              {trackingStatus.playerCount} 👥
             </div>
           )}
           <span className="text-white/60 text-xs font-mono">
-            {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+            {formatTime(elapsedSeconds)}
           </span>
         </div>
       </div>
 
-      {/* Zoom controls — right side */}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-        <button onClick={() => adjustZoom(0.5)} className="w-10 h-10 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white">
-          <ZoomIn className="w-5 h-5" />
-        </button>
-        <div className="w-10 h-8 flex items-center justify-center text-white text-xs font-bold">
-          {zoom.toFixed(1)}x
-        </div>
-        <button onClick={() => adjustZoom(-0.5)} className="w-10 h-10 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-white">
-          <ZoomOut className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Coverage Panel */}
-      <AnimatePresence>
-        {showCoverage && session && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-4 bottom-24 z-20 bg-black/90 backdrop-blur rounded-xl p-4 overflow-y-auto max-h-96"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <MapPin className="w-4 h-4" /> Feldabdeckung dieser Kamera
-              </h3>
-              <button onClick={() => { setShowCoverage(false); setEditMode(false); }} className="text-white/60 hover:text-white">✕</button>
-            </div>
-            
-            {!editMode ? (
-              <div className="space-y-2">
-                <CameraCoverageVisualizer
-                  cameras={session.camera_streams || []}
-                  readOnly={true}
-                />
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="w-full py-2 rounded-lg bg-primary/20 text-primary text-xs font-bold hover:bg-primary/30 transition-all"
-                >
-                  ✏️ Feldabdeckung bearbeiten
-                </button>
-              </div>
-            ) : (
-              <CameraCoverageEditor
-                sessionId={sessionId}
-                cameraId={cameraId}
-                initialPolygon={session.camera_streams?.find(c => c.camera_id === cameraId)?.coverage_polygon || []}
-                onSave={() => { setEditMode(false); setShowCoverage(false); }}
-                onCancel={() => setEditMode(false)}
-              />
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Bottom controls */}
+      {/* BOTTOM CONTROLS */}
       <div className="absolute bottom-0 left-0 right-0 z-10">
-       {/* Events panel */}
-       {showEvents && (
-          <div className="bg-black/80 backdrop-blur p-3 mx-2 mb-2 rounded-xl border border-white/10">
-            <EventButtons
-              sessionId={sessionId}
-              matchId={session?.match_id}
-              matchTitle={session?.match_title}
-              source={`camera_${cameraId}`}
-              elapsedSeconds={elapsedSeconds}
-              compact={true}
-            />
-          </div>
-        )}
-
-        {/* Chat panel */}
-        {showChat && (
-          <div className="bg-black/80 backdrop-blur p-3 mx-2 mb-2 rounded-xl border border-white/10 max-h-48 overflow-y-auto">
-            <div className="space-y-1 mb-2">
-              {messages.slice(-8).map((msg, i) => (
-                <div key={i} className={`text-xs ${msg.from === 'coach' ? 'text-green-400' : 'text-white/70'}`}>
-                  <span className="font-bold">{msg.from_label}: </span>{msg.text}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                placeholder="Nachricht..."
-                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none"
+        {/* Events panel */}
+        <AnimatePresence>
+          {showEvents && (
+            <motion.div
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              className="bg-black/80 backdrop-blur p-3 mx-2 mb-2 rounded-xl border border-white/10"
+            >
+              <EventButtons
+                sessionId={sessionId}
+                matchId={session?.match_id}
+                matchTitle={session?.match_title}
+                source={`camera_${cameraId}`}
+                elapsedSeconds={elapsedSeconds}
+                compact={true}
               />
-              <button onClick={sendMessage} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground">
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Action bar */}
-         <div className="flex items-center gap-2 px-3 pb-4 pt-2 bg-gradient-to-t from-black/70 to-transparent">
-           {/* Coverage Button */}
-           <button
-             onClick={() => setShowCoverage(s => !s)}
-             className={`w-12 h-12 rounded-full flex items-center justify-center select-none touch-manipulation transition-all ${
-               showCoverage ? 'bg-primary scale-110 neon-glow' : 'bg-white/20 border border-white/30'
-             }`}
-             title="Feldabdeckung anzeigen"
-           >
-             <MapPin className="w-5 h-5 text-white" />
-           </button>
+        {/* Funk panel */}
+        <AnimatePresence>
+          {showFunk && (
+            <motion.div
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              className="bg-black/90 backdrop-blur p-3 mx-2 mb-2 rounded-xl border border-white/10 max-h-48 overflow-hidden"
+            >
+              <FunkPanel sessionId={sessionId} onClose={() => setShowFunk(false)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-           {/* PTT */}
-           <button
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 px-3 pb-4 pt-2 bg-gradient-to-t from-black/70 to-transparent">
+          {/* PTT Button */}
+          <button
             onMouseDown={() => handlePTT(true)}
             onMouseUp={() => handlePTT(false)}
             onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
             onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
-            className={`w-12 h-12 rounded-full flex items-center justify-center select-none touch-manipulation transition-all ${
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
               micActive ? 'bg-primary scale-110 neon-glow' : 'bg-white/20 border border-white/30'
             }`}
           >
@@ -420,7 +241,7 @@ export default function CameraView() {
 
           {/* Events toggle */}
           <button
-            onClick={() => { setShowEvents(s => !s); setShowChat(false); }}
+            onClick={() => { setShowEvents(s => !s); setShowFunk(false); }}
             className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
               showEvents ? 'bg-primary text-primary-foreground' : 'bg-white/20 border border-white/30 text-white'
             }`}
@@ -428,11 +249,11 @@ export default function CameraView() {
             ⚽ Events
           </button>
 
-          {/* Chat toggle */}
+          {/* Funk toggle */}
           <button
-            onClick={() => { setShowChat(s => !s); setShowEvents(false); }}
+            onClick={() => { setShowFunk(s => !s); setShowEvents(false); }}
             className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
-              showChat ? 'bg-primary text-primary-foreground' : 'bg-white/20 border border-white/30 text-white'
+              showFunk ? 'bg-primary text-primary-foreground' : 'bg-white/20 border border-white/30 text-white'
             }`}
           >
             <Radio className="w-4 h-4 inline mr-1" /> Funk
