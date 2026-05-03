@@ -14,7 +14,7 @@ import useFrameCapture from '@/hooks/useFrameCapture';
 import useStreamHealth from '@/hooks/useStreamHealth';
 import useRealTimeTracking from '@/hooks/useRealTimeTracking';
 import StreamMonitor from '@/components/live/StreamMonitor';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Radio, Camera, Mic, MicOff,
@@ -86,10 +86,13 @@ export default function CoachingCockpit() {
   // Stream Health Monitoring
   const { cameraHealth, globalHealth, recordFrameLatency } = useStreamHealth();
 
-  // ── Load sessions + players (für DSGVO) ────────────────────────────────────
+  // ── Load sessions + players (für DSGVO + real-time roster sync) ────────────────────────────────────
+  const queryClient = useQueryClient();
   const { data: players = [] } = useQuery({
     queryKey: ['players'],
     queryFn: () => base44.entities.Player.list('-created_date', 100),
+    refetchInterval: 30000, // Sync every 30s (substitutions, injuries)
+    staleTime: 20000,
   });
 
   const { data: sessions = [] } = useQuery({
@@ -103,6 +106,13 @@ export default function CoachingCockpit() {
   const activeSession = sessions[0];
   // Kameras NUR aus aktiver Session — keine Demo-Fallback-Daten
   const cameras = activeSession?.camera_streams || [];
+
+  // Race condition fix: Invalidate and refetch when session changes
+  useEffect(() => {
+    if (activeSession?.id) {
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+    }
+  }, [activeSession?.id, queryClient]);
 
   const liveUrl = `${window.location.origin}/cam`;
 

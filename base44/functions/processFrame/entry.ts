@@ -395,15 +395,37 @@ Deno.serve(async (req) => {
       ? balls.sort((a, b) => b.confidence - a.confidence)[0]
       : null;
 
-    // All player positions for storage
-    const playerPositions = players.map(p => ({
-      player_id: p.tracker_id ? `t${p.tracker_id}` : `p${p.x}_${p.y}`,
-      team: p.team,
-      x: p.x,
-      y: p.y,
-      confidence: p.confidence,
-      tracker_id: p.tracker_id,
-    }));
+    // Persist tracker_id → player_id mappings
+    let playerTrackingResult = null;
+    try {
+      playerTrackingResult = await base44.functions.invoke('persistPlayerTracking', {
+        session_id,
+        tracking_data: players,
+      });
+    } catch (e) {
+      console.warn('⚠️ persistPlayerTracking failed:', e.message);
+    }
+
+    // All player positions for storage — use mapped IDs if available
+    const trackerToPlayerId = playerTrackingResult?.mappings || {};
+    const playerPositions = players.map(p => {
+      const trackerId = p.tracker_id;
+      let playerId = trackerId ? `t${trackerId}` : `p${p.x}_${p.y}`;
+      
+      // Use real player_id if mapped
+      if (trackerId && trackerToPlayerId[trackerId]) {
+        playerId = trackerToPlayerId[trackerId];
+      }
+      
+      return {
+        player_id: playerId,
+        team: p.team,
+        x: p.x,
+        y: p.y,
+        confidence: p.confidence,
+        tracker_id: p.tracker_id,
+      };
+    });
 
     // Quality score
     const qualityScore = Math.round(
