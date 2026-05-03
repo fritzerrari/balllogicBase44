@@ -20,7 +20,7 @@ import AIAssistant from './pages/AIAssistant';
 import ScoutingReport from './pages/ScoutingReport';
 import TrainingPlan from './pages/TrainingPlan';
 import MatchPrep from './pages/MatchPrep';
-import IntegratedLiveSession from './pages/IntegratedLiveSession.jsx';
+import LiveSession from './pages/LiveSession.jsx';
 import CameraView from './pages/CameraView';
 import AdminDocs from './pages/AdminDocs.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
@@ -65,7 +65,7 @@ const AuthenticatedApp = () => {
         <Route path="/matches/new" element={<NewMatch />} />
         <Route path="/matches/:id" element={<MatchDetail />} />
         <Route path="/tactics/:id" element={<TacticsAnalysis />} />
-        <Route path="/live" element={<IntegratedLiveSession />} />
+        <Route path="/live" element={<LiveSession />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/halftime/:id" element={<HalftimeReport />} />
@@ -73,7 +73,6 @@ const AuthenticatedApp = () => {
         <Route path="/scouting" element={<ScoutingReport />} />
         <Route path="/training" element={<TrainingPlan />} />
         <Route path="/matchprep" element={<MatchPrep />} />
-        <Route path="/cockpit" element={<IntegratedLiveSession />} />
         <Route path="/players" element={<Players />} />
         <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/events" element={<EventReview />} />
