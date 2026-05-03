@@ -498,12 +498,15 @@ Deno.serve(async (req) => {
     // ── Ball Possession ────────────────────────────────────────────────────
     const ballPossession = calculateBallPossession(ballPos, playerPositions);
 
+    // ── Multi-Frame History (INIT EARLY — before possession checks) ────────
+    let frameHistory = frameHistoryBySession.get(session_id) || [];
+
     // ── Possession Change Detection ────────────────────────────────────────
     let possessionChangeEvent = null;
     if (frameHistory.length >= 2) {
       const prevFrame = frameHistory[frameHistory.length - 2];
       const currBallOwner = ballPossession?.player_id;
-      const prevBallOwner = prevFrame.ball?.possession?.player_id;
+      const prevBallOwner = prevFrame.ball_possession?.player_id;
       
       if (currBallOwner && prevBallOwner && currBallOwner !== prevBallOwner) {
         possessionChangeEvent = {
@@ -543,14 +546,12 @@ Deno.serve(async (req) => {
         }
       }
     }
-
-    // ── Multi-Frame History ────────────────────────────────────────────────
-    let frameHistory = frameHistoryBySession.get(session_id) || [];
+    // Update frameHistory AFTER possession check
     frameHistory.push({
       timestamp_ms: Date.now(),
       frame_number,
       players: playerPositions,
-      ball: ballPos,
+      ball_possession: ballPossession,
     });
     frameHistory = frameHistory.slice(-FRAME_HISTORY_SIZE);
     frameHistoryBySession.set(session_id, frameHistory);

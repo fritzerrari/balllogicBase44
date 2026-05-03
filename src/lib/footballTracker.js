@@ -330,23 +330,23 @@ export function simulateDetections(tick, options = {}) {
 export function computeStats(history) {
   if (!history || history.length < 2) return null;
 
-  // GUARD: history must be Array<Array<Detection>>
-  if (!Array.isArray(history[0])) {
-    console.warn('⚠️ computeStats: history structure invalid, expected Array<Array<Detection>>');
-    return null;
-  }
+  // GUARD: Normalize history format (can be Array<Detection> or Array<Array<Detection>>)
+  const normalized = history.every(item => Array.isArray(item)) 
+    ? history  // Already Array<Array<Detection>>
+    : [history];  // Single frame, wrap it
 
-  const home = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.team === 'home'));
-  const away = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.team === 'away'));
-  const balls = history.flatMap(f => (Array.isArray(f) ? f : []).filter(d => d.class === 'ball'));
+  const home = normalized.flatMap(f => (Array.isArray(f) ? f : [f]).filter(d => d && d.team === 'home'));
+  const away = normalized.flatMap(f => (Array.isArray(f) ? f : [f]).filter(d => d && d.team === 'away'));
+  const balls = normalized.flatMap(f => (Array.isArray(f) ? f : [f]).filter(d => d && d.class === 'ball'));
 
   // Ball possession by proximity
   let homePoss = 0, awayPoss = 0;
-  history.forEach(frame => {
-    const ball = frame.find(d => d.class === 'ball');
+  normalized.forEach(frame => {
+    const frameArray = Array.isArray(frame) ? frame : [frame];
+    const ball = frameArray.find(d => d && d.class === 'ball');
     if (!ball) return;
-    const homeD = frame.filter(d => d.team === 'home').map(p => Math.hypot(p.x - ball.x, p.y - ball.y));
-    const awayD = frame.filter(d => d.team === 'away').map(p => Math.hypot(p.x - ball.x, p.y - ball.y));
+    const homeD = frameArray.filter(d => d && d.team === 'home').map(p => Math.hypot(p.x - ball.x, p.y - ball.y));
+    const awayD = frameArray.filter(d => d && d.team === 'away').map(p => Math.hypot(p.x - ball.x, p.y - ball.y));
     const minHome = homeD.length ? Math.min(...homeD) : 999;
     const minAway = awayD.length ? Math.min(...awayD) : 999;
     minHome < minAway ? homePoss++ : awayPoss++;

@@ -123,21 +123,27 @@ export default function LiveSession() {
         status: 'live',
       });
       matchId = m.id;
-    } catch (_) {
-      console.warn('⚠️ Auto-Match creation failed');
+    } catch (err) {
+      console.error('❌ Auto-Match creation failed:', err);
+      alert('⚠️ Match konnte nicht erstellt werden. Session wird ohne Match-Verknüpfung gestartet.');
     }
 
-    const s = await createSession.mutateAsync({
-      match_title: sessionTitle,
-      match_id: matchId,
-      status: 'active',
-      half_time: 1,
-      started_at: new Date().toISOString(),
-      camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', status: 'waiting' })),
-    });
-    setSession(s);
-    setSessionActive(true);
-    setElapsedTime(0);
+    try {
+      const s = await createSession.mutateAsync({
+        match_title: sessionTitle,
+        match_id: matchId || null,  // Explicitly null if failed
+        status: 'active',
+        half_time: 1,
+        started_at: new Date().toISOString(),
+        camera_streams: cameras.map(c => ({ camera_id: c.id.toString(), label: c.label, stream_url: '', status: 'waiting', code: Math.random().toString(36).substring(2, 8).toUpperCase() })),
+      });
+      setSession(s);
+      setSessionActive(true);
+      setElapsedTime(0);
+    } catch (err) {
+      console.error('❌ Session creation failed:', err);
+      alert('❌ Session konnte nicht gestartet werden. Bitte versuche es später erneut.');
+    }
   };
 
   // ── Stop + Auto-Report ────────────────────────────────────────────────────
