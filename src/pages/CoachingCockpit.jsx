@@ -13,6 +13,7 @@ import { base44 } from '@/api/base44Client';
 import useFrameCapture from '@/hooks/useFrameCapture';
 import useStreamHealth from '@/hooks/useStreamHealth';
 import useRealTimeTracking from '@/hooks/useRealTimeTracking';
+import useCameraConnections from '@/hooks/useCameraConnections';
 import StreamMonitor from '@/components/live/StreamMonitor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -37,6 +38,8 @@ import EventLog from '@/components/live/EventLog';
 import LiveStats from '@/components/live/LiveStats';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import NotificationBanner from '@/components/live/NotificationBanner';
+import CameraStreamViewer from '@/components/live/CameraStreamViewer';
+import CameraReadinessPanel from '@/components/live/CameraReadinessPanel';
 import {
   detectEvents,
   simulateDetections,
@@ -106,6 +109,9 @@ export default function CoachingCockpit() {
   const activeSession = sessions[0];
   // Kameras NUR aus aktiver Session — keine Demo-Fallback-Daten
   const cameras = activeSession?.camera_streams || [];
+
+  // Camera Connections Monitoring
+  const { readyToTrack, connectedCount, cameraCount } = useCameraConnections(activeSession?.id, trackingMode === 'roboflow');
 
   // Race condition fix: Invalidate and refetch when session changes
   useEffect(() => {
@@ -455,7 +461,17 @@ export default function CoachingCockpit() {
             </div>
           </div>
 
-          {/* Camera grid — nur echte Kameras aus Session */}
+          {/* Kamera-Bereitschaften Check */}
+          {activeSession && trackingMode === 'roboflow' && (
+            <CameraReadinessPanel
+              cameras={cameras}
+              readyToTrack={readyToTrack}
+              onStartTracking={() => setIsDetecting(true)}
+              disabled={isDetecting}
+            />
+          )}
+
+          {/* Camera grid — Live Video Streams */}
           {cameras.length === 0 ? (
             <div className="glass rounded-xl p-8 text-center border border-dashed border-border">
               <Camera className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
@@ -465,21 +481,10 @@ export default function CoachingCockpit() {
           ) : (
             <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
               {cameras.map((cam) => (
-                <CameraFeedCard
+                <CameraStreamViewer
                   key={cam.camera_id}
-                  cam={cam}
-                  isSelected={selectedCam === cam.camera_id}
-                  onSelect={() => setSelectedCam(selectedCam === cam.camera_id ? null : cam.camera_id)}
-                  onShare={() => setShowShare(cam)}
-                  onCopyCode={() => copyCode(cam.code || cam.camera_id)}
-                  copied={copiedCode === (cam.code || cam.camera_id)}
-                  liveUrl={liveUrl}
-                  messages={messages[cam.camera_id] || []}
-                  inputMsg={inputMsg[cam.camera_id] || ''}
-                  onInputChange={(v) => setInputMsg(prev => ({ ...prev, [cam.camera_id]: v }))}
-                  onSend={() => sendMessage(cam.camera_id)}
-                  micActive={!!micActive[cam.camera_id]}
-                  onMicToggle={() => setMicActive(prev => ({ ...prev, [cam.camera_id]: !prev[cam.camera_id] }))}
+                  camera={cam}
+                  sessionId={activeSession?.id}
                 />
               ))}
             </div>

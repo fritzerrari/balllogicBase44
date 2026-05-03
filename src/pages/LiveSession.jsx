@@ -29,6 +29,8 @@ import FunkPanel from '@/components/live/FunkPanel';
 import CameraStreamCard from '@/components/live/CameraStreamCard';
 import CameraCoverageSetup from '@/components/live/CameraCoverageSetup';
 import KickoffDetectionPanel from '@/components/live/KickoffDetectionPanel';
+import CameraReadinessPanel from '@/components/live/CameraReadinessPanel';
+import useCameraConnections from '@/hooks/useCameraConnections';
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -210,6 +212,9 @@ export default function LiveSession() {
   const gameMinute = halfTime === 1
     ? Math.floor(elapsedTime / 60)
     : 45 + Math.floor((elapsedTime - 45 * 60) / 60);
+
+  // Monitor camera connections
+  const { readyToTrack, connectedCount, cameraCount } = useCameraConnections(session?.id, true);
 
   const liveDangerZones = sessionActive ? [
     { x: 75, y: 50, intensity: 0.7, team: 'home' },
@@ -439,7 +444,20 @@ export default function LiveSession() {
                 </button>
               )}
 
-              {/* Anstoß-Erkennung Panel */}
+              {/* Kamera-Bereitschaft Panel — blockiert Tracking bis Kameras connected sind */}
+            {session && (
+              <CameraReadinessPanel
+                cameras={session.camera_streams || []}
+                readyToTrack={readyToTrack}
+                onStartTracking={() => {
+                  // Tracking gestartet — navigiere zu CoachingCockpit
+                  navigate('/cockpit');
+                }}
+                disabled={false}
+              />
+            )}
+
+            {/* Anstoß-Erkennung Panel */}
               {session && !session.kickoff_detected && (
                 <KickoffDetectionPanel session={session} onKickoffDetected={() => queryClient.invalidateQueries({ queryKey: ['liveSessions'] })} />
               )}

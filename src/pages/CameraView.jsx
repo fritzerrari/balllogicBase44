@@ -55,7 +55,7 @@ export default function CameraView() {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  // Heartbeat — update camera last_seen every 10s so Cockpit shows connection status
+  // Heartbeat — update camera last_seen every 3s for faster connection feedback
   useEffect(() => {
     if (!sessionId || !session) return;
     const hb = setInterval(() => {
@@ -67,7 +67,7 @@ export default function CameraView() {
       if (updatedStreams) {
         base44.entities.LiveSession.update(session.id, { camera_streams: updatedStreams }).catch(() => {});
       }
-    }, 10000);
+    }, 3000); // Schneller Heartbeat für schnellere Verbindungserkennung
     return () => clearInterval(hb);
   }, [sessionId, session, cameraId]);
 
