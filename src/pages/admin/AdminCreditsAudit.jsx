@@ -248,7 +248,7 @@ export default function AdminCreditsAudit() {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="glass rounded-xl p-4 border border-destructive/30">
             <div className="text-sm text-muted-foreground mb-1">Verbrannte Credits</div>
             <div className="text-4xl font-grotesk font-bold text-destructive">{totalCredits}</div>
-            <div className="text-xs text-destructive/70 mt-2">{{ allItems: auditLog.length }} false promises</div>
+            <div className="text-xs text-destructive/70 mt-2">{auditLog.length} false promises</div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="glass rounded-xl p-4 border border-yellow-500/30">

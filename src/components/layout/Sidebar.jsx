@@ -45,6 +45,7 @@ const bottomItems = [
   { label: 'Example Report', icon: FileText, path: '/admin/example-report', adminOnly: true },
   { label: 'Admin-Doku', icon: BookOpen, path: '/admin/docs', adminOnly: true },
   { label: 'Credits-Audit', icon: AlertTriangle, path: '/admin/credits-audit', adminOnly: true, badge: '⚠️' },
+  { label: 'Error Log', icon: AlertTriangle, path: '/admin/error-log', adminOnly: true },
   ];
 
 function NavLink({ label, icon: Icon, path, badge }) {

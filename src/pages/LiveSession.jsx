@@ -356,10 +356,21 @@ export default function LiveSession() {
                     <div key={cam.camera_id} className="space-y-2">
                       <CameraStreamViewLive camera={cam} sessionId={session.id} />
                       <div className="glass rounded-lg p-2 border border-green-500/40 bg-green-500/5 flex gap-2">
-                        <a href={camLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                          <button className="w-full py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold">↗ Handy-Link</button>
-                        </a>
-                        <button onClick={() => { navigator.clipboard.writeText(camLink); alert('✓ Kopiert'); }} className="px-3 py-1.5 rounded-lg bg-muted border border-border text-muted-foreground hover:text-foreground">📋</button>
+                        <button onClick={() => { navigator.clipboard.writeText(camLink); alert('✓ Link kopiert'); }} className="flex-1 py-1.5 rounded-lg bg-green-600/80 hover:bg-green-600 text-white text-xs font-bold gap-1 flex items-center justify-center">
+                          📋 Kopieren
+                        </button>
+                        <button onClick={() => {
+                          const title = 'TactIQ Kamera-Link';
+                          const text = `Kameramann für "${sessionTitle}": ${camLink}`;
+                          if (navigator.share) {
+                            navigator.share({ title, text }).catch(() => {});
+                          } else {
+                            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                            window.open(whatsappUrl, '_blank');
+                          }
+                        }} className="px-3 py-1.5 rounded-lg bg-muted border border-border hover:border-green-500/40 hover:bg-green-500/10 text-muted-foreground hover:text-green-400 transition-all">
+                          💬
+                        </button>
                       </div>
                     </div>
                   );

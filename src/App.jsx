@@ -37,6 +37,7 @@ import SessionArchive from './pages/SessionArchive.jsx';
 import ScoutingDashboard from './pages/ScoutingDashboard.jsx';
 import PromiseLog from './pages/admin/PromiseLog.jsx';
 import AdminCreditsAudit from './pages/admin/AdminCreditsAudit.jsx';
+import AdminErrorLog from './pages/admin/AdminErrorLog.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -90,8 +91,9 @@ const AuthenticatedApp = () => {
         <Route path="/scouting-dashboard" element={<ScoutingDashboard />} />
         <Route path="/admin/promise-log" element={<PromiseLog />} />
         <Route path="/admin/credits-audit" element={<AdminCreditsAudit />} />
+        <Route path="/admin/error-log" element={<AdminErrorLog />} />
       </Route>
-      {/* Public camera page — no login required */}
+      {/* Public routes — no login required */}
       <Route path="/cam" element={<CameraView />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
