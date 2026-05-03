@@ -39,7 +39,7 @@ import EventLog from '@/components/live/EventLog';
 import LiveStats from '@/components/live/LiveStats';
 import DsgvoConsentManager from '@/components/players/DsgvoConsentManager';
 import NotificationBanner from '@/components/live/NotificationBanner';
-import SimpleCameraView from '@/components/live/SimpleCameraView';
+import CameraStreamViewLive from '@/components/live/CameraStreamViewLive';
 import useCameraStreamManager from '@/hooks/useCameraStreamManager';
 import CameraReadinessPanel from '@/components/live/CameraReadinessPanel';
 import {
@@ -484,12 +484,11 @@ export default function CoachingCockpit() {
           ) : (
             <div className={`grid gap-3 ${cameras.length > 2 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
               {cameras.map((cam) => (
-                <SimpleCameraView
+                <CameraStreamViewLive
                   key={cam.camera_id}
                   camera={cam}
-                  status={cameraStates[cam.camera_id]?.status || 'waiting'}
-                  liveUrl={liveUrl}
                   sessionId={activeSession?.id}
+                  trackingData={null}
                 />
               ))}
             </div>
