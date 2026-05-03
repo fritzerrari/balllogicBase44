@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   Users, Video, BarChart3, FileText, Plus, Trash2,
-  Shield, Activity, Clock, CheckCircle2, AlertTriangle, BookOpen
+  Shield, Activity, Clock, CheckCircle2, AlertTriangle, BookOpen, Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,14 @@ const TABS = [
   { id: 'matches', label: 'Alle Spiele', icon: Video },
   { id: 'users', label: 'Nutzer', icon: Users },
   { id: 'changelog', label: 'Changelog', icon: BookOpen },
+  { id: 'settings', label: 'Einstellungen', icon: Settings },
+];
+
+const ROBOFLOW_MODELS = [
+  { id: 'football-players-detection-3zvbc/1', label: 'Football Players Detection (Standard)', description: 'Erkennt Spieler, Torwart, Schiedsrichter & Ball' },
+  { id: 'football-players-detection-3zvbc/2', label: 'Football Players Detection v2', description: 'Verbesserte Version mit höherer Genauigkeit' },
+  { id: 'football-detection-najd5/1', label: 'Football Detection (Najd)', description: 'Alternatives Modell für Spieler & Ball' },
+  { id: 'soccer-players-detection-pmrdp/1', label: 'Soccer Players (PMRDP)', description: 'Spezialisiert auf Spielererkennung' },
 ];
 
 const statusColors = {
@@ -53,6 +61,29 @@ export default function AdminDashboard() {
   const { data: changelogs = [] } = useQuery({
     queryKey: ['changelogs'],
     queryFn: () => base44.entities.Changelog.list('-date', 30),
+  });
+
+  const { data: appSettings = [] } = useQuery({
+    queryKey: ['app-settings'],
+    queryFn: () => base44.entities.AppSetting.list(),
+  });
+
+  const roboflowModelSetting = appSettings.find(s => s.key === 'roboflow_model');
+  const currentModel = roboflowModelSetting?.value || 'football-players-detection-3zvbc/1';
+
+  const saveAppSetting = useMutation({
+    mutationFn: async ({ key, value, label }) => {
+      const existing = appSettings.find(s => s.key === key);
+      if (existing) {
+        return base44.entities.AppSetting.update(existing.id, { value, label });
+      } else {
+        return base44.entities.AppSetting.create({ key, value, label });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app-settings'] });
+      toast({ title: 'Einstellung gespeichert' });
+    },
   });
 
   const { data: sessionReports = [] } = useQuery({
@@ -269,6 +300,50 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── SETTINGS ── */}
+      {activeTab === 'settings' && (
+        <div className="space-y-4">
+          <div className="glass rounded-xl p-5">
+            <h2 className="font-grotesk font-semibold text-foreground mb-1 flex items-center gap-2">
+              <Settings className="w-4 h-4 text-primary" /> Roboflow Modell
+            </h2>
+            <p className="text-xs text-muted-foreground mb-5">
+              Wähle das KI-Modell für die Live-Spielererkennung. Das Modell wird beim nächsten Frame-Aufruf aktiv.
+            </p>
+
+            <div className="space-y-2 mb-5">
+              {ROBOFLOW_MODELS.map(model => (
+                <button
+                  key={model.id}
+                  onClick={() => saveAppSetting.mutate({ key: 'roboflow_model', value: model.id, label: model.label })}
+                  className={`w-full text-left p-4 rounded-xl border transition-all ${
+                    currentModel === model.id
+                      ? 'border-primary/60 bg-primary/10'
+                      : 'border-border bg-muted/30 hover:border-primary/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-foreground">{model.label}</span>
+                    {currentModel === model.id && (
+                      <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">AKTIV</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{model.description}</div>
+                  <div className="text-[10px] font-mono text-primary/60 mt-1">{model.id}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Model */}
+            <CustomModelInput
+              currentModel={currentModel}
+              knownModels={ROBOFLOW_MODELS}
+              onSave={(id) => saveAppSetting.mutate({ key: 'roboflow_model', value: id, label: 'Custom Model' })}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── CHANGELOG ── */}
       {activeTab === 'changelog' && (
         <div className="space-y-4">
@@ -344,6 +419,46 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomModelInput({ currentModel, knownModels, onSave }) {
+  const isCustom = !knownModels.some(m => m.id === currentModel);
+  const [customId, setCustomId] = useState(isCustom ? currentModel : '');
+  const [expanded, setExpanded] = useState(isCustom);
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="text-xs text-primary hover:underline flex items-center gap-1"
+      >
+        {expanded ? '▲' : '▼'} Eigenes Modell eingeben
+      </button>
+      {expanded && (
+        <div className="mt-3 flex gap-2">
+          <input
+            value={customId}
+            onChange={e => setCustomId(e.target.value)}
+            placeholder="z.B. my-model/1"
+            className="flex-1 bg-muted border border-input rounded-md px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <Button
+            onClick={() => { if (customId.trim()) onSave(customId.trim()); }}
+            disabled={!customId.trim()}
+            size="sm"
+            className="bg-primary text-primary-foreground"
+          >
+            Speichern
+          </Button>
+        </div>
+      )}
+      {isCustom && (
+        <div className="mt-2 text-xs text-yellow-400">
+          ⚡ Custom-Modell aktiv: <span className="font-mono">{currentModel}</span>
         </div>
       )}
     </div>

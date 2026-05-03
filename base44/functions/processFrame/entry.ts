@@ -12,6 +12,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
+const DEFAULT_MODEL = 'football-players-detection-3zvbc/1';
 const API_TIMEOUT_MS = 3000; // Timeout nach 3s (fast fail)
 const MAX_RETRIES = 2;
 const RETRY_BACKOFF_MS = [200, 500]; // Schneller backoff
@@ -76,7 +77,7 @@ function recordFailure(sessionId) {
 /**
  * Roboflow API mit Retry + Timeout
  */
-async function callRoboflowWithRetry(base64Frame, sessionId) {
+async function callRoboflowWithRetry(base64Frame, sessionId, model = DEFAULT_MODEL) {
   if (!checkCircuitBreaker(sessionId)) {
     console.warn(`⚠️ Circuit breaker open [${sessionId}], using fallback`);
     return null;
@@ -89,7 +90,7 @@ async function callRoboflowWithRetry(base64Frame, sessionId) {
 
       // Roboflow Hosted Inference API (korrekte URL + Format)
       const response = await fetch(
-        `https://detect.roboflow.com/football-players-detection-3zvbc/1?api_key=${ROBOFLOW_API_KEY}`,
+        `https://detect.roboflow.com/${model}?api_key=${ROBOFLOW_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -276,7 +277,14 @@ Deno.serve(async (req) => {
     let source = 'roboflow';
     let error = null;
 
-    detections = await callRoboflowWithRetry(frame_base64, session_id);
+    // Load active model from AppSetting (with fallback to default)
+    let activeModel = DEFAULT_MODEL;
+    try {
+    const settings = await base44.asServiceRole.entities.AppSetting.filter({ key: 'roboflow_model' });
+    if (settings?.[0]?.value) activeModel = settings[0].value;
+    } catch (_) { /* use default */ }
+
+    detections = await callRoboflowWithRetry(frame_base64, session_id, activeModel);
 
     if (!detections) {
       // Fallback: leere Detections (Roboflow nicht verfügbar)

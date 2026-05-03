@@ -1,0 +1,22 @@
+{
+  "name": "AppSetting",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Eindeutiger Schl\u00fcssel, z.B. roboflow_model"
+    },
+    "value": {
+      "type": "string",
+      "description": "Wert der Einstellung"
+    },
+    "label": {
+      "type": "string",
+      "description": "Beschreibung der Einstellung"
+    }
+  },
+  "required": [
+    "key",
+    "value"
+  ]
+}
