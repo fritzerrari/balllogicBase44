@@ -40,7 +40,7 @@ export default function useFrameCapture(
   });
 
   useEffect(() => {
-    if (!enabled || !sessionId || !canvasRef?.current) {
+    if (!enabled || !sessionId) {
       setStatus('idle');
       return;
     }
@@ -53,7 +53,8 @@ export default function useFrameCapture(
     const captureAndSend = async () => {
       const sendTime = Date.now();
       try {
-        const canvas = canvasRef.current;
+        const canvas = canvasRef?.current;
+        // Canvas not ready yet — skip this frame silently
         if (!canvas?.getContext || canvas.width === 0 || canvas.height === 0) {
           return;
         }
@@ -162,7 +163,8 @@ export default function useFrameCapture(
       clearTimeout(intervalRef.current);
       setStatus('idle');
     };
-  }, [enabled, sessionId, team, canvasRef, onData]);
+  // Note: canvasRef intentionally excluded — it's a stable ref object, .current changes silently
+  }, [enabled, sessionId, team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { status, stats };
 }

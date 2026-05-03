@@ -9,12 +9,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
 
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    // Called from onSessionEnd automation (service role) — no user session available
+    // Accept both authenticated users AND service-role automation calls
     const body = await req.json();
     const { session_id, match_id } = body;
 
@@ -22,16 +19,16 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing session_id or match_id' }, { status: 400 });
     }
 
-    // Get match info
-    const matches = await base44.entities.Match.filter({ id: match_id });
+    // Get match info — use service role since called from automation
+    const matches = await base44.asServiceRole.entities.Match.filter({ id: match_id });
     const match = matches[0];
     if (!match) {
       return Response.json({ error: 'Match not found' }, { status: 404 });
     }
 
-    // Get tracking data for context
-    const trackingData = await base44.entities.TrackingData.filter({ session_id });
-    const events = await base44.entities.MatchEvent.filter({ session_id });
+    // Get tracking data for context — use service role
+    const trackingData = await base44.asServiceRole.entities.TrackingData.filter({ session_id });
+    const events = await base44.asServiceRole.entities.MatchEvent.filter({ session_id });
 
     if (trackingData.length === 0) {
       return Response.json({ 
@@ -79,8 +76,8 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Save as TeamAnalysis
-    const teamAnalysis = await base44.entities.TeamAnalysis.create({
+    // Save as TeamAnalysis — service role
+    const teamAnalysis = await base44.asServiceRole.entities.TeamAnalysis.create({
       match_id,
       match_title: match.title,
       analysis_type: 'own_team',

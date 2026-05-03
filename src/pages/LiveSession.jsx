@@ -141,64 +141,23 @@ export default function LiveSession() {
   const handleStop = async () => {
     setFinishing(true);
     try {
-      // 1. Session als beendet markieren + Match.status updaten
       if (session) {
+        // Mark session ended first (triggers onSessionEnd automation for heatmaps)
         await updateSession.mutateAsync({
           id: session.id,
           data: { status: 'ended', ended_at: new Date().toISOString() },
         });
-        // Update Match.status → 'analyzed' (damit Dashboard "LIVE" verschwindet)
-        if (session.match_id) {
-          base44.entities.Match.update(session.match_id, { status: 'analyzed' }).catch(() => {});
-        }
-        // FunkMessages der Session aufräumen
-        try {
-          const funkMsgs = await base44.entities.FunkMessage.filter({ session_id: session.id });
-          await Promise.all(funkMsgs.map(m => base44.entities.FunkMessage.delete(m.id)));
-        } catch (_) {}
-      }
-
-      // 2. Events laden
-      let events = [];
-      try {
-        events = await base44.entities.MatchEvent.filter({ session_id: session?.id });
-      } catch (_) {}
-
-      // 3. Automatisch SessionReport erstellen (mit Delta-Tracking für Kameras)
-      if (session) {
-        const goals = events.filter(e => e.type === 'goal');
-        const cards = events.filter(e => e.type === 'yellow_card' || e.type === 'red_card');
-        const subs = events.filter(e => e.type === 'substitution');
-        
-        // Delta-Check: vergleiche finale vs initial camera count
-        const cameraStreams = session.camera_streams || [];
-        const initialCount = cameras.length;
-        const cameraChanges = cameraStreams.length !== initialCount ? `Kameras: ${initialCount} → ${cameraStreams.length}` : null;
-
-        await base44.entities.SessionReport.create({
-          session_id: session.id,
-          match_id: session.match_id,
-          match_title: sessionTitle,
-          report_type: 'post_session',
-          generated_at: new Date().toISOString(),
-          event_count: events.length,
-          goals: goals.map(e => ({ minute: e.minute, team: e.team, description: e.description })),
-          cards: cards.map(e => ({ minute: e.minute, team: e.team, type: e.type })),
-          substitutions: subs.map(e => ({ minute: e.minute, team: e.team })),
-          key_events: events.slice(0, 20),
-          summary: `Session "${sessionTitle}" — ${events.length} Events aufgezeichnet. ${goals.length} Tore, ${cards.length} Karten, ${subs.length} Wechsel.${cameraChanges ? ` [⚠️ ${cameraChanges}]` : ''}`,
-        });
+        // Use finalizeSession backend function for report + cleanup
+        await base44.functions.invoke('finalizeSession', { session_id: session.id });
       }
     } catch (err) {
-      console.error('❌ Report generation failed:', err);
-      // Aber Session trotzdem beenden
+      console.error('❌ Session finalization failed:', err);
     }
 
     setSessionActive(false);
     setFinishing(false);
     queryClient.invalidateQueries({ queryKey: ['liveSessions'] });
     queryClient.invalidateQueries({ queryKey: ['session-reports'] });
-    // Navigiere zur Analyse wenn match_id vorhanden, sonst zu Reports
     if (session?.match_id) {
       navigate(`/analytics?match=${session.match_id}`);
     } else {

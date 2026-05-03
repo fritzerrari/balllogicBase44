@@ -73,22 +73,19 @@ function normalizeIntensities(grid) {
 }
 
 Deno.serve(async (req) => {
-   try {
-     const base44 = createClientFromRequest(req);
-     const user = await base44.auth.me();
+  try {
+    const base44 = createClientFromRequest(req);
 
-     // Allow service role (from automations) + regular users
-     const body = await req.json();
+    // Allow both authenticated users and service-role automation calls
+    const body = await req.json();
     const { session_id, team, heatmap_type = 'player_density', period = 'full_match' } = body;
 
     if (!session_id || !team) {
       return Response.json({ error: 'Missing session_id or team' }, { status: 400 });
     }
 
-    // 1. LOAD TRACKING DATA
-    const trackingDataList = await base44.entities.TrackingData.filter({
-      session_id,
-    });
+    // 1. LOAD TRACKING DATA — service role for automation compatibility
+    const trackingDataList = await base44.asServiceRole.entities.TrackingData.filter({ session_id });
 
     if (trackingDataList.length === 0) {
       return Response.json({ error: 'No tracking data found' }, { status: 404 });
@@ -148,8 +145,8 @@ Deno.serve(async (req) => {
        ? Math.round(filtered.reduce((sum, t) => sum + (t.detection_quality || 0), 0) / filtered.length)
        : 0;
 
-    // 7. SAVE HEATMAP CACHE
-    const heatmap = await base44.entities.HeatmapCache.create({
+    // 7. SAVE HEATMAP CACHE — service role
+    const heatmap = await base44.asServiceRole.entities.HeatmapCache.create({
       session_id,
       match_id: filtered[0]?.match_id,
       team,
