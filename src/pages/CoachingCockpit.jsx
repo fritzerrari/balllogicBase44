@@ -269,24 +269,16 @@ export default function CoachingCockpit() {
     setTrackTick(0);
   };
 
-  // Cleanup — only on unmount
-   useEffect(() => {
-     return () => {
-       clearInterval(simIntervalRef.current);
-       setIsDetecting(false); // Stop useFrameCapture hook
-     };
-   }, []);
-
   // ── Derived data ───────────────────────────────────────────────────────────
   // CONSISTENCY: Use displayBall / displayDetections consistently
   const ball = displayBall || displayDetections.find(d => d.class === 'ball') || null;
-  
+
   const playerList = trackingMode === 'roboflow' && displayDetections.length > 0
     ? displayDetections.filter(d => d.class !== 'ball')
     : detections.filter(d => d.class !== 'ball');
-  
+
   const stats = computeStats(statsHistory);
-  
+
   const playerCounts = trackingMode === 'roboflow' && displayDetections.length > 0
     ? {
         home: displayDetections.filter(d => d.team === 'home' && d.class !== 'ball').length,
@@ -298,6 +290,14 @@ export default function CoachingCockpit() {
         away: detections.filter(d => d.team === 'away' && d.class !== 'ball').length,
         referee: detections.filter(d => d.class === 'referee').length,
       };
+
+  // Cleanup — only on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(simIntervalRef.current);
+      setIsDetecting(false); // Stop useFrameCapture hook
+    };
+  }, []);
 
   // ── Chat ───────────────────────────────────────────────────────────────────
   const sendMessage = (camId) => {
