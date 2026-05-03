@@ -346,17 +346,24 @@ export default function LiveSession() {
             </div>
           </div>
 
-          {/* CENTER: LIVE CAMERA FEEDS */}
+          {/* CENTER: LIVE CAMERA FEEDS + LINKS */}
           <div className="space-y-4">
             {cameraList.length > 0 ? (
               <div className="space-y-3">
-                {cameraList.map(cam => (
-                  <CameraStreamViewLive
-                    key={cam.camera_id}
-                    camera={cam}
-                    sessionId={session.id}
-                  />
-                ))}
+                {cameraList.map(cam => {
+                  const camLink = `${window.location.origin}/cam?session=${session.id}&cam=${cam.camera_id}`;
+                  return (
+                    <div key={cam.camera_id} className="space-y-2">
+                      <CameraStreamViewLive camera={cam} sessionId={session.id} />
+                      <div className="glass rounded-lg p-2 border border-green-500/40 bg-green-500/5 flex gap-2">
+                        <a href={camLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                          <button className="w-full py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold">↗ Handy-Link</button>
+                        </a>
+                        <button onClick={() => { navigator.clipboard.writeText(camLink); alert('✓ Kopiert'); }} className="px-3 py-1.5 rounded-lg bg-muted border border-border text-muted-foreground hover:text-foreground">📋</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="glass rounded-xl p-4 text-center">

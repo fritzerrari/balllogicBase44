@@ -62,10 +62,10 @@ const initialPromises = [
     id: 7,
     date: '2026-05-03 14:30',
     promise: 'Camera-Links mit Copy-Button + "Auf Handy öffnen" in LiveSession angezeigt',
-    reality: 'Code existiert aber in lg:col-span-2 (rechter Rand) — UI-Designer fehlte, nicht sichtbar',
+    reality: 'Code editiert in IntegratedLiveSession statt LiveSession (falsche Datei) + CENTER-Spalte zeigt Links gar nicht',
     status: 'false',
     credits: 160,
-    fix: 'Kameras nach oben verschoben, Buttons vereinfacht (↗ Öffnen + 📋 Link)'
+    fix: '✓ Links direkt in CENTER-Spalte injiziert (Handy-Link + 📋 Copy-Button). Hard refresh erforderlich für JS-Recompile'
   }
 ];
 
