@@ -14,6 +14,8 @@ import CameraQuickShare from './CameraQuickShare';
 import LiveSessionStats from './LiveSessionStats';
 import AutomationControlPanel from './AutomationControlPanel';
 import EventApprovalPanel from './EventApprovalPanel';
+import MobileTrainerView from './MobileTrainerView';
+import DsgvoGatekeeper from './DsgvoGatekeeper';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -66,9 +68,21 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     base44.entities.LiveSession.update(session.id, { half_time: 2 }).catch(() => {});
   };
 
+  // Mobile view für Trainer
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    return (
+      <>
+        <DsgvoGatekeeper sessionId={session.id} onReadyToStart={() => {}} />
+        <MobileTrainerView session={session} elapsedSeconds={elapsedSeconds} onStop={onStop} />
+      </>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* HALFTIME ALERT */}
+    <>
+      <DsgvoGatekeeper sessionId={session.id} onReadyToStart={() => {}} />
+      <div className="min-h-screen bg-background">
+        {/* HALFTIME ALERT */}
       <AnimatePresence>
         {showHalftimeAlert && (
           <motion.div
@@ -179,5 +193,6 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
         </div>
       </div>
     </div>
+    </>
   );
 }
