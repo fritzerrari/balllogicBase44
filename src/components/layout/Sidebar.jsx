@@ -2,14 +2,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Radio, BarChart3, 
   FileText, Settings, Zap, ChevronRight, Bot,
-  Search, Dumbbell, ChevronDown, ChevronUp, Tv2, BookOpen, Users, Shield, ClipboardList,
+  Search, Dumbbell, ChevronDown, ChevronUp, BookOpen, Users, Shield, ClipboardList,
   Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },

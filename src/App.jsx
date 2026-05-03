@@ -13,7 +13,6 @@ import Matches from './pages/Matches';
 import NewMatch from './pages/NewMatch';
 import MatchDetail from './pages/MatchDetail';
 import TacticsAnalysis from './pages/TacticsAnalysis';
-import LiveSession from './pages/LiveSession';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import HalftimeReport from './pages/HalftimeReport';
