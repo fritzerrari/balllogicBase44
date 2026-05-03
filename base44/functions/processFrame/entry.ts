@@ -87,12 +87,13 @@ async function callRoboflowWithRetry(base64Frame, sessionId) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
+      // Roboflow Hosted Inference API (korrekte URL + Format)
       const response = await fetch(
-        `https://api.roboflow.com/api/v1/project/football-tracking/detect?api_key=${ROBOFLOW_API_KEY}`,
+        `https://detect.roboflow.com/football-players-detection-3zvbc/1?api_key=${ROBOFLOW_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `imageData=${encodeURIComponent(base64Frame)}`,
+          body: base64Frame,
           signal: controller.signal,
         }
       );
@@ -278,30 +279,17 @@ Deno.serve(async (req) => {
     detections = await callRoboflowWithRetry(frame_base64, session_id);
 
     if (!detections) {
-      // Fallback: Hole letzten erfolgreichen Frame
-      console.warn('📼 Falling back to last successful tracking data');
-      try {
-        const lastTracking = await base44.entities.TrackingData.filter({ session_id }, '-timestamp_ms', 1).catch(() => []);
-        if (lastTracking?.[0]?.player_positions) {
-          detections = {
-            predictions: [
-              { x: 50, y: 50, confidence: 0.5, class: 'ball' },
-              ...lastTracking[0].player_positions.slice(0, 22).map(p => ({
-                x: p.x, y: p.y, confidence: p.confidence / 100, class: 'player'
-              }))
-            ]
-          };
-          source = 'fallback';
-          error = 'Roboflow unavailable, using last frame';
-        }
-      } catch (_) {
-        detections = { predictions: [], image: { width: 1920, height: 1080 } };
-        error = 'Complete API failure — no tracking data';
-      }
+      // Fallback: leere Detections (Roboflow nicht verfügbar)
+      console.warn('📼 Roboflow not available — saving empty frame');
+      detections = { predictions: [], image: { width: 1920, height: 1080 } };
+      source = 'manual';
+      error = 'Roboflow unavailable';
     }
 
-    // Safety: ensure detections.image exists
+    // Safety: ensure detections exists and has image
+    if (!detections) detections = { predictions: [], image: { width: 1920, height: 1080 } };
     if (!detections.image) detections.image = { width: 1920, height: 1080 };
+    if (!detections.predictions) detections.predictions = [];
 
     // Parse Detections
     const ballPredictions = detections.predictions?.filter(p => p.class === 'ball') || [];
@@ -328,10 +316,15 @@ Deno.serve(async (req) => {
       Math.min(50, (playerPredictions.length / 22) * 50)
     );
 
-    // Get Session für Match-ID
-    const session = await base44.entities.LiveSession.filter({ id: session_id });
-    const sessionData = session[0];
-    const minute = sessionData ? Math.floor(elapsed_seconds / 60) : 0;
+    // Get Session für Match-ID (optional — kein harter Fehler wenn nicht gefunden)
+    let sessionData = null;
+    try {
+      const sessions = await base44.entities.LiveSession.filter({ id: session_id });
+      sessionData = sessions?.[0] || null;
+    } catch (_) {
+      console.warn('Could not load session data — continuing without match_id');
+    }
+    const minute = sessionData ? Math.floor(elapsed_seconds / 60) : Math.floor(elapsed_seconds / 60);
 
     // Auto-Events
     const autoEvents = detectAutoEvents(ballPos, playerPositions, minute, elapsed_seconds);
