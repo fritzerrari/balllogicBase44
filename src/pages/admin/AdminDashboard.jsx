@@ -8,8 +8,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   Users, Video, BarChart3, FileText, Plus, Trash2,
-  Shield, Activity, Clock, CheckCircle2, AlertTriangle, BookOpen, Settings
+  Shield, Activity, Clock, CheckCircle2, AlertTriangle, BookOpen, Settings, Radar
 } from 'lucide-react';
+import TeamSetupWizard from '@/components/admin/TeamSetupWizard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ const TABS = [
   { id: 'overview', label: 'Übersicht', icon: BarChart3 },
   { id: 'matches', label: 'Alle Spiele', icon: Video },
   { id: 'users', label: 'Nutzer', icon: Users },
+  { id: 'tracking', label: 'Tracking-Setup', icon: Radar },
   { id: 'changelog', label: 'Changelog', icon: BookOpen },
   { id: 'settings', label: 'Einstellungen', icon: Settings },
 ];
@@ -344,6 +346,82 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── TRACKING SETUP ── */}
+      {activeTab === 'tracking' && (
+        <div className="space-y-4">
+          {/* Workflow Info */}
+          <div className="glass rounded-xl p-5 border border-primary/20">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Radar className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-grotesk font-bold text-foreground">Roboflow Workflow</h3>
+                <p className="text-xs text-muted-foreground">Football Tracking Phase 1</p>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Aktiv
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {[
+                { label: 'Workflow-ID', value: 'hEJyatdTWBc5ITV4SGVz', mono: true },
+                { label: 'Object Detection', value: 'football-players-detection-3zvbc' },
+                { label: 'Byte Tracker', value: 'Eindeutige Spieler-IDs über Frames', },
+                { label: 'Keypoint Detection', value: 'Spielfeld-Linien Erkennung' },
+              ].map(item => (
+                <div key={item.label} className="bg-muted/50 rounded-lg p-3">
+                  <div className="text-muted-foreground mb-0.5">{item.label}</div>
+                  <div className={`text-foreground font-medium ${item.mono ? 'font-mono text-[10px]' : ''}`}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tracking Status Badge erklärt */}
+          <div className="glass rounded-xl p-5">
+            <h3 className="font-grotesk font-semibold text-foreground mb-3">Tracking-Status (Kamera-Badge)</h3>
+            <div className="space-y-2">
+              {[
+                { badge: '👥12 ⚽', style: 'bg-green-500/15 text-green-400 border border-green-500/30', label: 'Aktiv — Spieler + Ball erkannt' },
+                { badge: '👥12 ❌', style: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30', label: 'Teilweise — Spieler erkannt, Ball nicht sichtbar' },
+                { badge: 'Kein Tracking', style: 'bg-red-500/15 text-red-400 border border-red-500/30', label: 'Inaktiv — keine Detections' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-3">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 ${item.style}`}>{item.badge}</span>
+                  <span className="text-xs text-muted-foreground">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Team Setup Wizard */}
+          <div className="glass rounded-xl p-5">
+            <TeamSetupWizard
+              appSettings={appSettings}
+              onSave={async (key, value, label) => {
+                await saveAppSetting.mutateAsync({ key, value, label });
+              }}
+            />
+          </div>
+
+          {/* Model Update Guide */}
+          <div className="glass rounded-xl p-5 border border-border">
+            <h3 className="font-grotesk font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Settings className="w-4 h-4 text-muted-foreground" /> Modell wechseln (nach Training)
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Wenn ein neues Modell in Roboflow trainiert wurde, einfach die Workflow-ID unten eintragen.
+              Das Backend verwendet automatisch den neuen Workflow.
+            </p>
+            <CustomWorkflowInput
+              appSettings={appSettings}
+              onSave={(value) => saveAppSetting.mutate({ key: 'roboflow_workflow_id', value, label: 'Roboflow Workflow ID' })}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── CHANGELOG ── */}
       {activeTab === 'changelog' && (
         <div className="space-y-4">
@@ -461,6 +539,33 @@ function CustomModelInput({ currentModel, knownModels, onSave }) {
           ⚡ Custom-Modell aktiv: <span className="font-mono">{currentModel}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function CustomWorkflowInput({ appSettings, onSave }) {
+  const existing = appSettings?.find(s => s.key === 'roboflow_workflow_id');
+  const [value, setValue] = useState(existing?.value || 'hEJyatdTWBc5ITV4SGVz');
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (!value.trim()) return;
+    onSave(value.trim());
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="Workflow-ID (z.B. hEJyatdTWBc5ITV4SGVz)"
+        className="flex-1 bg-muted border border-input rounded-md px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+      <Button onClick={handleSave} disabled={!value.trim()} size="sm" className="bg-primary text-primary-foreground gap-1.5">
+        {saved ? <><CheckCircle2 className="w-3.5 h-3.5" /> Gespeichert</> : 'Speichern'}
+      </Button>
     </div>
   );
 }

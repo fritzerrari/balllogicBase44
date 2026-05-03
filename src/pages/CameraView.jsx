@@ -19,7 +19,7 @@ export default function CameraView() {
   const [showChat, setShowChat] = useState(false);
   const [zoom, setZoom] = useState(1.0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [trackingStatus, setTrackingStatus] = useState(null); // {players, ball, quality}
+  const [trackingStatus, setTrackingStatus] = useState(null); // {status, playerCount, ballDetected, teams}
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -105,10 +105,11 @@ export default function CameraView() {
           team: 'home',
         });
         if (res?.data?.success) {
-          setTrackingStatus({
-            players: res.data.players_detected || 0,
-            ball: res.data.ball_detected || false,
-            quality: res.data.quality_score || 0,
+          setTrackingStatus(res.data.tracking_status || {
+            status: res.data.ball_detected ? 'active' : 'partial',
+            playerCount: res.data.players_detected || 0,
+            ballDetected: res.data.ball_detected || false,
+            teams: { teamA: 0, teamB: 0, referee: 0 },
           });
         }
       } catch (e) {
@@ -194,14 +195,21 @@ export default function CameraView() {
           {/* Tracking indicator */}
           {trackingStatus !== null && (
             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              trackingStatus.players > 0 || trackingStatus.ball
+              trackingStatus.status === 'active'
                 ? 'bg-green-500/30 text-green-400 border border-green-500/40'
-                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : trackingStatus.status === 'partial'
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${trackingStatus.players > 0 || trackingStatus.ball ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-              {trackingStatus.players > 0 || trackingStatus.ball
-                ? `👥${trackingStatus.players} ${trackingStatus.ball ? '⚽' : ''}`
-                : 'Kein Tracking'}
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                trackingStatus.status === 'active' ? 'bg-green-400 animate-pulse' :
+                trackingStatus.status === 'partial' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+              }`} />
+              {trackingStatus.status === 'active'
+                ? `👥${trackingStatus.playerCount} ⚽`
+                : trackingStatus.status === 'partial'
+                  ? `👥${trackingStatus.playerCount} ❌`
+                  : 'Kein Tracking'}
             </div>
           )}
           <span className="text-white/60 text-xs font-mono">
