@@ -27,6 +27,8 @@ import EventButtons from '@/components/live/EventButtons';
 import CameraInviteButton from '@/components/live/CameraInviteButton';
 import FunkPanel from '@/components/live/FunkPanel';
 import CameraStreamCard from '@/components/live/CameraStreamCard';
+import CameraCoverageSetup from '@/components/live/CameraCoverageSetup';
+import KickoffDetectionPanel from '@/components/live/KickoffDetectionPanel';
 
 const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -56,6 +58,7 @@ export default function LiveSession() {
   const [finishing, setFinishing] = useState(false);
   const [eventCount, setEventCount] = useState(0);
   const [funkOpen, setFunkOpen] = useState(false);
+  const [showCoverageSetup, setShowCoverageSetup] = useState(false);
 
   const timerRef = useRef(null);
   const halftimeAlertRef = useRef(false);
@@ -175,6 +178,27 @@ export default function LiveSession() {
 
   const deleteCamera = (id) => {
     setCameras(cameras.filter(c => c.id !== id));
+  };
+
+  const handleCamerasConfigured = (configuredCameras) => {
+    // Speichere Kamerabereiche in Session nach Start
+    if (session) {
+      const updatedStreams = session.camera_streams.map((stream) => {
+        const config = configuredCameras.find((c) => c.id === parseInt(stream.camera_id));
+        if (config) {
+          return {
+            ...stream,
+            position_x: config.position_x,
+            position_y: config.position_y,
+            view_angle: config.view_angle,
+            coverage_polygon: config.coverage_polygon,
+          };
+        }
+        return stream;
+      });
+      updateSession.mutate({ id: session.id, data: { camera_streams: updatedStreams } });
+    }
+    setShowCoverageSetup(false);
   };
 
   const gameMinute = halfTime === 1
@@ -394,6 +418,25 @@ export default function LiveSession() {
                   📻 Funk-Kanal {funkOpen ? 'schließen' : 'öffnen'}
                 </button>
               )}
+
+              {/* Kamerabereiche Setup Button */}
+              {session && (
+                <button
+                  onClick={() => setShowCoverageSetup(o => !o)}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    showCoverageSetup
+                      ? 'bg-primary/15 border-primary/40 text-primary'
+                      : 'bg-muted border-border text-muted-foreground hover:text-foreground'
+                  }`}>
+                  <Camera className="w-3.5 h-3.5" />
+                  📐 Kamerabereiche {showCoverageSetup ? 'schließen' : 'einrichten'}
+                </button>
+              )}
+
+              {/* Anstoß-Erkennung Panel */}
+              {session && !session.kickoff_detected && (
+                <KickoffDetectionPanel session={session} onKickoffDetected={() => queryClient.invalidateQueries({ queryKey: ['liveSessions'] })} />
+              )}
             </div>
 
             {/* Event Buttons */}
@@ -410,6 +453,27 @@ export default function LiveSession() {
               />
             </div>
           </div>
+
+          {/* Coverage Setup Panel */}
+          <AnimatePresence>
+            {showCoverageSetup && session && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden">
+                <CameraCoverageSetup
+                  cameras={session.camera_streams.map((s, i) => ({
+                    id: parseInt(s.camera_id),
+                    label: s.label,
+                    position_x: s.position_x,
+                    position_y: s.position_y,
+                    view_angle: s.view_angle,
+                    coverage_polygon: s.coverage_polygon,
+                  }))}
+                  onSave={handleCamerasConfigured}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Funk Panel */}
           <AnimatePresence>

@@ -16,7 +16,8 @@
         "paused",
         "ended"
       ],
-      "default": "active"
+      "default": "active",
+      "description": "Current session status"
     },
     "started_at": {
       "type": "string",
@@ -67,6 +68,81 @@
           "thumbnail": {
             "type": "string",
             "description": "Thumbnail URL f\u00fcr Live-Vorschau"
+          },
+          "position_x": {
+            "type": "number",
+            "description": "Kamera-Position auf Spielfeld X (0-100 %)"
+          },
+          "position_y": {
+            "type": "number",
+            "description": "Kamera-Position auf Spielfeld Y (0-100 %)"
+          },
+          "view_angle": {
+            "type": "number",
+            "description": "Blickwinkel der Kamera in Grad (0-180)"
+          },
+          "coverage_polygon": {
+            "type": "array",
+            "description": "Abdeckungsbereich als Liste von Polygon-Punkten",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "description": "0-100"
+                },
+                "y": {
+                  "type": "number",
+                  "description": "0-100"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "kickoff_detected": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wurde Ansto\u00df erkannt/festgelegt f\u00fcr Team-Zuordnung"
+    },
+    "kickoff_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Zeitpunkt des Ansto\u00dfes"
+    },
+    "home_team_positions": {
+      "type": "array",
+      "description": "Spieler-Positionen beim Ansto\u00df (Heimteam) f\u00fcr Referenz",
+      "items": {
+        "type": "object",
+        "properties": {
+          "player_id": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "away_team_positions": {
+      "type": "array",
+      "description": "Spieler-Positionen beim Ansto\u00df (Gastteam) f\u00fcr Referenz",
+      "items": {
+        "type": "object",
+        "properties": {
+          "player_id": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
           }
         }
       }

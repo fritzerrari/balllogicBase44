@@ -224,15 +224,32 @@ function classifyPlayerTeam(playerX, playerY, playerW, playerH, teamReferences) 
 
 /**
  * Assign teams to players
- * Uses tracker_id parity as simple heuristic when no color references available
+ * Priorität:
+ * 1. Farbbasierte Klassifizierung (wenn Team-Referenzen vorhanden)
+ * 2. Position relative zu Anstoß-Kalibrierung (wenn verfügbar)
+ * 3. Fallback: tracker_id Parität
  */
-function assignTeams(players, teamReferences) {
+async function assignTeams(players, teamReferences, kickoffData) {
   return players.map(p => {
-    // If team references exist and we have color data, classify
+    // 1. Farbbasiert
     const classified = classifyPlayerTeam(p.x, p.y, p.width, p.height, teamReferences);
     if (classified) return { ...p, team: classified };
 
-    // Fallback: tracker_id even → home, odd → away
+    // 2. Position relativ zu Anstoß-Kalibrierung
+    if (kickoffData?.home_positions && kickoffData?.away_positions) {
+      const distToHome = kickoffData.home_positions.reduce(
+        (min, ref) => Math.min(min, Math.sqrt((p.x - ref.x) ** 2 + (p.y - ref.y) ** 2)),
+        Infinity
+      );
+      const distToAway = kickoffData.away_positions.reduce(
+        (min, ref) => Math.min(min, Math.sqrt((p.x - ref.x) ** 2 + (p.y - ref.y) ** 2)),
+        Infinity
+      );
+      if (distToHome < distToAway) return { ...p, team: 'home' };
+      if (distToAway < distToHome) return { ...p, team: 'away' };
+    }
+
+    // 3. Fallback: tracker_id Parität
     if (p.tracker_id !== null && p.tracker_id !== undefined) {
       return { ...p, team: p.tracker_id % 2 === 0 ? 'home' : 'away' };
     }
@@ -299,12 +316,12 @@ Deno.serve(async (req) => {
     // Load settings from AppSettings (workflow ID + team references)
     let teamReferences = null;
     let workflowUrl = WORKFLOW_URL;
+    let kickoffData = null;
     try {
       const settings = await base44.asServiceRole.entities.AppSetting.list();
       const wfSetting = settings?.find(s => s.key === 'roboflow_workflow_id');
       if (wfSetting?.value) {
         const val = wfSetting.value.trim();
-        // If it's a full URL, use it directly; otherwise build the URL from the workflow ID
         if (val.startsWith('http')) {
           workflowUrl = val;
         } else {
@@ -314,6 +331,17 @@ Deno.serve(async (req) => {
       const teamSetting = settings?.find(s => s.key === 'team_references');
       if (teamSetting?.value) teamReferences = JSON.parse(teamSetting.value);
     } catch (_) { /* use defaults */ }
+
+    // Load kickoff calibration data (falls verfügbar)
+    try {
+      const sessions = await base44.asServiceRole.entities.LiveSession.filter({ id: session_id });
+      if (sessions?.[0]?.kickoff_detected && sessions[0]?.home_team_positions) {
+        kickoffData = {
+          home_positions: sessions[0].home_team_positions,
+          away_positions: sessions[0].away_team_positions,
+        };
+      }
+    } catch (_) { /* Fallback zu anderen Methoden */ }
 
     // ── Call Roboflow Workflow ──────────────────────────────────────────────
     let workflowResult = null;
@@ -336,7 +364,7 @@ Deno.serve(async (req) => {
     const { players: rawPlayers, balls, goals } = parsePredictions(predictions, imageWidth, imageHeight);
 
     // Assign teams
-    const players = assignTeams(rawPlayers, teamReferences);
+    const players = await assignTeams(rawPlayers, teamReferences, kickoffData);
 
     // Ball position (best confidence)
     const ballPos = balls.length > 0
