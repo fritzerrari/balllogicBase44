@@ -40,10 +40,13 @@ export default function CameraStreamViewLive({
     c => String(c.camera_id) === String(camera.camera_id)
   );
 
-  // Draw canvas — simple status display, no waiting for thumbnail
+  // Draw canvas or show thumbnail image
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // If thumbnail available, skip canvas and show as image in parent
+    if (cameraStream?.thumbnail) return;
 
     const ctx = canvas.getContext('2d');
     canvas.width = 320;
@@ -111,10 +114,19 @@ export default function CameraStreamViewLive({
     >
       {/* Video/Canvas Area */}
       <div className="relative aspect-video bg-black">
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full"
-        />
+        {/* Show thumbnail if available, otherwise canvas */}
+        {cameraStream?.thumbnail ? (
+          <img
+            src={cameraStream.thumbnail}
+            alt={cameraStream.label}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full"
+          />
+        )}
 
         {/* Status Badge */}
         <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 ${
