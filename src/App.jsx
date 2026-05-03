@@ -20,7 +20,7 @@ import AIAssistant from './pages/AIAssistant';
 import ScoutingReport from './pages/ScoutingReport';
 import TrainingPlan from './pages/TrainingPlan';
 import MatchPrep from './pages/MatchPrep';
-import LiveSession from './pages/LiveSession.jsx';
+import LiveSession from './pages/LiveSession';
 import CameraView from './pages/CameraView';
 import AdminDocs from './pages/AdminDocs.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
