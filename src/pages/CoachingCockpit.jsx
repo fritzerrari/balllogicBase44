@@ -25,7 +25,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import EventButtons from '@/components/live/EventButtons';
 import SessionHealthCheck from '@/components/live/SessionHealthCheck';
-import FunkPanel from '@/components/live/FunkPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +43,7 @@ import {
   computeStats,
 } from '@/lib/footballTracker';
 import LiveTrackingPanel from '@/components/tracking/LiveTrackingPanel';
+import FunkPanel from '@/components/live/FunkPanel';
 
 // removed buildSimFrame wrapper — simulateDetections used directly now
 
@@ -581,6 +581,13 @@ export default function CoachingCockpit() {
             <LiveTrackingPanel sessionId={activeSession.id} />
           )}
 
+          {/* Funk-Kanal — Real-time Kommunikation mit Kameras */}
+          {activeSession && (
+            <div className="glass rounded-xl overflow-hidden" style={{ height: 360 }}>
+              <FunkPanel sessionId={activeSession.id} />
+            </div>
+          )}
+
           {/* Manual Event Buttons — Coach */}
           <div className="glass rounded-xl p-4">
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
@@ -598,13 +605,6 @@ export default function CoachingCockpit() {
 
           {/* Auto Event Log */}
           <EventLog events={events} />
-
-          {/* Funk-Kanal — echte DB-basierte Kommunikation (gleiche Session wie LiveSession) */}
-          {activeSession && (
-            <div className="glass rounded-xl overflow-hidden" style={{ height: 320 }}>
-              <FunkPanel sessionId={activeSession.id} />
-            </div>
-          )}
 
           {/* Camera codes — Codes kommen aus Session-DB, keine Random-Generierung */}
           {cameras.length > 0 && (

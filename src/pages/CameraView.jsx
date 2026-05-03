@@ -126,12 +126,14 @@ export default function CameraView() {
       if (!base64 || base64.length < 100) return;
 
       try {
+        const clientSentTime = Date.now(); // Frame latency tracking
         const res = await base44.functions.invoke('processFrame', {
           session_id: sessionId,
           frame_base64: base64,
           frame_number: frameNumber++,
           elapsed_seconds: elapsedSeconds,
           team: 'home',
+          client_sent_timestamp: clientSentTime, // Track transmission time
         });
         if (res?.data?.success) {
           setTrackingStatus(res.data.tracking_status || {
