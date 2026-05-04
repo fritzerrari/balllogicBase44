@@ -68,16 +68,25 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
         isOnline ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-muted/10'
       }`}
     >
-      {/* Adaptive Frame Capture — Stable Streaming */}
-      <AdaptiveStreamViewer
-        sessionId={sessionId}
-        cameraId={cam.camera_id}
-        onStatusChange={(status) => {
-          if (status.status === 'streaming') {
-            // Kamera erfolgreich aktiv
-          }
-        }}
-      />
+      {/* Thumbnail oder Status */}
+      <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
+        {thumbnail ? (
+          <img src={thumbnail} alt={cam.label} className="w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-muted to-black">
+            <Smartphone className="w-8 h-8 text-muted-foreground/60 mb-2" />
+            <div className="text-xs text-muted-foreground text-center px-2">
+              {isOnline ? 'Kamera aktiv' : 'Kamera verbindet sich...'}
+            </div>
+          </div>
+        )}
+        {isOnline && (
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-600/90 text-white text-[10px] font-bold">
+            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            LIVE
+          </div>
+        )}
+      </div>
 
       {/* Info & Actions */}
       <div className="p-3 space-y-2">
