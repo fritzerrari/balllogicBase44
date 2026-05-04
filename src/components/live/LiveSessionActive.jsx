@@ -76,7 +76,12 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     setHalfTime(2);
     setElapsedSeconds(45 * 60);
     halftimeRef.current = false;
-    base44.entities.LiveSession.update(session.id, { half_time: 2 }).catch(() => {});
+    // Halbzeit: kickoff_detected zurücksetzen → neue Kalibrierung nötig (Seitenwechsel)
+    setKickoffDetected(false);
+    base44.entities.LiveSession.update(session.id, {
+      half_time: 2,
+      kickoff_detected: false, // Kalibrierung zurücksetzen für Seitenwechsel
+    }).catch(() => {});
   };
 
   const handleKickoff = async () => {

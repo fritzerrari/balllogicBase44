@@ -1,16 +1,130 @@
 /**
  * SimpleCameraAssistant — Kameramann-Ansicht
- * Startet Kamera, sendet Heartbeat + Thumbnails an LiveSession → Trainer sieht "Online"
+ * Optimiert für Hochformat UND Querformat (landscape)
+ * Funk läuft immer im Hintergrund (kein separates Overlay)
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Camera, CameraOff } from 'lucide-react';
+import { Mic, MicOff, CameraOff, Radio, Zap, X, Send } from 'lucide-react';
 import EventButtons from './EventButtons';
-import FunkPanel from './FunkPanel';
 import useWebRTCCamera from '@/hooks/useWebRTCCamera';
+import useFunkSubscription from '@/hooks/useFunkSubscription';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+// Internes Mini-FunkPanel direkt in der Kamera-Ansicht
+function InlineFunkPanel({ sessionId, session, cameraId, onClose }) {
+  const { messages, activeSpeaker } = useFunkSubscription(sessionId);
+  const [text, setText] = useState('');
+  const [pttActive, setPttActive] = useState(false);
+  const listRef = useRef(null);
+
+  // Auto-scroll
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+
+  const sendText = async () => {
+    if (!text.trim()) return;
+    const label = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
+    await base44.entities.FunkMessage.create({
+      session_id: sessionId,
+      from: `camera_${cameraId}`,
+      from_label: label,
+      text: text.trim(),
+      is_ppt: false,
+      timestamp_ms: Date.now(),
+    }).catch(() => {});
+    setText('');
+  };
+
+  const handlePTT = async (active) => {
+    setPttActive(active);
+    const label = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
+    await base44.entities.FunkMessage.create({
+      session_id: sessionId,
+      from: `camera_${cameraId}`,
+      from_label: label,
+      text: active ? '🎙️ Spricht...' : '📻 Fertig',
+      is_ppt: true,
+      ppt_active: active,
+      timestamp_ms: Date.now(),
+    }).catch(() => {});
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-black/95 backdrop-blur-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Radio className="w-4 h-4 text-primary" />
+          <span className="text-sm font-bold text-white">Funk-Kanal</span>
+          {activeSpeaker && (
+            <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full animate-pulse">
+              {activeSpeaker} spricht
+            </span>
+          )}
+        </div>
+        <button onClick={onClose} className="text-white/60 hover:text-white p-1">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 min-h-0">
+        {messages.length === 0 ? (
+          <div className="text-center text-xs text-white/30 py-6">Noch keine Nachrichten</div>
+        ) : messages.map((msg, i) => {
+          const isMe = msg.from !== 'coach';
+          return (
+            <div key={msg.id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] px-2.5 py-1.5 rounded-xl text-xs ${
+                msg.is_ppt
+                  ? 'bg-primary/15 border border-primary/20 text-primary italic'
+                  : isMe
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-white/15 text-white'
+              }`}>
+                {!isMe && <div className="text-[9px] font-bold text-white/50 mb-0.5 uppercase">{msg.from_label || 'Trainer'}</div>}
+                <div>{msg.text}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Input + PTT */}
+      <div className="px-3 py-2 border-t border-white/10 space-y-2 flex-shrink-0">
+        <div className="flex gap-2">
+          <input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendText()}
+            placeholder="Nachricht..."
+            className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-primary/60"
+          />
+          <button onClick={sendText} disabled={!text.trim()}
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-40">
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <button
+          onMouseDown={() => handlePTT(true)}
+          onMouseUp={() => handlePTT(false)}
+          onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
+          onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
+          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all select-none touch-manipulation flex items-center justify-center gap-2 ${
+            pttActive ? 'bg-primary text-primary-foreground' : 'bg-white/10 border border-white/20 text-white'
+          }`}
+        >
+          {pttActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+          {pttActive ? 'SPRECHEN...' : 'Push-to-Talk halten'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function SimpleCameraAssistant() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -20,25 +134,44 @@ export default function SimpleCameraAssistant() {
   const [session, setSession] = useState(null);
   const [micActive, setMicActive] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [showFunk, setShowFunk] = useState(false);
-  const [showEvents, setShowEvents] = useState(false);
-  const [camStatus, setCamStatus] = useState('starting'); // starting | active | error
+  const [activePanel, setActivePanel] = useState(null); // null | 'funk' | 'events'
+  const [camStatus, setCamStatus] = useState('starting');
   const [isConnected, setIsConnected] = useState(false);
   const [mediaStream, setMediaStream] = useState(null);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [unreadFunk, setUnreadFunk] = useState(0);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const heartbeatRef = useRef(null);
   const thumbnailRef = useRef(null);
+  const lastMessageCountRef = useRef(0);
 
-  // WebRTC: sendet echten Livestream an Trainer
+  // Detect orientation
+  useEffect(() => {
+    const check = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    return () => { window.removeEventListener('resize', check); window.removeEventListener('orientationchange', check); };
+  }, []);
+
+  // WebRTC
   useWebRTCCamera({
-    sessionId,
-    cameraId,
-    stream: mediaStream,
+    sessionId, cameraId, stream: mediaStream,
     enabled: camStatus === 'active' && !!sessionId && !!mediaStream,
   });
+
+  // Funk subscription for unread badge
+  const { messages: funkMessages } = useFunkSubscription(sessionId);
+  useEffect(() => {
+    if (activePanel !== 'funk' && funkMessages.length > lastMessageCountRef.current) {
+      const newCoachMessages = funkMessages.slice(lastMessageCountRef.current).filter(m => m.from === 'coach');
+      if (newCoachMessages.length > 0) setUnreadFunk(c => c + newCoachMessages.length);
+    }
+    lastMessageCountRef.current = funkMessages.length;
+  }, [funkMessages, activePanel]);
 
   // Load session
   useEffect(() => {
@@ -54,16 +187,12 @@ export default function SimpleCameraAssistant() {
     return () => clearInterval(t);
   }, []);
 
-  // ── START CAMERA ──────────────────────────────────────────────────────────
+  // Start Camera
   useEffect(() => {
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
         streamRef.current = stream;
@@ -74,108 +203,71 @@ export default function SimpleCameraAssistant() {
         }
         setCamStatus('active');
       } catch (e) {
-        console.warn('Camera error:', e);
         setCamStatus('error');
       }
     };
     startCamera();
-    return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    };
+    return () => streamRef.current?.getTracks().forEach(t => t.stop());
   }, []);
 
-  // ── CAPTURE THUMBNAIL ─────────────────────────────────────────────────────
   const captureThumbnail = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState < 2) return null;
     const ctx = canvas.getContext('2d');
-    canvas.width = 320;
-    canvas.height = 180;
+    canvas.width = 320; canvas.height = 180;
     ctx.drawImage(video, 0, 0, 320, 180);
     return canvas.toDataURL('image/jpeg', 0.6);
   }, []);
 
-  // ── HEARTBEAT + THUMBNAIL → LiveSession ──────────────────────────────────
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
     if (!sessionId) return;
     try {
       const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
       const current = sessions[0];
       if (!current) return;
-
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
-
-      const updatedStreams = (current.camera_streams || []).map(cam => {
-        if (String(cam.camera_id) === String(cameraId)) {
-          return {
-            ...cam,
-            status: 'connected',
-            last_seen: new Date().toISOString(),
-            ...(thumbnail ? { thumbnail } : {}),
-          };
-        }
-        return cam;
-      });
-
-      await base44.entities.LiveSession.update(current.id, {
-        camera_streams: updatedStreams,
-      });
+      const updatedStreams = (current.camera_streams || []).map(cam =>
+        String(cam.camera_id) === String(cameraId)
+          ? { ...cam, status: 'connected', last_seen: new Date().toISOString(), ...(thumbnail ? { thumbnail } : {}) }
+          : cam
+      );
+      await base44.entities.LiveSession.update(current.id, { camera_streams: updatedStreams });
       setIsConnected(true);
-    } catch (e) {
-      console.warn('Heartbeat error:', e);
-    }
+    } catch (e) {}
   }, [sessionId, cameraId, captureThumbnail]);
 
-  // Start heartbeat loop once session is loaded
   useEffect(() => {
     if (!sessionId || !session) return;
-
-    // Immediate first heartbeat
     sendHeartbeat(false);
-
-    // Heartbeat every 8s (status only)
     heartbeatRef.current = setInterval(() => sendHeartbeat(false), 8000);
-
-    // Thumbnail every 20s
     thumbnailRef.current = setInterval(() => sendHeartbeat(true), 20000);
-
-    // Send first thumbnail after 3s (video needs time to start)
     const firstThumb = setTimeout(() => sendHeartbeat(true), 3000);
-
     return () => {
       clearInterval(heartbeatRef.current);
       clearInterval(thumbnailRef.current);
       clearTimeout(firstThumb);
-      // Mark as disconnected on unmount
-      if (sessionId) {
-        base44.entities.LiveSession.filter({ id: sessionId })
-          .then(sessions => {
-            const s = sessions[0];
-            if (!s) return;
-            const streams = (s.camera_streams || []).map(cam =>
-              String(cam.camera_id) === String(cameraId)
-                ? { ...cam, status: 'disconnected' }
-                : cam
-            );
-            base44.entities.LiveSession.update(s.id, { camera_streams: streams }).catch(() => {});
-          }).catch(() => {});
-      }
     };
   }, [sessionId, session]);
 
   const handlePTT = async (active) => {
     setMicActive(active);
     if (!sessionId) return;
+    const label = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
     await base44.entities.FunkMessage.create({
       session_id: sessionId,
       from: `camera_${cameraId}`,
-      from_label: session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`,
+      from_label: label,
       text: active ? '🎙️ Spricht...' : '📻 Fertig',
       is_ppt: true,
       ppt_active: active,
       timestamp_ms: Date.now(),
     }).catch(() => {});
+  };
+
+  const openPanel = (panel) => {
+    if (panel === 'funk') setUnreadFunk(0);
+    setActivePanel(prev => prev === panel ? null : panel);
   };
 
   if (!sessionId) {
@@ -190,147 +282,216 @@ export default function SimpleCameraAssistant() {
     );
   }
 
+  const camLabel = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
+
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-
-      {/* Hidden canvas for thumbnail capture */}
       <canvas ref={canvasRef} className="hidden" />
 
       {/* LIVE VIDEO — Vollbild */}
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      />
+      <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
 
-      {/* Camera error overlay */}
+      {/* Gradient overlays */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70 pointer-events-none" />
+
+      {/* Camera error */}
       {camStatus === 'error' && (
-        <div className="absolute inset-0 bg-black/90 flex items-center justify-center text-white text-center p-6">
+        <div className="absolute inset-0 bg-black/90 flex items-center justify-center text-white text-center p-6 z-50">
           <div className="space-y-3">
             <CameraOff className="w-12 h-12 mx-auto text-red-400" />
             <p className="font-bold">Kamerazugriff verweigert</p>
             <p className="text-sm text-gray-400">Bitte Kamera-Berechtigung erteilen und Seite neu laden</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary rounded-lg text-sm font-bold"
-            >
-              Neu laden
-            </button>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary rounded-lg text-sm font-bold">Neu laden</button>
           </div>
         </div>
       )}
 
-      {/* TOP BAR */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 pt-3 pb-1">
-        {/* LIVE Badge */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600/85 text-white text-xs font-bold backdrop-blur-sm">
-            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            LIVE {formatTime(elapsedSeconds)}
+      {/* ── PORTRAIT LAYOUT ────────────────────────────────────────── */}
+      {!isLandscape && (
+        <>
+          {/* TOP BAR */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 pt-safe pt-3 pb-1">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600/85 text-white text-xs font-bold backdrop-blur-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                LIVE {formatTime(elapsedSeconds)}
+              </div>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${isConnected ? 'bg-green-600/80 text-white' : 'bg-black/60 text-gray-300'}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
+                {isConnected ? 'Verbunden' : 'Verbinde...'}
+              </div>
+            </div>
+            <div className="text-xs text-white/60">{camLabel}</div>
           </div>
-          {/* Connection Status */}
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
-            isConnected ? 'bg-green-600/80 text-white' : 'bg-black/60 text-gray-300'
-          }`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
-            {isConnected ? 'Verbunden' : 'Verbinde...'}
-          </div>
-        </div>
 
-        {/* Events Toggle */}
-        <motion.button
-          animate={{ scale: showEvents ? 1.05 : 1 }}
-          onClick={() => { setShowEvents(!showEvents); setShowFunk(false); }}
-          className="px-3 py-1.5 rounded-lg text-sm font-bold bg-primary/90 text-primary-foreground backdrop-blur-sm"
-        >
-          {showEvents ? '✕' : '⚽ Events'}
-        </motion.button>
-      </div>
-
-      {/* EVENTS PANEL */}
-      <AnimatePresence>
-        {showEvents && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-14 right-2 left-2 z-20 bg-black/90 backdrop-blur p-3 rounded-xl border border-white/10 max-h-64 overflow-y-auto"
-          >
-            <EventButtons
-              sessionId={sessionId}
-              matchId={session?.match_id}
-              matchTitle={session?.match_title}
-              source={`camera_${cameraId}`}
-              elapsedSeconds={elapsedSeconds}
-              compact={true}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* FUNK PANEL */}
-      <AnimatePresence>
-        {showFunk && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-            className="absolute inset-0 z-30 bg-background flex flex-col"
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
-              <span className="text-sm font-bold">📻 Funk-Kanal</span>
+          {/* BOTTOM CONTROLS */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 pb-safe p-3 space-y-2">
+            {/* Action Buttons Row */}
+            <div className="flex gap-2">
+              {/* Events */}
               <button
-                onClick={() => setShowFunk(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted text-foreground font-bold text-lg"
+                onClick={() => openPanel('events')}
+                className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                  activePanel === 'events' ? 'bg-primary text-primary-foreground' : 'bg-black/50 border border-white/20 text-white backdrop-blur-sm'
+                }`}
               >
-                ×
+                <Zap className="w-4 h-4" /> Events
+              </button>
+              {/* Funk */}
+              <button
+                onClick={() => openPanel('funk')}
+                className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 relative transition-all active:scale-95 ${
+                  activePanel === 'funk' ? 'bg-primary text-primary-foreground' : 'bg-black/50 border border-white/20 text-white backdrop-blur-sm'
+                }`}
+              >
+                <Radio className="w-4 h-4" /> Funk
+                {unreadFunk > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{unreadFunk}</span>
+                )}
               </button>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <FunkPanel sessionId={sessionId} onClose={() => setShowFunk(false)} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* BOTTOM CONTROLS */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black via-black/70 to-transparent p-4 space-y-3">
-        {/* Camera label */}
-        {session && (
-          <div className="text-center text-xs text-white/60 font-medium">
-            {session.match_title} · {session.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`}
+            {/* PTT Button */}
+            <button
+              onMouseDown={() => handlePTT(true)}
+              onMouseUp={() => handlePTT(false)}
+              onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
+              onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
+              className={`w-full py-4 rounded-xl font-bold text-white text-base transition-all active:scale-95 select-none touch-manipulation flex items-center justify-center gap-2 ${
+                micActive ? 'bg-primary neon-glow' : 'bg-black/50 border border-white/30 backdrop-blur-sm'
+              }`}
+            >
+              {micActive ? <><Mic className="w-5 h-5" /> SPRECHEN</> : <><MicOff className="w-5 h-5" /> Halten zum Sprechen</>}
+            </button>
           </div>
-        )}
 
-        {/* PTT Button */}
-        <button
-          onMouseDown={() => handlePTT(true)}
-          onMouseUp={() => handlePTT(false)}
-          onTouchStart={(e) => { e.preventDefault(); handlePTT(true); }}
-          onTouchEnd={(e) => { e.preventDefault(); handlePTT(false); }}
-          className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all active:scale-95 select-none ${
-            micActive ? 'bg-primary neon-glow' : 'bg-white/20 border border-white/30'
-          }`}
-        >
-          {micActive
-            ? <><Mic className="w-6 h-6 inline mr-2" />SPRECHEN</>
-            : <><MicOff className="w-6 h-6 inline mr-2" />Halten zum Sprechen</>
-          }
-        </button>
+          {/* EVENTS PANEL — slides from bottom */}
+          <AnimatePresence>
+            {activePanel === 'events' && (
+              <motion.div
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="absolute inset-x-0 bottom-0 z-20 bg-black/95 backdrop-blur rounded-t-2xl border-t border-white/10"
+                style={{ maxHeight: '65vh' }}
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <span className="font-bold text-white text-sm">⚽ Events tippen</span>
+                  <button onClick={() => setActivePanel(null)} className="text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="p-3 overflow-y-auto" style={{ maxHeight: 'calc(65vh - 48px)' }}>
+                  <EventButtons sessionId={sessionId} matchId={session?.match_id} matchTitle={session?.match_title}
+                    source={`camera_${cameraId}`} elapsedSeconds={elapsedSeconds} compact={true} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Funk Button */}
-        <button
-          onClick={() => { setShowFunk(!showFunk); setShowEvents(false); }}
-          className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${
-            showFunk ? 'bg-primary text-primary-foreground' : 'bg-white/20 border border-white/30 text-white'
-          }`}
-        >
-          📻 {showFunk ? 'Schließen' : 'Funk-Kanal'}
-        </button>
-      </div>
+          {/* FUNK PANEL — slides from bottom */}
+          <AnimatePresence>
+            {activePanel === 'funk' && (
+              <motion.div
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="absolute inset-x-0 bottom-0 z-20 rounded-t-2xl border-t border-white/10 overflow-hidden"
+                style={{ height: '65vh' }}
+              >
+                <InlineFunkPanel sessionId={sessionId} session={session} cameraId={cameraId} onClose={() => setActivePanel(null)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
+      {/* ── LANDSCAPE LAYOUT ────────────────────────────────────────── */}
+      {isLandscape && (
+        <>
+          {/* TOP STATUS BAR — slim */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-2 pb-1">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-600/85 text-white text-[11px] font-bold backdrop-blur-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                LIVE {formatTime(elapsedSeconds)}
+              </div>
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-sm ${isConnected ? 'bg-green-600/80 text-white' : 'bg-black/60 text-gray-300'}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
+                {isConnected ? 'OK' : '...'}
+              </div>
+              <span className="text-[10px] text-white/50">{camLabel}</span>
+            </div>
+          </div>
+
+          {/* RIGHT SIDEBAR — Landscape Controls */}
+          <div className="absolute right-0 top-0 bottom-0 z-10 flex flex-col justify-center gap-2 pr-3 pl-2">
+            {/* PTT */}
+            <button
+              onMouseDown={() => handlePTT(true)}
+              onMouseUp={() => handlePTT(false)}
+              onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
+              onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
+              className={`w-14 py-4 rounded-xl font-bold text-[11px] flex flex-col items-center gap-1 transition-all active:scale-95 select-none touch-manipulation ${
+                micActive ? 'bg-primary neon-glow text-primary-foreground' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
+              }`}
+            >
+              {micActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              <span>{micActive ? 'Sprich' : 'PTT'}</span>
+            </button>
+
+            {/* Events */}
+            <button
+              onClick={() => openPanel('events')}
+              className={`w-14 py-3 rounded-xl font-bold text-[11px] flex flex-col items-center gap-1 transition-all active:scale-95 ${
+                activePanel === 'events' ? 'bg-primary text-primary-foreground' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
+              }`}
+            >
+              <Zap className="w-5 h-5" />
+              <span>Events</span>
+            </button>
+
+            {/* Funk */}
+            <button
+              onClick={() => openPanel('funk')}
+              className={`w-14 py-3 rounded-xl font-bold text-[11px] flex flex-col items-center gap-1 relative transition-all active:scale-95 ${
+                activePanel === 'funk' ? 'bg-primary text-primary-foreground' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
+              }`}
+            >
+              <Radio className="w-5 h-5" />
+              <span>Funk</span>
+              {unreadFunk > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{unreadFunk}</span>
+              )}
+            </button>
+          </div>
+
+          {/* LANDSCAPE PANEL — links, halbe Breite */}
+          <AnimatePresence>
+            {activePanel === 'events' && (
+              <motion.div
+                initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="absolute left-0 top-0 bottom-0 z-20 w-72 bg-black/95 backdrop-blur border-r border-white/10 flex flex-col"
+              >
+                <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 flex-shrink-0">
+                  <span className="font-bold text-white text-sm">⚽ Events</span>
+                  <button onClick={() => setActivePanel(null)} className="text-white/60"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2">
+                  <EventButtons sessionId={sessionId} matchId={session?.match_id} matchTitle={session?.match_title}
+                    source={`camera_${cameraId}`} elapsedSeconds={elapsedSeconds} compact={true} />
+                </div>
+              </motion.div>
+            )}
+            {activePanel === 'funk' && (
+              <motion.div
+                initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="absolute left-0 top-0 bottom-0 z-20 w-72 overflow-hidden"
+              >
+                <InlineFunkPanel sessionId={sessionId} session={session} cameraId={cameraId} onClose={() => setActivePanel(null)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }

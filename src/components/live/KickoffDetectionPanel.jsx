@@ -5,14 +5,16 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
-import { Play, Zap, CheckCircle2, Loader2 } from 'lucide-react';
+import { Play, Zap, CheckCircle2, Loader2, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import LateKickoffCalibration from '@/components/live/LateKickoffCalibration';
 
 export default function KickoffDetectionPanel({ session, onKickoffDetected }) {
   const [detecting, setDetecting] = useState(false);
   const [status, setStatus] = useState(null); // null | 'detecting' | 'success' | 'error'
   const [message, setMessage] = useState('');
+  const [showLateCalib, setShowLateCalib] = useState(false);
 
   const handleKickoffDetection = async () => {
     if (!session?.id) {
@@ -117,13 +119,27 @@ export default function KickoffDetectionPanel({ session, onKickoffDetected }) {
       </Button>
 
       <div className="mt-3 text-[10px] text-muted-foreground space-y-1 bg-muted/40 rounded-lg p-2.5">
-        <div className="flex gap-1">
-          <span className="font-bold">Wie es funktioniert:</span>
-        </div>
+        <div className="font-bold">Wie es funktioniert:</div>
         <div>1️⃣ Klick nach dem Anstoß (wenn Teams auf Positionen stehen)</div>
         <div>2️⃣ Backend erfasst Spielerpositionen → erkennt Heim/Gäste-Seite</div>
         <div>3️⃣ Für Rest des Spiels: neue Spieler-IDs werden per Position zugeordnet</div>
       </div>
+
+      {/* Late Calibration Toggle */}
+      <button
+        onClick={() => setShowLateCalib(v => !v)}
+        className="w-full mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors py-1"
+      >
+        <Settings2 className="w-3.5 h-3.5" />
+        {showLateCalib ? 'Schließen' : 'Anstoß verpasst? Manuelle Kalibrierung →'}
+      </button>
+
+      {showLateCalib && (
+        <LateKickoffCalibration
+          session={session}
+          onCalibrated={() => { setShowLateCalib(false); onKickoffDetected?.(); }}
+        />
+      )}
     </motion.div>
   );
 }

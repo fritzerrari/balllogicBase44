@@ -46,12 +46,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Neuester Frame mit Spielerpositionen
-    const latestFrame = trackingFrames[0];
-    if (!latestFrame?.player_positions || latestFrame.player_positions.length < 20) {
+    // Besten Frame suchen (nicht unbedingt 20 Spieler — auch 6+ reicht)
+    const latestFrame = trackingFrames.find(f => f.player_positions?.length >= 10)
+      || trackingFrames.find(f => f.player_positions?.length >= 6)
+      || trackingFrames[0];
+
+    if (!latestFrame?.player_positions || latestFrame.player_positions.length < 4) {
       return Response.json(
         {
-          error: 'Zu wenig Spieler erkannt — stellen Sie sicher, dass beide Teams sichtbar sind',
+          error: 'Zu wenig Spieler erkannt (min. 4 benötigt)',
           players_detected: latestFrame?.player_positions?.length || 0,
         },
         { status: 202 }
