@@ -99,55 +99,22 @@ Deno.serve(async (req) => {
       if (nearBall.length >= 3) dangerousSituations++;
     });
 
-    // 6. Update SessionState
+    // 6. Update SessionState mit rolling average (70% neu, 30% alt)
+    const oldHome = sessionState.possession_percentage?.home || 50;
+    const rollingHome = Math.round(possession.home * 0.7 + oldHome * 0.3);
+    
     await base44.entities.SessionState.update(sessionState.id, {
       frame_count: tracking.length,
-      last_frame_number: Math.max(...tracking.map(t => t.frame_number || 0)),
-      possession_percentage: possession,
+      last_frame_number: possession.last_updated_frame,
+      possession_percentage: { home: rollingHome, away: 100 - rollingHome, last_updated_frame: possession.last_updated_frame },
       detection_quality_avg: Math.round(
         tracking.reduce((sum, t) => sum + (t.detection_quality || 0), 0) / tracking.length
       ),
       updated_at: new Date().toISOString(),
     });
 
-    // 7. Auto-erstelle AutoEvents falls nicht vorhanden
-    const existingAutoEvents = await base44.entities.AutoEvent.filter({
-      session_id,
-      type: 'ball_in_penalty_area',
-    });
-
-    // Nur erstelle neue Events wenn wenige vorhanden (nicht duplizieren)
-    if (existingAutoEvents.length === 0 && chances.home > 0) {
-      await base44.entities.AutoEvent.create({
-        session_id,
-        type: 'ball_in_penalty_area',
-        team: 'home',
-        confidence: 80,
-        timestamp_ms: Date.now(),
-        description: `Ball im Strafraum (${chances.home}x in letzten Frames)`,
-      });
-    }
-
-    if (existingAutoEvents.length === 0 && chances.away > 0) {
-      await base44.entities.AutoEvent.create({
-        session_id,
-        type: 'ball_in_penalty_area',
-        team: 'away',
-        confidence: 80,
-        timestamp_ms: Date.now(),
-        description: `Ball im Strafraum (${chances.away}x in letzten Frames)`,
-      });
-    }
-
-    if (dangerousSituations > 3) {
-      await base44.entities.AutoEvent.create({
-        session_id,
-        type: 'dangerous_situation',
-        confidence: 85,
-        timestamp_ms: Date.now(),
-        description: `Kritische Spielsituation erkannt`,
-      });
-    }
+    // 7. AutoEvents NICHT hier erstellen — wird von processFrame gemacht
+    // (verhindert Duplikate bei regelmäßigen Updates)
 
     console.log(`✅ Session stats updated: Possession ${possession.home}%-${possession.away}%, ${chances.home} home chances, ${chances.away} away chances`);
 

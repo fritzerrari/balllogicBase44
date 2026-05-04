@@ -669,13 +669,12 @@ Deno.serve(async (req) => {
 
     const minute = Math.floor(elapsed_seconds / 60);
     
-    // Increment SessionState frame_count (CRITICAL for frontend monitoring)
+    // NUR frame_count inkrementieren (updateSessionStats macht den Rest)
     if (sessionStates.length > 0) {
       try {
+        // Nur frame metadata — possession wird von updateSessionStats berechnet
         await base44.asServiceRole.entities.SessionState.update(sessionStates[0].id, {
-          frame_count: (sessionStates[0].frame_count || 0) + 1,
           last_frame_number: frame_number,
-          detection_quality_avg: qualityScore,
           updated_at: new Date().toISOString(),
         });
       } catch (_) {}

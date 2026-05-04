@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
         possession_percentage: { home: 50, away: 50 },
         confidence: 0,
         frames_analyzed: tracking.length,
+        reason: 'no_possession_data',
       });
     }
 
