@@ -20,6 +20,7 @@ import ClubLogoUpload from '@/components/club/ClubLogoUpload';
 import ClubColorThemePicker from '@/components/club/ClubColorThemePicker';
 import ClubSchedule from '@/components/club/ClubSchedule';
 import TransferScout from '@/components/club/TransferScout';
+import TeamSelector from '@/components/club/TeamSelector';
 import { applyClubTheme } from '@/lib/clubTheme';
 
 const FORMATIONS = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '3-4-3', '5-3-2', '4-1-4-1'];
@@ -390,13 +391,34 @@ export default function ClubManagement() {
       </motion.div>
 
       {/* Tabs */}
-      <Tabs defaultValue="schedule" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-muted mb-4">
+      <Tabs defaultValue="teams" className="w-full">
+        <TabsList className="grid w-full grid-cols-5 bg-muted mb-4">
+          <TabsTrigger value="teams" className="text-xs">👥 Mannschaften</TabsTrigger>
           <TabsTrigger value="schedule" className="text-xs">📅 Spielplan</TabsTrigger>
           <TabsTrigger value="scout" className="text-xs">🔭 Transfer</TabsTrigger>
-          <TabsTrigger value="logo" className="text-xs">🎨 Logo & Farben</TabsTrigger>
+          <TabsTrigger value="logo" className="text-xs">🎨 Farben</TabsTrigger>
           <TabsTrigger value="import" className="text-xs">⬇️ Daten</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="teams">
+          <div className="glass rounded-xl p-5">
+            <h2 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> Mannschaften
+            </h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Suche alle Mannschaften des Vereins in der Datenbank und importiere Spielplan + Spieler pro Team.
+            </p>
+            <TeamSelector
+              clubId={selectedClub.id}
+              clubName={selectedClub.short_name || selectedClub.name}
+              apiTeamId={selectedClub.api_team_id}
+              onTeamImported={() => {
+                queryClient.invalidateQueries({ queryKey: ['club-matches', selectedClub.id] });
+                queryClient.invalidateQueries({ queryKey: ['players'] });
+              }}
+            />
+          </div>
+        </TabsContent>
 
         <TabsContent value="schedule">
           <ClubSchedule clubId={selectedClub.id} clubName={selectedClub.name} />
