@@ -116,12 +116,14 @@ export default function TacticsChangeLogger({ sessionId, elapsedSeconds }) {
 
       {/* Timeline */}
       <div className="space-y-1 max-h-32 overflow-y-auto">
-        {changes.length === 0 ? (
-          <div className="text-[10px] text-muted-foreground text-center py-2">
-            Keine Taktik-Änderungen dokumentiert
-          </div>
-        ) : (
-          changes.map((change) => (
+        <AnimatePresence>
+          {changes.length === 0 ? (
+            <div key="empty" className="text-[10px] text-muted-foreground text-center py-2">
+              Keine Taktik-Änderungen dokumentiert
+            </div>
+          ) : (
+            <div key="list" className="space-y-1">
+            {changes.map((change) => (
             <motion.div
               key={change.id}
               initial={{ opacity: 0, x: -10 }}
@@ -141,10 +143,11 @@ export default function TacticsChangeLogger({ sessionId, elapsedSeconds }) {
               >
                 <Trash2 className="w-3 h-3" />
               </Button>
-            </motion.div>
-          ))
-        )}
-      </div>
+              </motion.div>
+              ))}</div>
+              )}
+              </AnimatePresence>
+              </div>
 
       <div className="text-[8px] text-muted-foreground/60 text-center">
         Alle Änderungen werden im Match-Report gespeichert
