@@ -12,15 +12,34 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
   const [liveCam, setLiveCam] = useState(cam);
 
-  // Check connection status
+  // Subscribe to FULL session — get latest camera_streams data
   useEffect(() => {
-    setLiveCam(cam);
-  }, [cam]);
+    try {
+      const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
+        if (event.id === sessionId && event.data?.camera_streams) {
+          const updated = event.data.camera_streams.find(c => String(c.camera_id) === String(cam.camera_id));
+          if (updated) {
+            console.log(`[Subscribe ${cam.camera_id}] Got update:`, updated.last_seen);
+            setLiveCam(updated);
+          }
+        }
+      });
+      return () => unsubscribe?.();
+    } catch (err) {
+      console.warn('[CameraFeed] Subscribe failed:', err.message);
+      setLiveCam(cam); // Fallback
+    }
+  }, [sessionId, cam.camera_id]);
 
   const thumbnail = liveCam?.thumbnail;
   const lastSeenMs = liveCam?.last_seen ? Date.now() - new Date(liveCam.last_seen).getTime() : null;
   const isOnline = lastSeenMs !== null && lastSeenMs < 15000;
   const camLink = `${window.location.origin}/cam?session=${sessionId}&cam=${cam.camera_id}`;
+  
+  // Debug output
+  useEffect(() => {
+    console.log(`[CameraFeed ${cam.camera_id}] last_seen: ${liveCam?.last_seen}, lastSeenMs: ${lastSeenMs}, isOnline: ${isOnline}, status: ${liveCam?.status}`);
+  }, [liveCam?.last_seen, lastSeenMs, isOnline, cam.camera_id, liveCam?.status]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(camLink).catch(() => {});

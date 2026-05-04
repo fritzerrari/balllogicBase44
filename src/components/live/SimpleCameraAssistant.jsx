@@ -237,27 +237,41 @@ export default function SimpleCameraAssistant() {
 
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
     if (!sessionId || !sessionRef.current) return;
+    
     try {
       const current = sessionRef.current;
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
-      const updatedStreams = (current.camera_streams || []).map(cam =>
-        String(cam.camera_id) === String(cameraId)
-          ? { 
-              ...cam, 
-              status: 'connected', 
-              last_seen: new Date().toISOString(),
-              ...(thumbnail ? { thumbnail } : {})
-            }
-          : cam
+      
+      // Build updated streams with strict last_seen timestamp
+      const updatedStreams = (current.camera_streams || []).map(cam => {
+        if (String(cam.camera_id) === String(cameraId)) {
+          const updated = {
+            ...cam,
+            status: 'connected',
+            last_seen: new Date().toISOString(),
+          };
+          if (thumbnail) updated.thumbnail = thumbnail;
+          console.log('[Heartbeat] Updating cam', cameraId, 'last_seen:', updated.last_seen);
+          return updated;
+        }
+        return cam;
+      });
+
+      // Update ONLY if something changed
+      const changed = updatedStreams.some((s, i) => 
+        s.last_seen !== current.camera_streams[i]?.last_seen
       );
       
-      // Atomic update — only update the camera_streams array
-      await base44.entities.LiveSession.update(current.id, { 
-        camera_streams: updatedStreams 
-      });
-      setIsConnected(true);
+      if (changed) {
+        const result = await base44.entities.LiveSession.update(current.id, { 
+          camera_streams: updatedStreams 
+        });
+        console.log('[Heartbeat] ✅ Success, result:', result);
+        setIsConnected(true);
+      }
     } catch (e) {
-      console.warn('[SimpleCameraAssistant] Heartbeat failed:', e.message);
+      console.error('[SimpleCameraAssistant] ❌ Heartbeat FAILED:', e.message, e);
+      setIsConnected(false);
     }
   }, [sessionId, cameraId, captureThumbnail]);
 
