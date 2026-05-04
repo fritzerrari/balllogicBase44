@@ -78,6 +78,13 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
     toast({ title: '✓ Alle ausstehenden Einwilligungen erteilt' });
   };
 
+  const grantAll = () => {
+    filteredPlayers
+      .filter(p => !p.age || p.age >= 18) // nur Erwachsene
+      .forEach(p => grantConsent(p));
+    toast({ title: '✓ Allen Spielern Einwilligung erteilt' });
+  };
+
   const sendGuardianRequest = async (player) => {
     const email = guardianEmail[player.id];
     if (!email) return;
@@ -232,12 +239,20 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-border flex-shrink-0">
-          {pendingCount > 0 && filteredPlayers.some(p => !isMinor(p) && (p.tracking_consent || 'pending') === 'pending') ? (
-            <button onClick={grantAllPending}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-sm font-medium hover:bg-primary/25 transition-all">
-              <Check className="w-4 h-4" /> Alle ausstehenden bestätigen
-            </button>
-          ) : <div />}
+          <div className="flex gap-2">
+            {filteredPlayers.some(p => !isMinor(p) && (p.tracking_consent || 'pending') === 'pending') && (
+              <button onClick={grantAllPending}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-sm font-medium hover:bg-primary/25 transition-all">
+                <Check className="w-4 h-4" /> Ausstehende erteilen
+              </button>
+            )}
+            {filteredPlayers.some(p => !isMinor(p) && p.tracking_consent !== 'granted') && (
+              <button onClick={grantAll}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/25 border border-primary/50 text-primary text-sm font-medium hover:bg-primary/35 transition-all">
+                <Check className="w-4 h-4" /> Allen erteilen
+              </button>
+            )}
+          </div>
           <Button onClick={onClose} className="bg-primary text-primary-foreground px-8">
             {players.length === 0 ? 'Verstanden' : 'Schließen'}
           </Button>
