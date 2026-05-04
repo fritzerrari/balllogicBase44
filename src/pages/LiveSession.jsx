@@ -11,7 +11,7 @@ import { Play, Square, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import SimpleSessionSetup from '@/components/live/SimpleSessionSetup';
+import SessionSetupWizard from '@/components/live/SessionSetupWizard';
 import LiveSessionActive from '@/components/live/LiveSessionActive';
 import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
 
@@ -92,39 +92,27 @@ export default function LiveSession() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md"
+          className="w-full max-w-lg"
         >
-          <div className="glass rounded-2xl p-8 space-y-6 border border-primary/20">
+          <div className="glass rounded-2xl p-6 sm:p-8 border border-primary/20">
             {/* Header */}
-            <div className="text-center space-y-2">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Radio className="w-8 h-8 text-red-500 animate-pulse" />
-                <h1 className="text-3xl font-grotesk font-bold">Live-Session</h1>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Starten Sie eine Live-Tracking-Session
-              </p>
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Radio className="w-6 h-6 text-red-500 animate-pulse" />
+              <h1 className="text-xl font-grotesk font-bold">Live-Tracking starten</h1>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400 mb-4">
                 {error}
               </div>
             )}
 
-            {/* Setup Form */}
-            <SimpleSessionSetup
+            {/* Wizard */}
+            <SessionSetupWizard
               onStart={handleStartSession}
               isLoading={createSessionMutation.isPending}
             />
-
-            {/* Info Box */}
-            <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg space-y-1">
-              <div>✓ Geben Sie einfach den Match-Namen ein</div>
-              <div>✓ Kameramänner erhalten direkten Link</div>
-              <div>✓ Live-Tracking startet automatisch</div>
-            </div>
           </div>
         </motion.div>
       </div>
