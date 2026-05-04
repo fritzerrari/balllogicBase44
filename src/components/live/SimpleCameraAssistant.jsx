@@ -304,7 +304,7 @@ export default function SimpleCameraAssistant() {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       if (thumbnailRef.current) clearInterval(thumbnailRef.current);
     };
-  }, [sessionId, session, cameraId, sendHeartbeat]);
+  }, [sessionId, session, cameraId]);
 
   const handlePTT = async (active) => {
     setMicActive(active);
