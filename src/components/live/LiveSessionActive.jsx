@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Square, Zap, Video, BarChart3, Radio, Play, CheckCircle2, Loader2, ChevronDown } from 'lucide-react';
+import { Clock, Square, Zap, Video, BarChart3, Radio, Play, Pause, CheckCircle2, Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -19,6 +19,7 @@ import CoverageBlindspotMap from '@/components/live/CoverageBlindspotMap';
 import KickoffStatusBanner from '@/components/live/KickoffStatusBanner';
 import PlayerAssignmentPanel from '@/components/live/PlayerAssignmentPanel';
 import FrameMonitor from '@/components/live/FrameMonitor';
+import LiveReportingPanel from '@/components/live/LiveReportingPanel';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'tracking', label: 'Tracking', icon: BarChart3 },
   { id: 'coverage', label: 'Abdeckung', icon: Radio },
   { id: 'events', label: 'Events', icon: Zap },
+  { id: 'reporting', label: 'Live-Report', icon: TrendingUp },
 ];
 
 export default function LiveSessionActive({ session, onStop, isFinishing }) {
@@ -37,13 +39,15 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   const [showHalftimeAlert, setShowHalftimeAlert] = useState(false);
   const [kickoffDetected, setKickoffDetected] = useState(session?.kickoff_detected || false);
   const [doingKickoff, setDoingKickoff] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef(null);
   const halftimeRef = useRef(false);
 
-  // Timer
+  // Timer (pauseable)
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setElapsedSeconds(t => {
+        if (isPaused) return t; // Pause: don't increment
         const next = t + 1;
         if (next === 45 * 60 && halfTime === 1 && !halftimeRef.current) {
           halftimeRef.current = true;
@@ -53,7 +57,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [halfTime]);
+  }, [halfTime, isPaused]);
 
   // Subscribe to session updates — keep internal state in sync
   const [liveSession, setLiveSession] = useState(session);
@@ -94,12 +98,17 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     setHalfTime(2);
     setElapsedSeconds(45 * 60);
     halftimeRef.current = false;
-    // Halbzeit: kickoff_detected zurücksetzen → neue Kalibrierung nötig (Seitenwechsel)
+    setIsPaused(false); // Spiel weitergehen
+    // Seitenwechsel: kickoff_detected zurücksetzen → neue Kalibrierung nötig
     setKickoffDetected(false);
     base44.entities.LiveSession.update(session.id, {
       half_time: 2,
-      kickoff_detected: false, // Kalibrierung zurücksetzen für Seitenwechsel
+      kickoff_detected: false,
     }).catch(() => {});
+  };
+
+  const handlePause = () => {
+    setIsPaused(!isPaused);
   };
 
   const handleKickoff = async () => {
@@ -157,10 +166,18 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
 
-            {/* Timer */}
-            <div className="flex items-center gap-3">
-              <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+            {/* Timer + Pause */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`} />
               <span className="font-mono text-2xl lg:text-3xl font-bold tabular-nums">{formatTime(elapsedSeconds)}</span>
+              <Button
+                onClick={handlePause}
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+              >
+                {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+              </Button>
               <div className="text-xs text-muted-foreground leading-tight">
                 <div className="font-bold text-primary">{halfTime}. HZ</div>
                 <div>{gameMinute}'</div>
@@ -340,21 +357,26 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                 </motion.div>
               )}
               {tab === 'events' && (
-                <motion.div key="events" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-3">
-                  <div className="glass rounded-xl p-4 border border-border">
-                    <EventButtons
-                      sessionId={session.id}
-                      matchId={session.match_id}
-                      matchTitle={session.match_title}
-                      source="coach"
-                      elapsedSeconds={elapsedSeconds}
-                      onEventLogged={() => setEventCount(c => c + 1)}
-                    />
-                  </div>
-                  <EventApprovalPanel sessionId={session.id} />
-                </motion.div>
+               <motion.div key="events" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-3">
+                 <div className="glass rounded-xl p-4 border border-border">
+                   <EventButtons
+                     sessionId={session.id}
+                     matchId={session.match_id}
+                     matchTitle={session.match_title}
+                     source="coach"
+                     elapsedSeconds={elapsedSeconds}
+                     onEventLogged={() => setEventCount(c => c + 1)}
+                   />
+                 </div>
+                 <EventApprovalPanel sessionId={session.id} />
+               </motion.div>
               )}
-            </AnimatePresence>
+              {tab === 'reporting' && (
+               <motion.div key="reporting" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
+                 <LiveReportingPanel sessionId={session.id} elapsedSeconds={elapsedSeconds} halfTime={halfTime} />
+               </motion.div>
+              )}
+              </AnimatePresence>
           </div>
         </div>
       </div>
