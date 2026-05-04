@@ -1,0 +1,92 @@
+{
+  "name": "Club",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Vereinsname"
+    },
+    "short_name": {
+      "type": "string",
+      "description": "K\u00fcrzel, z.B. FCB"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL des hochgeladenen Logos"
+    },
+    "primary_color": {
+      "type": "string",
+      "description": "Prim\u00e4rfarbe als HEX, z.B. #E32219"
+    },
+    "secondary_color": {
+      "type": "string",
+      "description": "Sekund\u00e4rfarbe als HEX"
+    },
+    "accent_color": {
+      "type": "string",
+      "description": "Akzentfarbe als HEX"
+    },
+    "country": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "founded": {
+      "type": "number",
+      "description": "Gr\u00fcndungsjahr"
+    },
+    "stadium": {
+      "type": "string"
+    },
+    "stadium_capacity": {
+      "type": "number"
+    },
+    "league": {
+      "type": "string",
+      "description": "Liga-Name"
+    },
+    "league_id": {
+      "type": "string",
+      "description": "API-Ligakennung"
+    },
+    "api_team_id": {
+      "type": "string",
+      "description": "Externe Team-ID (football-data.org)"
+    },
+    "website": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "description": "KI-generierte Vereinsbeschreibung"
+    },
+    "ai_identified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Wurde per Logo-KI erkannt?"
+    },
+    "ai_identification_data": {
+      "type": "object",
+      "description": "Rohdaten der KI-Erkennung"
+    },
+    "current_table_position": {
+      "type": "number"
+    },
+    "current_season": {
+      "type": "string",
+      "description": "z.B. 2025/26"
+    },
+    "standard_formation": {
+      "type": "string",
+      "description": "z.B. 4-3-3"
+    },
+    "colors_applied_to_theme": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

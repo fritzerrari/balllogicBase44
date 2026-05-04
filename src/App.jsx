@@ -1,4 +1,8 @@
 import { Toaster } from "@/components/ui/toaster"
+import { restoreTheme } from '@/lib/clubTheme';
+
+// Theme beim Start aus localStorage wiederherstellen
+restoreTheme();
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
@@ -34,6 +38,7 @@ import AdminManual from './pages/AdminManual.jsx';
 import AdminDemo from './pages/AdminDemo.jsx';
 import AdminExampleReport from './pages/AdminExampleReport.jsx';
 import SessionArchive from './pages/SessionArchive.jsx';
+import ClubManagement from './pages/ClubManagement.jsx';
 import ScoutingDashboard from './pages/ScoutingDashboard.jsx';
 import PromiseLog from './pages/admin/PromiseLog.jsx';
 import AdminCreditsAudit from './pages/admin/AdminCreditsAudit.jsx';
@@ -91,6 +96,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/demo" element={<AdminDemo />} />
         <Route path="/admin/example-report" element={<AdminExampleReport />} />
         <Route path="/archive" element={<SessionArchive />} />
+        <Route path="/club" element={<ClubManagement />} />
         <Route path="/scouting-dashboard" element={<ScoutingDashboard />} />
         <Route path="/admin/promise-log" element={<PromiseLog />} />
         <Route path="/admin/credits-audit" element={<AdminCreditsAudit />} />

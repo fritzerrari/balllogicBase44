@@ -29,8 +29,15 @@
       "type": "string",
       "description": "Vereins- oder Teamname"
     },
+    "club_id": {
+      "type": "string",
+      "description": "Referenz zu Club-Entity"
+    },
     "age": {
       "type": "number"
+    },
+    "nationality": {
+      "type": "string"
     },
     "dominant_foot": {
       "type": "string",
@@ -40,11 +47,38 @@
         "beidf\u00fc\u00dfig"
       ]
     },
+    "height_cm": {
+      "type": "number"
+    },
+    "weight_kg": {
+      "type": "number"
+    },
+    "market_value": {
+      "type": "string",
+      "description": "Marktwert, z.B. 500.000 \u20ac"
+    },
+    "contract_until": {
+      "type": "string",
+      "format": "date",
+      "description": "Vertragsende"
+    },
     "notes": {
       "type": "string"
     },
     "avatar_url": {
       "type": "string"
+    },
+    "api_player_id": {
+      "type": "string",
+      "description": "Externe Spieler-ID"
+    },
+    "strengths": {
+      "type": "string",
+      "description": "St\u00e4rken des Spielers"
+    },
+    "weaknesses": {
+      "type": "string",
+      "description": "Schw\u00e4chen des Spielers"
     },
     "tracking_consent": {
       "type": "string",
@@ -55,21 +89,18 @@
         "guardian_required"
       ],
       "default": "pending",
-      "description": "DSGVO-Einwilligung f\u00fcr KI-Tracking. Minderj\u00e4hrige (<18): guardian_required bis Erziehungsberechtigte zustimmen."
+      "description": "DSGVO-Einwilligung f\u00fcr KI-Tracking."
     },
     "tracking_consent_date": {
       "type": "string",
-      "format": "date",
-      "description": "Datum der Einwilligungserteilung"
+      "format": "date"
     },
     "tracking_anonymize": {
       "type": "boolean",
-      "default": false,
-      "description": "Wenn true: Spieler wird im Tracking anonym behandelt (kein Name, zuf\u00e4llige ID). F\u00fcr DSGVO-Konformit\u00e4t ohne Einwilligung."
+      "default": false
     },
     "guardian_email": {
-      "type": "string",
-      "description": "E-Mail Erziehungsberechtigter (bei Minderj\u00e4hrigen)"
+      "type": "string"
     }
   },
   "required": [

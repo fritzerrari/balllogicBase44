@@ -1,0 +1,73 @@
+{
+  "name": "ClubMatch",
+  "type": "object",
+  "properties": {
+    "club_id": {
+      "type": "string",
+      "description": "Referenz zu Club"
+    },
+    "api_match_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "matchday": {
+      "type": "number"
+    },
+    "home_team": {
+      "type": "string"
+    },
+    "away_team": {
+      "type": "string"
+    },
+    "home_score": {
+      "type": "number"
+    },
+    "away_score": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "live",
+        "finished",
+        "postponed"
+      ],
+      "default": "scheduled"
+    },
+    "competition": {
+      "type": "string"
+    },
+    "venue": {
+      "type": "string"
+    },
+    "is_home": {
+      "type": "boolean"
+    },
+    "season": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Manuelle Notizen"
+    },
+    "prep_done": {
+      "type": "boolean",
+      "default": false,
+      "description": "Spielvorbereitung erledigt?"
+    },
+    "manual_override": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "club_id",
+    "date",
+    "home_team",
+    "away_team"
+  ]
+}

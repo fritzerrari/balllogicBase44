@@ -1,0 +1,64 @@
+{
+  "name": "TransferTarget",
+  "type": "object",
+  "properties": {
+    "club_id": {
+      "type": "string"
+    },
+    "player_name": {
+      "type": "string"
+    },
+    "current_club": {
+      "type": "string"
+    },
+    "position": {
+      "type": "string"
+    },
+    "age": {
+      "type": "number"
+    },
+    "nationality": {
+      "type": "string"
+    },
+    "market_value": {
+      "type": "string",
+      "description": "z.B. 2,5 Mio \u20ac"
+    },
+    "contract_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "strengths": {
+      "type": "string"
+    },
+    "weaknesses": {
+      "type": "string"
+    },
+    "ai_recommendation": {
+      "type": "string"
+    },
+    "recommendation_score": {
+      "type": "number",
+      "description": "0-100 KI-Score"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "suggested",
+        "watching",
+        "contacted",
+        "rejected"
+      ],
+      "default": "suggested"
+    },
+    "source": {
+      "type": "string",
+      "description": "Woher stammt die Info (AI, manual, scout)"
+    }
+  },
+  "required": [
+    "club_id",
+    "player_name",
+    "position"
+  ]
+}

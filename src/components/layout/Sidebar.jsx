@@ -29,6 +29,7 @@ const toolsItems = [
   { label: 'Berichte', icon: FileText, path: '/session-reports' },
   { label: 'Analytics Cockpit', icon: BarChart3, path: '/analytics', badge: 'NEU' },
   { label: 'Session-Archiv', icon: Calendar, path: '/archive' },
+  { label: 'Vereins-Management', icon: Shield, path: '/club', badge: 'NEU' },
 ];
 
 const scoutingLinks = [
