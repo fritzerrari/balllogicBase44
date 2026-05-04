@@ -10,7 +10,7 @@ import { Mic, MicOff, CameraOff, Radio, Zap, X, Send, MessageSquare } from 'luci
 import EventButtons from './EventButtons';
 import useWebRTCCamera from '@/hooks/useWebRTCCamera';
 import useFunkSubscription from '@/hooks/useFunkSubscription';
-import FrameUploadService from '@/lib/frameUploadService';
+import { SimpleFrameUpload } from '@/lib/simpleFrameUpload';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -137,8 +137,8 @@ export default function SimpleCameraAssistant() {
   const heartbeatRef = useRef(null);
   const thumbnailRef = useRef(null);
   const lastMessageCountRef = useRef(0);
-  const frameUploadServiceRef = useRef(null);
-  const [uploadProgress, setUploadProgress] = useState(null);
+  const frameUploadRef = useRef(null);
+  const [frameStats, setFrameStats] = useState(null);
 
   // Detect orientation
   useEffect(() => {
@@ -179,7 +179,7 @@ export default function SimpleCameraAssistant() {
     return () => clearInterval(t);
   }, []);
 
-  // Start Camera + Frame Upload Service
+  // Start Camera + Frame Upload
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -193,28 +193,31 @@ export default function SimpleCameraAssistant() {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
           
-          // Start Frame Upload Service
+          // Start SimpleFrameUpload
           if (sessionId && cameraId) {
-            const uploadService = new FrameUploadService(
+            const uploader = new SimpleFrameUpload(
               videoRef.current,
               sessionId,
               cameraId,
-              (progress) => setUploadProgress(progress)
+              (update) => {
+                setFrameStats(update.stats);
+                console.log('[SimpleCameraAssistant] Frame update:', update);
+              }
             );
-            uploadService.setStartTime(Date.now());
-            uploadService.start();
-            frameUploadServiceRef.current = uploadService;
+            uploader.start();
+            frameUploadRef.current = uploader;
           }
         }
         setCamStatus('active');
       } catch (e) {
+        console.error('Camera start error:', e);
         setCamStatus('error');
       }
     };
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
-      frameUploadServiceRef.current?.stop();
+      frameUploadRef.current?.stop();
     };
   }, [sessionId, cameraId]);
 
@@ -333,16 +336,16 @@ export default function SimpleCameraAssistant() {
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
                 {isConnected ? 'Verbunden' : 'Verbinde...'}
               </div>
-              {uploadProgress && (
+              {frameStats && (
                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
-                  uploadProgress.status === 'error' ? 'bg-red-600/80 text-white' :
-                  uploadProgress.status === 'uploaded' ? 'bg-blue-600/80 text-white' :
-                  'bg-purple-600/80 text-white'
+                  !frameStats.lastUploadSuccess ? 'bg-red-600/80 text-white' :
+                  frameStats.uploadedCount > 0 ? 'bg-green-600/80 text-white' :
+                  'bg-yellow-600/80 text-white'
                 }`}>
                   <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  {uploadProgress.status === 'error' ? '⚠️ Fehler' :
-                   uploadProgress.status === 'uploaded' ? `✓ ${uploadProgress.stats?.uploadedCount || 0}` :
-                   `📤 ${uploadProgress.stats?.capturedCount || 0}`}
+                  {!frameStats.lastUploadSuccess ? '⚠️' :
+                   frameStats.uploadedCount > 0 ? `✓ ${frameStats.uploadedCount}` :
+                   `📹 ${frameStats.capturedCount}`}
                 </div>
               )}
             </div>
