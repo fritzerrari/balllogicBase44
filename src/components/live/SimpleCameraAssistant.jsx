@@ -11,6 +11,7 @@ import EventButtons from './EventButtons';
 import useWebRTCCamera from '@/hooks/useWebRTCCamera';
 import useFunkSubscription from '@/hooks/useFunkSubscription';
 import { SimpleFrameUpload } from '@/lib/simpleFrameUpload';
+import CameraDebugPanel from './CameraDebugPanel';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -138,6 +139,9 @@ export default function SimpleCameraAssistant() {
   const [mediaStream, setMediaStream] = useState(null);
   const [isLandscape, setIsLandscape] = useState(false);
   const [unreadFunk, setUnreadFunk] = useState(0);
+  const [debugErrors, setDebugErrors] = useState([]);
+  const [videoReady, setVideoReady] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -147,6 +151,7 @@ export default function SimpleCameraAssistant() {
   const lastMessageCountRef = useRef(0);
   const frameUploadRef = useRef(null);
   const [frameStats, setFrameStats] = useState(null);
+  const errorQueueRef = useRef([]);
 
   // Detect orientation
   useEffect(() => {
@@ -196,6 +201,12 @@ export default function SimpleCameraAssistant() {
     return () => clearInterval(t);
   }, []);
 
+  // Helper: Add error to queue
+  const addError = useCallback((msg) => {
+    errorQueueRef.current = [...errorQueueRef.current, `[${new Date().toLocaleTimeString('de')}] ${msg}`].slice(-10);
+    setDebugErrors([...errorQueueRef.current]);
+  }, []);
+
   // Start Camera + Direct Frame Upload (no polling delays)
   useEffect(() => {
     const startCamera = async () => {
@@ -211,37 +222,75 @@ export default function SimpleCameraAssistant() {
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
+          videoRef.current.onloadedmetadata = () => {
+            setVideoReady(true);
+            console.log('[SimpleCameraAssistant] Video metadata loaded');
+          };
+          await videoRef.current.play().catch(e => {
+            addError('Video play failed: ' + e.message);
+          });
           
           // Direct frame capture loop — starts IMMEDIATELY (not waiting for session)
           let frameCount = 0;
+          let uploadedCount = 0;
+          let failedCount = 0;
+          
           const captureLoop = setInterval(async () => {
             const video = videoRef.current;
-            if (!video || video.readyState < 2) return;
+            if (!video || video.readyState < 2) {
+              console.warn('[Frame Loop] Video not ready (state=' + (video?.readyState ?? 'null') + ')');
+              return;
+            }
             
-            const canvas = canvasRef.current;
-            canvas.width = 320;
-            canvas.height = 180;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, 320, 180);
-            
-            const base64 = canvas.toDataURL('image/jpeg', 0.6);
-            frameCount++;
-            
-            // Send frame directly to backend — sessionId/cameraId come from closure, so always available
-            base44.functions.invoke('uploadFrameBatch', {
-              session_id: sessionId,
-              camera_id: cameraId,
-              frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
-            }).then(res => {
-              if (frameCount === 1) console.log('[Frame Loop] ✅ First upload success:', res);
-              // Also send thumbnail via heartbeat after successful upload
-              if (sendHeartbeatRef.current) sendHeartbeatRef.current(true);
-            }).catch(e => {
-              if (frameCount === 1) console.error('[Frame Loop] ❌ First upload FAILED:', e.message);
-            });
-            
-            setFrameStats({ capturedCount: frameCount, uploadedCount: frameCount, pendingFrames: 0, lastUploadSuccess: true });
+            try {
+              const canvas = canvasRef.current;
+              if (!canvas) {
+                addError('Canvas missing');
+                return;
+              }
+              
+              canvas.width = 320;
+              canvas.height = 180;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                addError('Canvas context failed');
+                return;
+              }
+              
+              ctx.drawImage(video, 0, 0, 320, 180);
+              setCanvasReady(true);
+              
+              const base64 = canvas.toDataURL('image/jpeg', 0.6);
+              if (!base64 || base64.length < 100) {
+                addError('Frame toDataURL failed or empty');
+                failedCount++;
+                return;
+              }
+              
+              frameCount++;
+              
+              // Send frame directly to backend
+              base44.functions.invoke('uploadFrameBatch', {
+                session_id: sessionId,
+                camera_id: cameraId,
+                frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
+              }).then(res => {
+                uploadedCount++;
+                if (frameCount === 1) console.log('[Frame Loop] ✅ First upload success');
+                // Also send thumbnail via heartbeat after successful upload
+                if (sendHeartbeatRef.current) sendHeartbeatRef.current(true);
+                setFrameStats({ capturedCount: frameCount, uploadedCount, pendingFrames: 0, lastUploadSuccess: true, lastUploadTime: Date.now() });
+              }).catch(e => {
+                failedCount++;
+                addError('Upload error: ' + e.message);
+                console.error('[Frame Loop] Upload failed:', e.message);
+                setFrameStats(prev => ({ ...prev, lastUploadSuccess: false }));
+              });
+            } catch (e) {
+              failedCount++;
+              addError('Frame capture error: ' + e.message);
+              console.error('[Frame Loop] Capture error:', e);
+            }
           }, 5000); // Every 5 seconds
           
           frameUploadRef.current = { stop: () => clearInterval(captureLoop) };
@@ -250,6 +299,7 @@ export default function SimpleCameraAssistant() {
         setCamStatus('active');
       } catch (e) {
         console.error('[SimpleCameraAssistant] Camera error:', e.message);
+        addError('Camera permission denied: ' + e.message);
         setCamStatus('error');
       }
     };
@@ -263,7 +313,7 @@ export default function SimpleCameraAssistant() {
       streamRef.current?.getTracks().forEach(t => t.stop());
       frameUploadRef.current?.stop?.();
     };
-  }, [sessionId, cameraId]);
+  }, [sessionId, cameraId, addError]);
 
   const captureThumbnail = useCallback(() => {
     const video = videoRef.current;
@@ -385,6 +435,15 @@ export default function SimpleCameraAssistant() {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
+      
+      {/* DEBUG PANEL */}
+      <CameraDebugPanel
+        frameStats={frameStats}
+        errors={debugErrors}
+        isConnected={isConnected}
+        videoReady={videoReady}
+        canvasReady={canvasReady}
+      />
 
       {/* LIVE VIDEO — Vollbild */}
       <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />

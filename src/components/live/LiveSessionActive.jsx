@@ -18,6 +18,7 @@ import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
 import CoverageBlindspotMap from '@/components/live/CoverageBlindspotMap';
 import KickoffStatusBanner from '@/components/live/KickoffStatusBanner';
 import PlayerAssignmentPanel from '@/components/live/PlayerAssignmentPanel';
+import FrameMonitor from '@/components/live/FrameMonitor';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -261,8 +262,9 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               />
             </div>
 
-            {/* RIGHT: Cameras + Coverage (4 cols) */}
+            {/* RIGHT: Cameras + Coverage + Monitor (4 cols) */}
             <div className="col-span-4 space-y-4">
+              <FrameMonitor sessionId={session.id} cameraId={session.camera_streams?.[0]?.camera_id} />
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Video className="w-3.5 h-3.5 text-primary" /> Live Kameras
