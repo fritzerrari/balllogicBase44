@@ -2,18 +2,18 @@
  * SessionSetupWizard — Intelligenter 4-Schritt Onboarding-Wizard
  * Für Trainer die noch nie ein Tracking-System benutzt haben.
  * 
- * Schritt 1: Match-Name (wer spielt?)
+ * Schritt 1: Match-Name (wer spielt?) — AUTO-INTELLIGENT mit Heimmannschaft + Gegner aus Spielplan
  * Schritt 2: Kameras (wieviele & wo?)
  * Schritt 3: Spieler-Zuordnung (anonym oder mit Namen — optional!)
  * Schritt 4: Bestätigung & Start
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Camera, Users, CheckCircle2, ChevronRight, ChevronLeft,
-  Zap, UserX, UserCheck, Radio, Trophy, Smartphone, Info
+  Zap, UserX, UserCheck, Radio, Trophy, Smartphone, Info, Lightbulb, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,33 +43,114 @@ function StepLine({ done }) {
   );
 }
 
-// ─── Step 1: Match Name ───────────────────────────────────────────────────────
+// ─── Step 1: Match Name (mit Smart-Vorschlag aus Spielplan) ──────────────
 function StepMatchName({ value, onChange }) {
-  const quickNames = ['Heimspiel', 'Auswärtsspiel', 'Testspiel', 'Training'];
+  // Lade Heimmannschaft
+  const { data: club } = useQuery({
+    queryKey: ['club-for-wizard'],
+    queryFn: () => base44.entities.Club.list().then(c => c?.[0]),
+    staleTime: 300000,
+  });
+
+  // Lade Matches für nächste 7 Tage
+  const { data: upcomingMatches = [] } = useQuery({
+    queryKey: ['upcoming-matches-wizard', club?.id],
+    queryFn: async () => {
+      if (!club?.id) return [];
+      const matches = await base44.entities.ClubMatch.filter({ club_id: club.id }, '-date', 20);
+      const now = new Date();
+      return matches.filter(m => {
+        const mDate = new Date(m.date);
+        const diff = mDate.getTime() - now.getTime();
+        return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+      }).sort((a, b) => new Date(a.date) - new Date(b.date));
+    },
+    enabled: !!club?.id,
+    staleTime: 60000,
+  });
+
+  const homeClubName = club?.name || 'Heimteam';
+  const suggestedMatch = upcomingMatches[0];
+
+  // Auto-fill default beim ersten Render
+  useEffect(() => {
+    if (!value && suggestedMatch) {
+      const homeTeam = suggestedMatch.is_home ? homeClubName : suggestedMatch.home_team;
+      const awayTeam = suggestedMatch.is_home ? suggestedMatch.away_team : homeClubName;
+      onChange(`${homeTeam} vs ${awayTeam}`);
+    }
+  }, [suggestedMatch?.id]);
+
+  const quickSuggestions = suggestedMatch
+    ? [
+        { 
+          label: suggestedMatch.is_home ? suggestedMatch.away_team : suggestedMatch.home_team,
+          emoji: '⚡',
+          hint: 'Aus Spielplan',
+          action: () => {
+            const homeTeam = suggestedMatch.is_home ? homeClubName : suggestedMatch.home_team;
+            const awayTeam = suggestedMatch.is_home ? suggestedMatch.away_team : homeClubName;
+            onChange(`${homeTeam} vs ${awayTeam}`);
+          }
+        },
+        { label: 'Testspiel', emoji: '🧪', action: () => onChange(`${homeClubName} vs ...`) },
+        { label: 'Training', emoji: '🏋️', action: () => onChange(`${homeClubName} Training`) },
+      ]
+    : [
+        { label: 'Heimspiel', emoji: '🏠', action: () => onChange(`${homeClubName} vs ...`) },
+        { label: 'Testspiel', emoji: '🧪', action: () => onChange(`${homeClubName} vs ...`) },
+        { label: 'Training', emoji: '🏋️', action: () => onChange(`${homeClubName} Training`) },
+      ];
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <div className="text-5xl mb-3">🏟️</div>
         <h2 className="text-2xl font-grotesk font-bold">Wer spielt heute?</h2>
-        <p className="text-sm text-muted-foreground">Gib einfach den Match-Namen ein. Z.B. "Bayern vs Dortmund"</p>
+        <p className="text-sm text-muted-foreground">
+          {club ? (
+            <>Heim: <strong className="text-primary">{homeClubName}</strong></> 
+          ) : (
+            'Match auswählen oder manuell eingeben'
+          )}
+        </p>
       </div>
 
       <div className="space-y-3">
         <Input
           value={value}
           onChange={e => onChange(e.target.value)}
-          placeholder="z.B. FC Muster vs SV Beispiel"
+          placeholder={`z.B. ${homeClubName || 'FC Muster'} vs ...`}
           className="text-lg font-bold h-14 text-center"
           autoFocus
         />
-        <div className="flex gap-2 flex-wrap justify-center">
-          {quickNames.map(name => (
-            <button key={name} onClick={() => onChange(name)}
-              className="px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:border-primary hover:text-primary transition-all">
-              {name}
-            </button>
-          ))}
+
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground px-2 font-medium">
+            {suggestedMatch ? '⚡ Spielplan-Vorschläge' : '💡 Schnellauswahl'}
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            {quickSuggestions.map((sugg, idx) => (
+              <button
+                key={idx}
+                onClick={sugg.action}
+                className="px-3 py-2 rounded-full border border-border text-xs text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center gap-1.5 bg-muted/30 hover:bg-muted/60">
+                <span>{sugg.emoji}</span>
+                <span>{sugg.label}</span>
+                {sugg.hint && (
+                  <span className="text-[9px] text-primary font-bold">{sugg.hint}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {suggestedMatch && (
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs text-green-400 flex items-start gap-2">
+            <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <span>Im Spielplan gefunden: <strong>{suggestedMatch.is_home ? suggestedMatch.away_team : suggestedMatch.home_team}</strong> am <strong>{new Date(suggestedMatch.date).toLocaleDateString('de')}</strong></span>
+          </div>
+        )}
       </div>
     </div>
   );
