@@ -54,13 +54,21 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     return () => clearInterval(timerRef.current);
   }, [halfTime]);
 
-  // Poll session for kickoff status
-  const { data: liveSession } = useQuery({
-    queryKey: ['live-session-active', session.id],
-    queryFn: () => base44.entities.LiveSession.filter({ id: session.id }).then(r => r[0]),
-    refetchInterval: 20000,
-    staleTime: 15000,
-  });
+  // Subscribe to session updates (NOT polling)
+  const [liveSession, setLiveSession] = useState(session);
+  
+  useEffect(() => {
+    try {
+      const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
+        if (event.type === 'update' && event.id === session.id) {
+          setLiveSession(event.data);
+        }
+      });
+      return () => unsubscribe?.();
+    } catch (err) {
+      console.warn('[LiveSessionActive] Subscribe failed:', err.message);
+    }
+  }, [session.id]);
 
   // Live camera connection count
   const connectedCams = (liveSession?.camera_streams || session?.camera_streams || [])

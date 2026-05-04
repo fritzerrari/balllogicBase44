@@ -25,7 +25,7 @@ import ScoutingReport from './pages/ScoutingReport';
 import TrainingPlan from './pages/TrainingPlan';
 import MatchPrep from './pages/MatchPrep';
 import LiveSession from './pages/LiveSession';
-import CameraView from './pages/CameraView';
+import CameraViewV2 from './pages/CameraViewV2';
 import AdminDocs from './pages/AdminDocs.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import Players from './pages/Players.jsx';
@@ -106,7 +106,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/robustness-test" element={<SystemRobustnessTest />} />
       </Route>
       {/* Public routes — no login required */}
-      <Route path="/cam" element={<CameraView />} />
+      <Route path="/cam" element={<CameraViewV2 />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

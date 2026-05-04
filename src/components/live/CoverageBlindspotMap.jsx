@@ -9,8 +9,7 @@
  * 
  * Basis: Echte TrackingData-Positionen der letzten N Frames
  */
-import { useEffect, useRef, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Eye, EyeOff, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 
@@ -71,16 +70,23 @@ export default function CoverageBlindspotMap({ session }) {
   const canvasRef = useRef(null);
   const cameras = session?.camera_streams || [];
 
-  // Lade letzte 30 Frames Tracking-Daten für Coverage-Analyse
-  const { data: recentTracking = [] } = useQuery({
-    queryKey: ['coverage-tracking', session?.id],
-    queryFn: () => base44.entities.TrackingData.filter(
-      { session_id: session.id }, '-timestamp_ms', 30
-    ),
-    refetchInterval: 30000,
-    staleTime: 25000,
-    enabled: !!session?.id,
-  });
+  const [recentTracking, setRecentTracking] = useState([]);
+
+  // Subscribe to tracking updates
+  useEffect(() => {
+    if (!session?.id) return;
+
+    try {
+      const unsubscribe = base44.entities.TrackingData.subscribe((event) => {
+        if (event.type === 'create' && event.data?.session_id === session.id) {
+          setRecentTracking(prev => [...prev, event.data].slice(-30));
+        }
+      });
+      return () => unsubscribe?.();
+    } catch (err) {
+      console.warn('[CoverageBlindspotMap] Subscribe failed:', err.message);
+    }
+  }, [session?.id]);
 
   // Kamera-Status berechnen
   const cameraStatuses = useMemo(() => cameras.map(cam => {

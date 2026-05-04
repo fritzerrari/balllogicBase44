@@ -33,60 +33,32 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
     };
   }, [sessionId]);
 
-  // Frame Display vom SessionState Polling
+  // Subscribe to SessionState changes (NOT polling, reactive)
   useEffect(() => {
-    let lastFrameTime = 0;
+    if (!sessionId) return;
 
-    const pollFrames = async () => {
-      try {
-        const states = await base44.entities.SessionState.filter({ session_id: sessionId });
-        if (states.length === 0) return;
-
-        const state = states[0];
-        if (!state.latest_frame_base64) {
-          setStatus('ready');
-          return;
-        }
-
-        // Nur wenn neue Frame (verhindert Redundanz)
-        if (state.latest_frame_timestamp <= lastFrameTime) return;
-        lastFrameTime = state.latest_frame_timestamp;
-
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const ctx = canvas.getContext('2d');
+    let unsubscribe;
+    try {
+      unsubscribe = base44.entities.SessionState.subscribe((event) => {
+        if (event.type === 'update' && event.data?.latest_frame_base64) {
           const img = new Image();
-
           img.onload = () => {
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            if (canvasRef.current) {
+              const ctx = canvasRef.current.getContext('2d');
+              ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
               setStatus('streaming');
-              setProgress({
-                status: 'streaming',
-                capturedCount: 0,
-                droppedCount: 0,
-                pendingFrames: 0,
-                totalUploaded: 0,
-              });
             }
           };
-          img.onerror = () => {
-            console.warn('[SnapshotViewer] Image load failed');
-            setStatus('error');
-          };
-
-          img.src = `data:image/jpeg;base64,${state.latest_frame_base64}`;
+          img.src = `data:image/jpeg;base64,${event.data.latest_frame_base64}`;
         }
-      } catch (err) {
-        console.warn('[SnapshotViewer] Poll failed:', err.message);
-        setStatus('error');
-      }
-    };
+      });
+    } catch (err) {
+      console.warn('[AdaptiveStreamViewer] Subscribe failed, using fallback:', err.message);
+    }
 
-    // Poll alle 2 Sekunden
-    const interval = setInterval(pollFrames, 2000);
-    pollFrames(); // Initial poll
-    return () => clearInterval(interval);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [sessionId]);
 
   const handleRecover = async () => {

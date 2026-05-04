@@ -3,8 +3,7 @@
  * Spieler-Positionen, Ball, Formations-Linien, Ballbesitz, Pressing-Linie
  * Pollt SessionState + TrackingData in Echtzeit
  */
-import { useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useRef, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
 function drawPitch(ctx, W, H) {
@@ -57,28 +56,46 @@ function drawPitch(ctx, W, H) {
 export default function LivePitchTracker({ sessionId, kickoffDetected, playerAssignments }) {
   const canvasRef = useRef(null);
 
-  const { data: sessionState } = useQuery({
-    queryKey: ['session-state-pitch', sessionId],
-    queryFn: () => base44.entities.SessionState.filter({ session_id: sessionId }),
-    refetchInterval: 8000,
-    staleTime: 6000,
-    select: d => d?.[0],
-  });
+  const [sessionState, setSessionState] = useState(null);
+  const [lastTracking, setLastTracking] = useState(null);
+  const [recentEvents, setRecentEvents] = useState([]);
 
-  const { data: lastTracking } = useQuery({
-    queryKey: ['tracking-latest', sessionId],
-    queryFn: () => base44.entities.TrackingData.filter({ session_id: sessionId }, '-timestamp_ms', 1),
-    refetchInterval: 5000,
-    staleTime: 3000,
-    select: d => d?.[0],
-  });
+  // Subscribe instead of polling
+  useEffect(() => {
+    const subs = [];
 
-  const { data: recentEvents = [] } = useQuery({
-    queryKey: ['recent-events-pitch', sessionId],
-    queryFn: () => base44.entities.MatchEvent.filter({ session_id: sessionId }, '-timestamp_ms', 5),
-    refetchInterval: 10000,
-    staleTime: 8000,
-  });
+    try {
+      subs.push(
+        base44.entities.SessionState.subscribe((event) => {
+          if (event.type === 'update' && event.data?.session_id === sessionId) {
+            setSessionState(event.data);
+          }
+        })
+      );
+
+      subs.push(
+        base44.entities.TrackingData.subscribe((event) => {
+          if (event.type === 'create' && event.data?.session_id === sessionId) {
+            setLastTracking(event.data);
+          }
+        })
+      );
+
+      subs.push(
+        base44.entities.MatchEvent.subscribe((event) => {
+          if (event.type === 'create' && event.data?.session_id === sessionId) {
+            setRecentEvents(prev => [event.data, ...prev].slice(0, 5));
+          }
+        })
+      );
+    } catch (err) {
+      console.warn('[LivePitchTracker] Subscribe failed:', err.message);
+    }
+
+    return () => {
+      subs.forEach(u => u?.());
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

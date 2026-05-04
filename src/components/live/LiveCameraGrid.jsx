@@ -2,8 +2,7 @@
  * LiveCameraGrid — Zeigt alle Kameras als Live-Feed-Grid
  * Thumbnail-Polling, Status-Badges, Share-Links, QR-Code
  */
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { Copy, Share2, Wifi, WifiOff, CheckCircle2, Smartphone } from 'lucide-react';
@@ -11,15 +10,23 @@ import AdaptiveStreamViewer from '@/components/live/AdaptiveStreamViewer';
 
 function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
+  const [liveCam, setLiveCam] = useState(cam);
 
-  const { data: liveSession } = useQuery({
-    queryKey: ['cam-feed', sessionId, cam.camera_id],
-    queryFn: () => base44.entities.LiveSession.filter({ id: sessionId }).then(r => r[0]),
-    refetchInterval: 20000,
-    staleTime: 15000,
-  });
+  // Subscribe to session updates instead of polling
+  useEffect(() => {
+    try {
+      const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
+        if (event.type === 'update' && event.data?.camera_streams) {
+          const updated = event.data.camera_streams.find(c => String(c.camera_id) === String(cam.camera_id));
+          if (updated) setLiveCam(updated);
+        }
+      });
+      return () => unsubscribe?.();
+    } catch (err) {
+      console.warn('[CameraFeed] Subscribe failed:', err.message);
+    }
+  }, [cam.camera_id]);
 
-  const liveCam = liveSession?.camera_streams?.find(c => String(c.camera_id) === String(cam.camera_id));
   const thumbnail = liveCam?.thumbnail;
   const lastSeenMs = liveCam?.last_seen ? Date.now() - new Date(liveCam.last_seen).getTime() : null;
   const isOnline = lastSeenMs !== null && lastSeenMs < 15000;
