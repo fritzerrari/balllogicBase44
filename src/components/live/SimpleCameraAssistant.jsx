@@ -10,6 +10,7 @@ import { Mic, MicOff, CameraOff, Radio, Zap, X, Send, MessageSquare } from 'luci
 import EventButtons from './EventButtons';
 import useWebRTCCamera from '@/hooks/useWebRTCCamera';
 import useFunkSubscription from '@/hooks/useFunkSubscription';
+import FrameUploadService from '@/lib/frameUploadService';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -136,6 +137,8 @@ export default function SimpleCameraAssistant() {
   const heartbeatRef = useRef(null);
   const thumbnailRef = useRef(null);
   const lastMessageCountRef = useRef(0);
+  const frameUploadServiceRef = useRef(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
 
   // Detect orientation
   useEffect(() => {
@@ -176,7 +179,7 @@ export default function SimpleCameraAssistant() {
     return () => clearInterval(t);
   }, []);
 
-  // Start Camera
+  // Start Camera + Frame Upload Service
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -189,6 +192,19 @@ export default function SimpleCameraAssistant() {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
+          
+          // Start Frame Upload Service
+          if (sessionId && cameraId) {
+            const uploadService = new FrameUploadService(
+              videoRef.current,
+              sessionId,
+              cameraId,
+              (progress) => setUploadProgress(progress)
+            );
+            uploadService.setStartTime(Date.now());
+            uploadService.start();
+            frameUploadServiceRef.current = uploadService;
+          }
         }
         setCamStatus('active');
       } catch (e) {
@@ -196,8 +212,11 @@ export default function SimpleCameraAssistant() {
       }
     };
     startCamera();
-    return () => streamRef.current?.getTracks().forEach(t => t.stop());
-  }, []);
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      frameUploadServiceRef.current?.stop();
+    };
+  }, [sessionId, cameraId]);
 
   const captureThumbnail = useCallback(() => {
     const video = videoRef.current;
@@ -314,6 +333,18 @@ export default function SimpleCameraAssistant() {
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
                 {isConnected ? 'Verbunden' : 'Verbinde...'}
               </div>
+              {uploadProgress && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm ${
+                  uploadProgress.status === 'error' ? 'bg-red-600/80 text-white' :
+                  uploadProgress.status === 'uploaded' ? 'bg-blue-600/80 text-white' :
+                  'bg-purple-600/80 text-white'
+                }`}>
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  {uploadProgress.status === 'error' ? '⚠️ Fehler' :
+                   uploadProgress.status === 'uploaded' ? `✓ ${uploadProgress.stats?.uploadedCount || 0}` :
+                   `📤 ${uploadProgress.stats?.capturedCount || 0}`}
+                </div>
+              )}
             </div>
             <div className="text-xs text-white/60">{camLabel}</div>
           </div>
