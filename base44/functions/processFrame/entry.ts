@@ -17,14 +17,14 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const ROBOFLOW_API_KEY = Deno.env.get('ROBOFLOW_API_KEY');
 const WORKFLOW_URL = 'https://serverless.roboflow.com/fritzs-workspace-fieldiq/workflows/football-tracking-phase-1-1777785537057';
 
-const API_TIMEOUT_MS = 35000; // Roboflow Serverless cold-start kann bis zu 30s dauern
-const MAX_RETRIES = 3; // Increased from 2
+const API_TIMEOUT_MS = 15000; // Timeout reduced — Roboflow should respond in < 10s normally
+const MAX_RETRIES = 2; // Retry only 2x to fail fast
 const CONFIDENCE_MIN = 0.35; // Lowered to catch more weak detections
 
 // Circuit breaker per session
 const circuitBreakerBySession = new Map();
-const CIRCUIT_BREAKER_THRESHOLD = 10; // Increased tolerance
-const CIRCUIT_BREAKER_RESET_MS = 15000; // Faster reset (was 30s)
+const CIRCUIT_BREAKER_THRESHOLD = 5; // Failures before breaking (reduced from 10)
+const CIRCUIT_BREAKER_RESET_MS = 5000; // Fast reset for testing (was 15s)
 
 // Multi-Frame History cache (in-memory, last N frames per session for sprint detection)
 // Note: Für Produktion sollte SessionState DB-Entity genutzt werden (siehe sessionState.last_20_frames)
@@ -421,6 +421,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing session_id or frame_base64' }, { status: 400 });
     }
 
+    // Validate base64 format (must be data:image/* or raw base64)
+    if (typeof frame_base64 !== 'string' || frame_base64.length < 100) {
+      console.error(`❌ Invalid frame_base64: type=${typeof frame_base64}, length=${frame_base64?.length || 0}`);
+      return Response.json({ 
+        error: 'Invalid frame_base64 format',
+        detail: `Expected base64 string, got ${typeof frame_base64} (${frame_base64?.length || 0} chars)`
+      }, { status: 400 });
+    }
+
+    console.log(`[processFrame] Received: session=${session_id}, frame=${frame_number}, base64_length=${frame_base64.length}, elapsed=${elapsed_seconds}s`);
+
     // Auto-ensure SessionState exists (one-time per session)
     try {
       const stateCheck = await base44.asServiceRole.entities.SessionState.filter({ session_id });
@@ -657,6 +668,18 @@ Deno.serve(async (req) => {
     } catch (_) {}
 
     const minute = Math.floor(elapsed_seconds / 60);
+    
+    // Increment SessionState frame_count (CRITICAL for frontend monitoring)
+    if (sessionStates.length > 0) {
+      try {
+        await base44.asServiceRole.entities.SessionState.update(sessionStates[0].id, {
+          frame_count: (sessionStates[0].frame_count || 0) + 1,
+          last_frame_number: frame_number,
+          detection_quality_avg: qualityScore,
+          updated_at: new Date().toISOString(),
+        });
+      } catch (_) {}
+    }
 
     // Auto-events (with noise filtering)
     const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds, session_id);

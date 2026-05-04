@@ -94,8 +94,14 @@ Deno.serve(async (req) => {
           elapsed_seconds: elapsed_seconds || 0,
           timestamp_ms,
           source: 'adaptive_capture',
+        }).then(res => {
+          if (res?.data?.success) {
+            console.log(`[uploadFrameBatch] Frame ${i} tracked: ${res.data.players_detected} players, quality=${res.data.quality_score}%`);
+          } else {
+            console.error(`[uploadFrameBatch] Frame ${i} failed: ${res?.data?.error}`);
+          }
         }).catch(err => {
-          console.warn(`[uploadFrameBatch] processFrame async error: ${err.message}`);
+          console.error(`[uploadFrameBatch] processFrame crashed: ${err.message}`);
         });
 
         processedFrames.push({
