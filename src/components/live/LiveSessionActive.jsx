@@ -47,9 +47,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   const [doingKickoff, setDoingKickoff] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showOverTimeDialog, setShowOverTimeDialog] = useState(false);
+  const [cameraTimeoutWarning, setCameraTimeoutWarning] = useState(null);
   const timerRef = useRef(null);
   const halftimeRef = useRef(false);
   const overtimeRef = useRef(false);
+  const cameraCheckRef = useRef(null);
 
   // Timer (pauseable + Überlänge-Check)
   useEffect(() => {
@@ -98,6 +100,41 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   useEffect(() => {
     setLiveSession(session); // Update when prop changes
   }, [session]);
+
+  // Kamera-Verbindungs-Monitoring mit Timeout-Alert
+  useEffect(() => {
+    if (!session?.id || kickoffDetected) return; // Nur vor Anstoß checken
+
+    const checkCameraHealth = async () => {
+      try {
+        const cams = await base44.entities.CameraConnection.filter({ session_id: session.id });
+        const expectedCount = session.camera_streams?.length || 0;
+        const connectedCount = cams.filter(c => {
+          const ms = c.last_heartbeat ? Date.now() - new Date(c.last_heartbeat).getTime() : Infinity;
+          return ms < 15000; // Online: < 15s since heartbeat
+        }).length;
+
+        // Warning: Weniger Kameras verbunden als erwartet
+        if (expectedCount > 0 && connectedCount === 0 && elapsedSeconds < 300) {
+          // Timeout nach 30s: Nur eine Warnung, NICHT abbrechen
+          if (elapsedSeconds > 30) {
+            setCameraTimeoutWarning({
+              message: `⚠️ Keine Kameras verbunden (erwartet: ${expectedCount})`,
+              action: 'Überprüfe die Kamera-Links oder starte Session neu',
+            });
+          }
+        } else {
+          setCameraTimeoutWarning(null);
+        }
+      } catch (err) {
+        console.warn('[LiveSessionActive] Camera check failed:', err);
+      }
+    };
+
+    cameraCheckRef.current = setInterval(checkCameraHealth, 10000);
+    return () => clearInterval(cameraCheckRef.current);
+  }, [session?.id, kickoffDetected, elapsedSeconds]);
+
 
   // Subscribe to tracking updates for correction panel
   useEffect(() => {
@@ -189,6 +226,50 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   return (
     <>
       <DsgvoGatekeeper sessionId={session.id} onReadyToStart={() => {}} />
+
+      {/* CAMERA TIMEOUT WARNING */}
+      <AnimatePresence>
+        {cameraTimeoutWarning && !kickoffDetected && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 left-4 right-4 z-40 bg-yellow-500/15 border border-yellow-500/30 rounded-lg p-4 backdrop-blur-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="text-2xl flex-shrink-0">⚠️</div>
+              <div className="flex-1">
+                <div className="font-bold text-yellow-400">{cameraTimeoutWarning.message}</div>
+                <div className="text-sm text-yellow-300/80 mt-1">{cameraTimeoutWarning.action}</div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCameraTimeoutWarning(null)}
+                    className="text-yellow-400 border-yellow-500/30"
+                  >
+                    Verstanden
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-yellow-400 border-yellow-500/30"
+                    onClick={async () => {
+                      // Manueller Kamera-Refresh
+                      await base44.entities.LiveSession.update(session.id, {
+                        camera_streams: session.camera_streams,
+                      }).catch(() => {});
+                      setCameraTimeoutWarning(null);
+                    }}
+                  >
+                    Kameras neu laden
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* HALFTIME ALERT */}
       <AnimatePresence>
