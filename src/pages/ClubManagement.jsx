@@ -410,8 +410,8 @@ export default function ClubManagement() {
             </p>
             <TeamSelector
               clubId={selectedClub.id}
-              clubName={selectedClub.short_name || selectedClub.name}
-              apiTeamId={selectedClub.api_team_id}
+              clubName={selectedClub.name}
+              clubWebsite={selectedClub.website || null}
               onTeamImported={() => {
                 queryClient.invalidateQueries({ queryKey: ['club-matches', selectedClub.id] });
                 queryClient.invalidateQueries({ queryKey: ['players'] });

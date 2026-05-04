@@ -1,31 +1,35 @@
 /**
- * TeamSelector — Zeigt alle gefundenen Mannschaften eines Vereins
- * und ermöglicht Auswahl + Datenimport für eine Mannschaft
+ * TeamSelector — KI-Web-Suche: alle Mannschaften eines Vereins + Kader-/Spielplan-Import
  */
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Check, Users, Trophy, MapPin, ChevronRight, Download } from 'lucide-react';
+import { Loader2, Check, Users, MapPin, Download, Globe, Sparkles, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 
-export default function TeamSelector({ clubId, clubName, apiTeamId, onTeamImported }) {
+export default function TeamSelector({ clubId, clubName, clubWebsite, onTeamImported }) {
   const [teams, setTeams] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState(null); // team_id being imported
-  const [importedTeams, setImportedTeams] = useState(new Set());
+  const [importing, setImporting] = useState(null);
+  const [importedTeams, setImportedTeams] = useState({});  // label -> { players, matches }
+  const [note, setNote] = useState(null);
   const { toast } = useToast();
 
   const searchTeams = async () => {
     if (!clubName) return;
     setLoading(true);
+    setTeams(null);
+    setNote(null);
     try {
       const res = await base44.functions.invoke('fetchClubTeams', {
         action: 'search_teams',
         team_name: clubName,
+        club_website: clubWebsite || null,
       });
       setTeams(res.data.teams || []);
+      setNote(res.data.note || null);
     } catch (e) {
       toast({ title: '❌ Fehler beim Suchen', description: e.message, variant: 'destructive' });
     } finally {
@@ -34,58 +38,60 @@ export default function TeamSelector({ clubId, clubName, apiTeamId, onTeamImport
   };
 
   const importTeam = async (team) => {
-    setImporting(team.id);
+    const key = team.label || team.name;
+    setImporting(key);
     try {
-      // Team-Daten laden (Spielplan + Spieler)
       const res = await base44.functions.invoke('fetchClubTeams', {
         action: 'fetch_team_data',
-        team_id: team.id,
+        team_name: team.name,
+        team_label: team.label,
+        club_website: clubWebsite || null,
       });
-      const { matches, players, season } = res.data;
-
-      // Club mit gewähltem Team aktualisieren
-      await base44.entities.Club.update(clubId, {
-        api_team_id: String(team.id),
-        league: team.league || undefined,
-      }).catch(() => {});
+      const { players, matches, season, league, data_source } = res.data;
 
       // Spielplan importieren
+      let matchCount = 0;
       if (matches?.length > 0) {
-        await Promise.all(matches.slice(0, 50).map(m =>
+        await Promise.all(matches.slice(0, 60).map(m =>
           base44.entities.ClubMatch.create({
             club_id: clubId,
-            ...m,
+            api_match_id: `ai-${team.label}-${m.date}-${m.home_team}`.replace(/\s+/g, '-').toLowerCase(),
+            date: m.date,
+            matchday: m.matchday ? String(m.matchday) : null,
+            home_team: m.home_team,
+            away_team: m.away_team,
+            home_score: m.home_score ?? null,
+            away_score: m.away_score ?? null,
+            status: m.status || 'scheduled',
+            competition: m.competition || league || team.league,
+            season: season || team.season,
           }).catch(() => {})
         ));
+        matchCount = matches.length;
       }
 
       // Spieler importieren
+      let playerCount = 0;
       if (players?.length > 0) {
-        const posMap = {
-          'Torwart': 'Torwart',
-          'Innenverteidiger': 'Innenverteidiger',
-          'Zentrales Mittelfeld': 'Zentrales Mittelfeld',
-          'Mittelstürmer': 'Mittelstürmer',
-        };
-        await Promise.all(players.slice(0, 30).map(p =>
+        await Promise.all(players.slice(0, 40).map(p =>
           base44.entities.Player.create({
             name: p.name,
             position: p.position || 'Zentrales Mittelfeld',
             team: team.name,
             club_id: clubId,
-            age: p.age,
-            nationality: p.nationality,
-            api_player_id: p.api_player_id,
-            avatar_url: p.avatar_url,
-            number: p.number,
+            age: p.age || null,
+            nationality: p.nationality || null,
+            number: p.number || null,
           }).catch(() => {})
         ));
+        playerCount = players.length;
       }
 
-      setImportedTeams(prev => new Set([...prev, team.id]));
+      setImportedTeams(prev => ({ ...prev, [key]: { players: playerCount, matches: matchCount, source: data_source } }));
+
       toast({
         title: `✓ ${team.name} importiert`,
-        description: `${matches?.length || 0} Spiele · ${players?.length || 0} Spieler · Saison ${season}`,
+        description: `${playerCount} Spieler · ${matchCount} Spiele · Quelle: ${data_source || 'KI-Web-Suche'}`,
       });
       if (onTeamImported) onTeamImported(team);
     } catch (e) {
@@ -97,103 +103,133 @@ export default function TeamSelector({ clubId, clubName, apiTeamId, onTeamImport
 
   return (
     <div className="space-y-4">
+      {/* KI-Info Banner */}
+      <div className="flex items-start gap-2 p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+        <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+        <span>
+          Die KI durchsucht das Internet (Vereinshomepage, fussball.de, transfermarkt.de, kicker.de) und findet <strong className="text-foreground">alle Mannschaften</strong> — 1. Herren, Frauen, U19, U17, U15 usw. — auch ohne API-Zugang.
+        </span>
+      </div>
+
       {/* Suche auslösen */}
-      {teams === null && (
+      {teams === null && !loading && (
         <div className="text-center py-4">
           <p className="text-xs text-muted-foreground mb-3">
-            Suche alle Mannschaften von <strong className="text-foreground">„{clubName}"</strong> in der Datenbank
+            Alle Mannschaften von <strong className="text-foreground">„{clubName}"</strong> per KI-Web-Suche finden
           </p>
-          <Button onClick={searchTeams} disabled={loading} className="bg-primary text-primary-foreground gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-            Mannschaften suchen
+          <Button onClick={searchTeams} className="bg-primary text-primary-foreground gap-2">
+            <Sparkles className="w-4 h-4" /> Mannschaften suchen
           </Button>
         </div>
       )}
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" /> Suche läuft...
+        <div className="flex flex-col items-center justify-center gap-3 py-8 text-muted-foreground text-sm">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <div className="text-center">
+            <div className="font-medium text-foreground text-sm mb-1">KI durchsucht das Internet...</div>
+            <div className="text-xs">Vereinshomepage · fussball.de · transfermarkt.de · kicker.de</div>
+          </div>
         </div>
       )}
 
       {/* Ergebnisse */}
       {teams !== null && !loading && (
-        <AnimatePresence>
-          {teams.length === 0 ? (
-            <div className="text-center py-6 text-sm text-muted-foreground">
-              Keine Mannschaften in der Datenbank gefunden.
-              <br />
-              <button onClick={() => setTeams(null)} className="text-primary underline text-xs mt-2">Erneut suchen</button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  {teams.length} Mannschaft{teams.length !== 1 ? 'en' : ''} gefunden
-                </span>
-                <button onClick={() => setTeams(null)} className="text-[10px] text-muted-foreground underline">
-                  Neu suchen
-                </button>
-              </div>
-              {teams.map((team, i) => (
-                <motion.div
-                  key={team.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  className="glass rounded-xl p-4 flex items-center gap-3"
-                >
-                  {team.logo ? (
-                    <img src={team.logo} alt={team.name} className="w-10 h-10 object-contain flex-shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-                      <Users className="w-5 h-5 text-primary" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-grotesk font-bold text-sm text-foreground">{team.name}</div>
-                    <div className="flex flex-wrap gap-2 mt-0.5">
-                      {team.country && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                          <MapPin className="w-2.5 h-2.5" /> {team.country}
-                        </span>
-                      )}
-                      {team.founded && (
-                        <span className="text-[10px] text-muted-foreground">Gegr. {team.founded}</span>
-                      )}
-                      {team.venue && (
-                        <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">{team.venue}</span>
-                      )}
-                      {team.national && (
-                        <Badge className="text-[9px] bg-yellow-500/15 text-yellow-400 border-yellow-500/20 h-4 px-1.5">Nationalteam</Badge>
-                      )}
-                    </div>
-                  </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              {teams.length} Mannschaft{teams.length !== 1 ? 'en' : ''} gefunden
+            </span>
+            <button onClick={searchTeams} className="text-[10px] text-primary underline flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5" /> Erneut suchen
+            </button>
+          </div>
 
-                  {importedTeams.has(team.id) ? (
-                    <div className="flex items-center gap-1 text-primary text-xs font-bold flex-shrink-0">
-                      <Check className="w-4 h-4" /> Importiert
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => importTeam(team)}
-                      disabled={importing === team.id}
-                      className="bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 text-xs gap-1.5 h-8 flex-shrink-0"
-                    >
-                      {importing === team.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <Download className="w-3.5 h-3.5" />
-                      }
-                      Importieren
-                    </Button>
-                  )}
-                </motion.div>
-              ))}
+          {note && (
+            <div className="flex items-start gap-2 p-2 rounded-lg bg-muted text-[10px] text-muted-foreground">
+              <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              {note}
             </div>
           )}
-        </AnimatePresence>
+
+          {teams.length === 0 ? (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              Keine Mannschaften gefunden. Überprüfe den Vereinsnamen.
+            </div>
+          ) : (
+            <AnimatePresence>
+              {teams.map((team, i) => {
+                const key = team.label || team.name;
+                const imported = importedTeams[key];
+                const isImporting = importing === key;
+
+                return (
+                  <motion.div
+                    key={key}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="glass rounded-xl p-4 flex items-center gap-3"
+                  >
+                    {/* Label Badge */}
+                    <div className="w-12 h-12 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px] font-bold text-primary leading-tight text-center px-1">{team.label || '1.'}</span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="font-grotesk font-bold text-sm text-foreground">{team.name}</div>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {team.league && (
+                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {team.league}
+                          </span>
+                        )}
+                        {team.season && (
+                          <span className="text-[10px] text-muted-foreground">{team.season}</span>
+                        )}
+                        {team.has_squad_data && (
+                          <Badge className="text-[9px] h-4 px-1.5 bg-green-500/15 text-green-400 border-green-500/20">
+                            Kader verfügbar
+                          </Badge>
+                        )}
+                        {team.has_fixture_data && (
+                          <Badge className="text-[9px] h-4 px-1.5 bg-blue-500/15 text-blue-400 border-blue-500/20">
+                            Spielplan verfügbar
+                          </Badge>
+                        )}
+                      </div>
+                      {imported && (
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          ✓ {imported.players} Spieler · {imported.matches} Spiele importiert
+                          {imported.source && <span className="ml-1 opacity-60">· {imported.source}</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {imported ? (
+                      <div className="flex items-center gap-1 text-primary text-xs font-bold flex-shrink-0">
+                        <Check className="w-4 h-4" /> OK
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => importTeam(team)}
+                        disabled={isImporting}
+                        className="bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 text-xs gap-1.5 h-8 flex-shrink-0 min-w-[90px]"
+                      >
+                        {isImporting
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Lade...</>
+                          : <><Download className="w-3.5 h-3.5" /> Importieren</>
+                        }
+                      </Button>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
+        </div>
       )}
     </div>
   );
