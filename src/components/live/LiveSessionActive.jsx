@@ -17,6 +17,7 @@ import EventApprovalPanel from '@/components/live/EventApprovalPanel';
 import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
 import CoverageBlindspotMap from '@/components/live/CoverageBlindspotMap';
 import KickoffStatusBanner from '@/components/live/KickoffStatusBanner';
+import PlayerAssignmentPanel from '@/components/live/PlayerAssignmentPanel';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -207,6 +208,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
 
             {/* LEFT: Events (3 cols) */}
             <div className="col-span-3 space-y-4">
+              <PlayerAssignmentPanel session={liveSession || session} onAssigned={() => {}} />
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Zap className="w-3.5 h-3.5 text-primary" /> Events tippen
@@ -230,7 +232,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <BarChart3 className="w-3.5 h-3.5 text-primary" /> Live Tracking
                 </h2>
-                <LivePitchTracker sessionId={session.id} kickoffDetected={kickoffDetected} />
+                <LivePitchTracker
+                  sessionId={session.id}
+                  kickoffDetected={kickoffDetected}
+                  playerAssignments={(liveSession || session)?.player_assignments}
+                />
               </div>
 
               {/* Kompakter Kalibrierungs-Hinweis (kein doppelter Anstoß-Button) */}
@@ -294,7 +300,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               {tab === 'tracking' && (
                 <motion.div key="tracking" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-3">
                   <div className="glass rounded-xl p-4 border border-border">
-                    <LivePitchTracker sessionId={session.id} kickoffDetected={kickoffDetected} />
+                    <LivePitchTracker
+                      sessionId={session.id}
+                      kickoffDetected={kickoffDetected}
+                      playerAssignments={(liveSession || session)?.player_assignments}
+                    />
                   </div>
                   <KickoffStatusBanner
                     session={liveSession || session}

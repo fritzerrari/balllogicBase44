@@ -54,7 +54,7 @@ function drawPitch(ctx, W, H) {
   ctx.strokeRect(W - 18, H / 2 - 20, 12, 40);
 }
 
-export default function LivePitchTracker({ sessionId, kickoffDetected }) {
+export default function LivePitchTracker({ sessionId, kickoffDetected, playerAssignments }) {
   const canvasRef = useRef(null);
 
   const { data: sessionState } = useQuery({
@@ -131,6 +131,10 @@ export default function LivePitchTracker({ sessionId, kickoffDetected }) {
       ctx.fillText(`▲ ${avgX.toFixed(0)}%`, (avgX / 100) * W, 10);
     }
 
+    // Tracker-zu-Name Lookup aus player_assignments
+    const homeTrackerMap = playerAssignments?.home_tracker_map || {};
+    const awayTrackerMap = playerAssignments?.away_tracker_map || {};
+
     // Draw players
     const drawPlayer = (p, fill, border, label) => {
       const px = (p.x / 100) * W;
@@ -155,11 +159,15 @@ export default function LivePitchTracker({ sessionId, kickoffDetected }) {
 
     home.forEach((p, i) => {
       const fill = p.class === 'goalkeeper' ? '#16a34a' : '#4ade80';
-      drawPlayer(p, fill, '#fff', p.number || String(i + 1));
+      const tid = p.tracker_id ?? i;
+      const label = homeTrackerMap[tid] ? String(homeTrackerMap[tid]).slice(0, 4) : (p.number || `H${i + 1}`);
+      drawPlayer(p, fill, '#fff', label);
     });
     away.forEach((p, i) => {
       const fill = p.class === 'goalkeeper' ? '#b91c1c' : '#f87171';
-      drawPlayer(p, fill, '#fff', p.number || String(i + 1));
+      const tid = p.tracker_id ?? i;
+      const label = awayTrackerMap[tid] ? String(awayTrackerMap[tid]).slice(0, 4) : (p.number || `G${i + 1}`);
+      drawPlayer(p, fill, '#fff', label);
     });
 
     // Ball
