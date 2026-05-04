@@ -18,7 +18,7 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
     staleTime: 1000,
   });
 
-  const liveCam = liveSession?.camera_streams?.find(c => c.camera_id === cam.camera_id);
+  const liveCam = liveSession?.camera_streams?.find(c => String(c.camera_id) === String(cam.camera_id));
   const thumbnail = liveCam?.thumbnail;
   const lastSeenMs = liveCam?.last_seen ? Date.now() - new Date(liveCam.last_seen).getTime() : null;
   const isOnline = lastSeenMs !== null && lastSeenMs < 15000;
