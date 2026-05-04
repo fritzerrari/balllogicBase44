@@ -29,6 +29,7 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
       const unsubscribe = base44.entities.SessionState.subscribe((event) => {
         if (event.type === 'update' && event.data?.session_id === sessionId) {
           const pct = event.data.possession_percentage || { home: 50, away: 50 };
+          console.log('[LiveReportingPanel] 📊 Possession update:', pct);
           setStats(prev => ({
             ...prev,
             possession_home: pct.home ?? 50,
@@ -45,16 +46,40 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
   // Events abrufen (Goals, Chances, etc)
   const { data: events = [] } = useQuery({
     queryKey: ['match-events-live', sessionId],
-    queryFn: () => base44.entities.MatchEvent.filter({ session_id: sessionId }),
-    refetchInterval: 5000, // Poll alle 5s
+    queryFn: () => {
+      console.log('[LiveReportingPanel] 📥 Fetching match events...');
+      return base44.entities.MatchEvent.filter({ session_id: sessionId });
+    },
+    refetchInterval: 3000, // Poll alle 3s (schneller)
   });
 
   // AutoEvents abrufen (Chancen, Dangerous Situations)
   const { data: autoEvents = [] } = useQuery({
     queryKey: ['auto-events-live', sessionId],
-    queryFn: () => base44.entities.AutoEvent.filter({ session_id: sessionId }),
-    refetchInterval: 5000,
+    queryFn: () => {
+      console.log('[LiveReportingPanel] 📥 Fetching auto events...');
+      return base44.entities.AutoEvent.filter({ session_id: sessionId });
+    },
+    refetchInterval: 3000, // Poll alle 3s
   });
+
+  // Trigger updateSessionStats alle 10 Sekunden
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const interval = setInterval(() => {
+      base44.functions
+        .invoke('updateSessionStats', { session_id: sessionId })
+        .then(res => {
+          console.log('[LiveReportingPanel] ✅ Stats updated:', res.data);
+        })
+        .catch(err => {
+          console.warn('[LiveReportingPanel] ⚠️ Stats update failed:', err.message);
+        });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [sessionId]);
 
   // Stats kalkulieren
   useEffect(() => {
@@ -63,6 +88,8 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
     const chances_home = autoEvents.filter(e => e.type === 'ball_in_penalty_area' && e.team === 'home').length;
     const chances_away = autoEvents.filter(e => e.type === 'ball_in_penalty_area' && e.team === 'away').length;
     const dangerous = autoEvents.filter(e => e.type === 'dangerous_situation').length;
+
+    console.log('[LiveReportingPanel] 📊 Stats calculated:', { goals_home, goals_away, chances_home, chances_away, dangerous, total_events: events.length });
 
     setStats(prev => ({
       ...prev,
