@@ -120,6 +120,14 @@ export default function SimpleCameraAssistant() {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session');
   const cameraId = urlParams.get('cam') || '1';
+  
+  // Immediate debug log
+  console.log('[SimpleCameraAssistant] MOUNTED — URL params:', { 
+    fullUrl: window.location.href, 
+    sessionId, 
+    cameraId,
+    searchString: window.location.search 
+  });
 
   const [session, setSession] = useState(null);
   const [micActive, setMicActive] = useState(false);
