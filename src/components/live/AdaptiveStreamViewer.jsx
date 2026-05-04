@@ -7,10 +7,8 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, AlertTriangle, Loader2, Download, RotateCcw } from 'lucide-react';
+import { Play, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AdaptiveFrameCapture } from '@/lib/adaptiveFrameCapture';
 
 export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChange }) {
   const videoRef = useRef(null);
@@ -23,48 +21,53 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
   const [isRecovering, setIsRecovering] = useState(false);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Starte Capture bei Mount
+  // Warte auf externe Kamera-Frames (vom Handy)
+  // Dieser Viewer empfängt nur Snapshots, startet KEINE lokale Kamera
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const init = async () => {
-      // Check für Recovery-Kandidaten
-      const recovery = await AdaptiveFrameCapture.recoverFrames(sessionId);
-      if (recovery) {
-        setRecoveryData(recovery);
-        setShowRecovery(true);
-        return; // Warte auf User-Action
-      }
-
-      startCapture();
-    };
-
-    init();
-
+    setStatus('ready'); // Bereit zum Empfang von Frames
+    
     return () => {
-      if (captureRef.current) {
-        captureRef.current.stop();
-      }
+      // Cleanup
     };
   }, [sessionId]);
 
-  const startCapture = async () => {
-    if (captureRef.current) {
-      captureRef.current.stop();
-    }
+  // Frame Display vom Backend empfangen (via polling oder WS)
+  useEffect(() => {
+    const pollFrames = async () => {
+      try {
+        // Polling für neue Frames vom Backend
+        const response = await fetch(`/api/live/${sessionId}/frames/${cameraId}/latest`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.frame_base64 && videoRef.current) {
+            const img = new Image();
+            img.onload = () => {
+              const ctx = videoRef.current?.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                setStatus('streaming');
+                setProgress({
+                  status: 'streaming',
+                  capturedCount: data.captured_total || 0,
+                  droppedCount: data.dropped_total || 0,
+                  pendingFrames: 0,
+                  totalUploaded: data.uploaded_total || 0,
+                });
+              }
+            };
+            img.src = `data:image/jpeg;base64,${data.frame_base64}`;
+          }
+        }
+      } catch (err) {
+        console.warn('[SnapshotViewer] Poll failed:', err.message);
+      }
+    };
 
-    captureRef.current = new AdaptiveFrameCapture(sessionId, cameraId, (prog) => {
-      setProgress(prog);
-      setStatus(prog.status);
-      onStatusChange?.(prog);
-    });
-
-    const success = await captureRef.current.start(videoRef.current);
-    if (success) {
-      setStatus('streaming');
-    } else {
-      setStatus('error');
-    }
-  };
+    // Poll alle 3-5 Sekunden für neue Frames
+    const interval = setInterval(pollFrames, 4000);
+    return () => clearInterval(interval);
+  }, [sessionId, cameraId]);
 
   const handleRecover = async () => {
     if (!recoveryData) return;
@@ -76,7 +79,6 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
     if (success) {
       setShowRecovery(false);
       setRecoveryData(null);
-      startCapture();
     }
   };
 
@@ -84,7 +86,6 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
     localStorage.removeItem(`frames_${sessionId}`);
     setShowRecovery(false);
     setRecoveryData(null);
-    startCapture();
   };
 
   return (
@@ -133,13 +134,10 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
         )}
       </AnimatePresence>
 
-      {/* Video Container */}
+      {/* Canvas für Snapshot Display */}
       <div className="relative rounded-xl overflow-hidden bg-black" style={{ aspectRatio: '16/9' }}>
-        <video
+        <canvas
           ref={videoRef}
-          autoPlay
-          muted
-          playsInline
           className={`w-full h-full object-cover transition-opacity ${
             status === 'streaming' ? 'opacity-100' : 'opacity-50'
           }`}
@@ -152,20 +150,12 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
               {status === 'ready' ? (
                 <>
                   <Play className="w-8 h-8 text-primary mx-auto animate-pulse" />
-                  <div className="text-sm text-white/70">Kamera wird aktiviert...</div>
+                  <div className="text-sm text-white/70">Warte auf externe Kamera...</div>
                 </>
               ) : status === 'error' ? (
                 <>
                   <AlertTriangle className="w-8 h-8 text-red-400 mx-auto" />
-                  <div className="text-sm text-red-400">Kamera nicht verfügbar</div>
-                  <Button
-                    onClick={startCapture}
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                  >
-                    <RotateCcw className="w-3 h-3 mr-1" /> Erneut versuchen
-                  </Button>
+                  <div className="text-sm text-red-400">Keine Frames empfangen</div>
                 </>
               ) : (
                 <>
