@@ -22,6 +22,8 @@ import KickoffStatusBanner from '@/components/live/KickoffStatusBanner';
 import PlayerAssignmentPanel from '@/components/live/PlayerAssignmentPanel';
 import FrameMonitor from '@/components/live/FrameMonitor';
 import LiveReportingPanel from '@/components/live/LiveReportingPanel';
+import TrackingCorrectionPanel from '@/components/live/TrackingCorrectionPanel';
+import LiveExportButton from '@/components/live/LiveExportButton';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -89,10 +91,26 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
 
   // Subscribe to session updates — keep internal state in sync
   const [liveSession, setLiveSession] = useState(session);
+  const [lastTracking, setLastTracking] = useState(null);
   
   useEffect(() => {
     setLiveSession(session); // Update when prop changes
   }, [session]);
+
+  // Subscribe to tracking updates for correction panel
+  useEffect(() => {
+    if (!session?.id) return;
+    try {
+      const unsubscribe = base44.entities.TrackingData.subscribe((event) => {
+        if (event.type === 'create' && event.data?.session_id === session.id) {
+          setLastTracking(event.data);
+        }
+      });
+      return () => unsubscribe?.();
+    } catch (err) {
+      console.warn('[LiveSessionActive] Tracking subscribe failed:', err.message);
+    }
+  }, [session?.id]);
   
   useEffect(() => {
     try {
@@ -252,7 +270,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               </div>
             </div>
 
-            {/* Right: Kickoff + Stop */}
+            {/* Right: Kickoff + Export + Stop */}
             <div className="flex items-center gap-2 flex-shrink-0">
               {!kickoffDetected ? (
                 <Button
@@ -270,6 +288,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                   <CheckCircle2 className="w-3 h-3" /> Teams erkannt
                 </Badge>
               )}
+              <LiveExportButton 
+                sessionId={session.id} 
+                matchTitle={session.match_title}
+                elapsedSeconds={elapsedSeconds}
+              />
               <Button
                 onClick={onStop}
                 disabled={isFinishing}
@@ -291,6 +314,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
             {/* LEFT: Events (3 cols) */}
             <div className="col-span-3 space-y-4">
               <PlayerAssignmentPanel session={liveSession || session} onAssigned={() => {}} />
+              <TrackingCorrectionPanel sessionId={session.id} lastTracking={lastTracking} />
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Zap className="w-3.5 h-3.5 text-primary" /> Events tippen
