@@ -15,7 +15,7 @@ export default function MobileTrainerView({ session, elapsedSeconds, onStop }) {
   const [activeTab, setActiveTab] = useState('cameras');
 
   return (
-    <div className="fixed inset-0 bg-background flex flex-col z-40 md:hidden">
+    <div className="fixed inset-0 bg-background flex flex-col z-40">
       {/* TOP BAR */}
       <div className="flex items-center justify-between px-3 py-2 bg-card border-b border-border">
         <div>
@@ -35,7 +35,7 @@ export default function MobileTrainerView({ session, elapsedSeconds, onStop }) {
 
       {/* TABBED CONTENT */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="grid w-full grid-cols-4 px-2 py-1 h-auto bg-muted rounded-none">
+        <TabsList className="grid w-full grid-cols-4 px-2 md:px-4 py-1 h-auto bg-muted rounded-none">
           <TabsTrigger value="cameras" className="text-[11px] py-1">
             📹 Kameras
           </TabsTrigger>
@@ -51,7 +51,8 @@ export default function MobileTrainerView({ session, elapsedSeconds, onStop }) {
         </TabsList>
 
         {/* CAMERAS TAB */}
-        <TabsContent value="cameras" className="flex-1 overflow-y-auto p-2 space-y-2">
+        <TabsContent value="cameras" className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
           {session.camera_streams?.map(cam => (
             <div key={cam.camera_id} className="glass rounded-lg overflow-hidden border border-border">
               <div className="aspect-video bg-black relative">
@@ -71,6 +72,7 @@ export default function MobileTrainerView({ session, elapsedSeconds, onStop }) {
               </div>
             </div>
           ))}
+          </div>
         </TabsContent>
 
         {/* EVENTS TAB */}

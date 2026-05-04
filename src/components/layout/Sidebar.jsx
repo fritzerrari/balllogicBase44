@@ -76,6 +76,7 @@ function NavLink({ label, icon: Icon, path, badge }) {
   );
 }
 
+// Note: Sidebar is shown only on lg+ (desktop). md uses TabletSidebar.
 export default function Sidebar() {
   const [toolsOpen, setToolsOpen] = useState(true);
   const navigate = useNavigate();

@@ -90,23 +90,23 @@ export default function Dashboard() {
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
         </div>
-        <div className="relative p-6 lg:p-8">
+        <div className="relative p-4 md:p-6 lg:p-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
-            <div className="flex items-center gap-2 text-xs text-primary mb-3 font-bold tracking-widest uppercase">
+            <div className="flex items-center gap-2 text-xs text-primary mb-2 font-bold tracking-widest uppercase">
               <Activity className="w-4 h-4" /><span>🎯 KI-Echtzeit-Analyse</span>
             </div>
-            <h1 className="text-5xl lg:text-6xl font-grotesk font-black bg-clip-text text-transparent bg-gradient-to-r from-foreground to-primary mb-2">TactIQ</h1>
-            <p className="text-lg text-muted-foreground mb-4">Echtzeit-Fußball-Analyse mit KI-gestütztem Tracking, Formation-Erkennung und Live-Coaching</p>
-            <div className="flex flex-wrap gap-2">
+            <h1 className="text-3xl md:text-4xl lg:text-6xl font-grotesk font-black bg-clip-text text-transparent bg-gradient-to-r from-foreground to-primary mb-2">TactIQ</h1>
+            <p className="text-sm md:text-base lg:text-lg text-muted-foreground mb-3">Echtzeit-Fußball-Analyse mit KI-gestütztem Tracking, Formation-Erkennung und Live-Coaching</p>
+            <div className="flex flex-wrap gap-1.5">
               {['⚡ Live-Tracking', '📊 Echtzeit-KPIs', '🎯 Auto-Events', '👥 Spieler-Stats'].map(f => (
-                <span key={f} className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm font-semibold border border-primary/40">{f}</span>
+                <span key={f} className="bg-primary/20 text-primary px-2.5 py-0.5 rounded-full text-xs md:text-sm font-semibold border border-primary/40">{f}</span>
               ))}
             </div>
           </motion.div>
         </div>
       </div>
 
-      <div className="p-6 lg:p-8">
+      <div className="p-4 md:p-6 lg:p-8">
 
       {/* Demo-Banner für neue Nutzer */}
       {matches.length === 0 && (
@@ -128,7 +128,7 @@ export default function Dashboard() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <StatCard label="Spiele" value={matches.length} icon={Video} color="bg-primary/15 text-primary" sub={`${analyzedCount} ✓`} />
         <StatCard label="Live" value={liveCount} icon={Radio} color="bg-red-500/15 text-red-500" sub={liveCount > 0 ? '🔴 AKTIV' : '○ Inaktiv'} />
         <StatCard label="Reports" value={reports.length} icon={BarChart3} color="bg-blue-500/15 text-blue-400" sub={`${(reports.length * 6)} Metriken`} />
@@ -136,9 +136,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Left: recent matches + trend */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="md:col-span-1 lg:col-span-2 space-y-4 md:space-y-6">
           {/* Featured Activity */}
           {matches.length > 0 && (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-6 border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
@@ -258,7 +258,7 @@ export default function Dashboard() {
           </Link>
 
           <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold px-1 pt-1">KI-Tools</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-2">
             <ToolCard label="KI-Assistent" desc="Co-Trainer Chat" icon={Bot} path="/assistant" color="border-primary/20 hover:border-primary/40" iconBg="bg-primary/15 text-primary" />
             <ToolCard label="Scouting" desc="Gegner-Profil" icon={Search} path="/scouting" color="border-blue-500/20 hover:border-blue-500/40" iconBg="bg-blue-500/15 text-blue-400" />
             <ToolCard label="Trainingsplan" desc="KI-generiert" icon={Dumbbell} path="/training" color="border-orange-500/20 hover:border-orange-500/40" iconBg="bg-orange-500/15 text-orange-400" />

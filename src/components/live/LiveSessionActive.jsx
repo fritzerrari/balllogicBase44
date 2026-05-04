@@ -149,8 +149,8 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="p-4 lg:p-6 max-w-6xl mx-auto">
-        <div className="grid lg:grid-cols-4 gap-4">
+      <div className="p-3 md:p-4 lg:p-6 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {/* LEFT: AUTOMATION + EVENTS */}
           <div className="space-y-4">
             <div className="glass rounded-xl p-4 border border-border">
@@ -171,7 +171,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
           </div>
 
           {/* CENTER: CAMERA LINKS */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="md:col-span-1 lg:col-span-3 space-y-4">
             {cameraList.length > 0 ? (
               cameraList.map(cam => (
                 <CameraQuickShare

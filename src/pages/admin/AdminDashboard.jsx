@@ -159,22 +159,22 @@ export default function AdminDashboard() {
   const typeLabels = { added: '✦ Neu', improved: '↑ Verbessert', fixed: '✓ Behoben', removed: '✕ Entfernt' };
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen max-w-6xl mx-auto">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
+    <div className="p-4 md:p-6 lg:p-8 min-h-screen max-w-6xl mx-auto">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 md:mb-6">
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2 uppercase tracking-widest">
           <Shield className="w-3 h-3 text-primary" /> Admin-Bereich
         </div>
-        <h1 className="text-3xl font-grotesk font-bold text-foreground">Admin-Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-grotesk font-bold text-foreground">Admin-Dashboard</h1>
         <p className="text-muted-foreground text-sm">Systemverwaltung & Übersicht</p>
       </motion.div>
 
-      {/* Tab Nav */}
-      <div className="flex flex-wrap gap-1 mb-6 bg-muted rounded-xl p-1">
+      {/* Tab Nav — scrollable on mobile */}
+      <div className="flex gap-1 mb-4 md:mb-6 bg-muted rounded-xl p-1 overflow-x-auto">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === t.id ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${activeTab === t.id ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
           >
             <t.icon className="w-3.5 h-3.5" /> {t.label}
           </button>
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
       {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[
               { label: 'Gesamt Spiele', value: stats.totalMatches, icon: Video, color: 'text-primary bg-primary/15', sub: `${stats.analyzed} analysiert` },
               { label: 'Analyse-Reports', value: stats.totalReports, icon: BarChart3, color: 'text-blue-400 bg-blue-500/15' },
