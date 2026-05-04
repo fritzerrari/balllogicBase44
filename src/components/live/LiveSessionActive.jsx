@@ -26,6 +26,7 @@ import TrackingCorrectionPanel from '@/components/live/TrackingCorrectionPanel';
 import LiveExportButton from '@/components/live/LiveExportButton';
 import MatchHistoryPanel from '@/components/live/MatchHistoryPanel';
 import TacticsChangeLogger from '@/components/live/TacticsChangeLogger';
+import SystemDebugPanel from '@/components/live/SystemDebugPanel';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -225,6 +226,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
 
   return (
     <>
+      <SystemDebugPanel sessionId={session.id} />
       <DsgvoGatekeeper sessionId={session.id} onReadyToStart={() => {}} />
 
       {/* CAMERA TIMEOUT WARNING */}
