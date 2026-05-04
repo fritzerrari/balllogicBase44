@@ -81,8 +81,8 @@ export default function LiveSession() {
     queryClient.invalidateQueries();
     
     setTimeout(() => {
-      navigate('/');
-    }, 500);
+      navigate('/session-reports');
+    }, 800);
   };
 
   // SETUP PHASE
