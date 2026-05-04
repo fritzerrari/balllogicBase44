@@ -61,17 +61,56 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Teile Spieler nach Position ──────────────────────────────────────────
-    const homeTeam = [];
-    const awayTeam = [];
-
-    latestFrame.player_positions.forEach((player) => {
-      if (player.x < 50) {
-        homeTeam.push(player);
-      } else {
-        awayTeam.push(player);
-      }
-    });
+    // ── SMART TEAM CLASSIFICATION (Improved for Mid-Game) ──────────────────────
+    // Smart clustering: use both X and Y for better separation when teams overlap
+    const allPositions = latestFrame.player_positions;
+    
+    // First: Check for clear X-separation
+    const leftSide = allPositions.filter(p => p.x < 40);
+    const rightSide = allPositions.filter(p => p.x > 60);
+    
+    let homeTeam = [];
+    let awayTeam = [];
+    
+    if (leftSide.length >= 4 && rightSide.length >= 4) {
+      // Clear separation exists
+      homeTeam = leftSide;
+      awayTeam = rightSide;
+    } else {
+      // No clear X-separation → use centroid-based clustering
+      // Split by x=50 midline + assign center players to closest cluster
+      const byX = { left: [], right: [], center: [] };
+      allPositions.forEach(p => {
+        if (p.x < 45) byX.left.push(p);
+        else if (p.x > 55) byX.right.push(p);
+        else byX.center.push(p);
+      });
+      
+      // Calculate centroids
+      const leftCentroid = byX.left.length > 0 
+        ? { x: byX.left.reduce((s, p) => s + p.x, 0) / byX.left.length, y: byX.left.reduce((s, p) => s + p.y, 0) / byX.left.length }
+        : { x: 25, y: 50 };
+      const rightCentroid = byX.right.length > 0
+        ? { x: byX.right.reduce((s, p) => s + p.x, 0) / byX.right.length, y: byX.right.reduce((s, p) => s + p.y, 0) / byX.right.length }
+        : { x: 75, y: 50 };
+      
+      homeTeam = [...byX.left];
+      awayTeam = [...byX.right];
+      
+      // Assign center players by proximity to closest centroid
+      byX.center.forEach(p => {
+        const distToHome = Math.sqrt((p.x - leftCentroid.x) ** 2 + (p.y - leftCentroid.y) ** 2);
+        const distToAway = Math.sqrt((p.x - rightCentroid.x) ** 2 + (p.y - rightCentroid.y) ** 2);
+        if (distToHome < distToAway) homeTeam.push(p);
+        else awayTeam.push(p);
+      });
+    }
+    
+    // Fallback if either team has < 4 players (incomplete detection)
+    if (homeTeam.length < 4 || awayTeam.length < 4) {
+      homeTeam = leftSide;
+      awayTeam = rightSide;
+    }
 
     console.log(
       `✓ Kickoff: ${homeTeam.length} Heim (links) + ${awayTeam.length} Gäste (rechts)`

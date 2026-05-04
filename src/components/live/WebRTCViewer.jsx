@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Wifi, WifiOff, Loader2 } from 'lucide-react';
+import CameraFallbackViewer from '@/components/live/CameraFallbackViewer';
 
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -33,7 +34,8 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
   const reconnectTimerRef = useRef(null);
   const mountedRef = useRef(true);
   const reconnectAttemptsRef = useRef(0);
-  const [rtcState, setRtcState] = useState('waiting'); // waiting | connecting | live | failed
+  const [rtcState, setRtcState] = useState('waiting'); // waiting | connecting | live | failed | fallback
+  const [useFallback, setUseFallback] = useState(false);
 
   const signal = useCallback(async (action, data) => {
     return base44.functions.invoke('webrtcSignal', {
@@ -71,6 +73,15 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
     const attempt = reconnectAttemptsRef.current++;
+    
+    // Nach 3 Versuchen: Switch zu Fallback-Mode (HTTP-Snapshots)
+    if (attempt >= 3) {
+      console.warn(`[WebRTC] Fallback to HTTP snapshots after ${attempt} failed attempts for cam ${cameraId}`);
+      setUseFallback(true);
+      setRtcState('fallback');
+      return;
+    }
+    
     const delay = Math.min(RECONNECT_BASE_MS * Math.pow(1.5, attempt), RECONNECT_MAX_MS);
     console.log(`[WebRTC Viewer] Reconnect cam ${cameraId} in ${delay}ms (attempt ${attempt + 1})`);
     setRtcState('waiting');
@@ -250,6 +261,12 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
   useEffect(() => {
     if (!sessionId || !cameraId || !isOnline) {
       cleanup();
+      setUseFallback(false);
+      return;
+    }
+
+    // Wenn bereits im Fallback-Mode → nicht erneut versuchen
+    if (useFallback) {
       return;
     }
 
@@ -261,7 +278,12 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
       mountedRef.current = false;
       cleanup();
     };
-  }, [sessionId, cameraId, isOnline]);
+  }, [sessionId, cameraId, isOnline, useFallback]);
+
+  // Wenn Fallback aktiviert → nutze HTTP-Snapshots statt WebRTC
+  if (useFallback) {
+    return <CameraFallbackViewer sessionId={sessionId} cameraId={cameraId} isOnline={isOnline} fallbackThumbnail={fallbackThumbnail} />;
+  }
 
   return (
     <div className="relative w-full bg-black" style={{ aspectRatio: '16/9' }}>
@@ -310,14 +332,16 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
       <div className={`absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold backdrop-blur-sm z-10 ${
         rtcState === 'live' ? 'bg-green-600/80 text-white' :
         rtcState === 'connecting' ? 'bg-yellow-500/80 text-black' :
+        rtcState === 'fallback' ? 'bg-orange-600/80 text-white' :
         'bg-black/60 text-muted-foreground'
       }`}>
         <div className={`w-1.5 h-1.5 rounded-full ${
           rtcState === 'live' ? 'bg-white animate-pulse' :
           rtcState === 'connecting' ? 'bg-black animate-pulse' :
+          rtcState === 'fallback' ? 'bg-white' :
           'bg-muted-foreground'
         }`} />
-        {rtcState === 'live' ? 'LIVE' : rtcState === 'connecting' ? 'Verbinde...' : 'OFFLINE'}
+        {rtcState === 'live' ? 'LIVE STREAM' : rtcState === 'connecting' ? 'Verbinde...' : rtcState === 'fallback' ? 'FALLBACK (STABIL)' : 'OFFLINE'}
       </div>
     </div>
   );
