@@ -18,6 +18,19 @@ import { Eye, EyeOff, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 const GRID_COLS = 10;
 const GRID_ROWS = 6;
 
+// Point-in-polygon test (ray casting)
+function pointInPolygon(x, y, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 function drawPitchLines(ctx, W, H) {
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 1;
@@ -64,7 +77,7 @@ export default function CoverageBlindspotMap({ session }) {
     queryFn: () => base44.entities.TrackingData.filter(
       { session_id: session.id }, '-timestamp_ms', 30
     ),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
     enabled: !!session?.id,
   });
 
@@ -85,8 +98,33 @@ export default function CoverageBlindspotMap({ session }) {
   }, [recentTracking]);
 
   // Coverage-Statistik
+  // Wenn keine Tracking-Daten aber Kameras mit coverage_polygon → Polygon-Abdeckung schätzen
+  const estimatedCoverageFromCameras = useMemo(() => {
+    const onlineCams = cameras.filter(cam => {
+      const ms = cam.last_seen ? Date.now() - new Date(cam.last_seen).getTime() : Infinity;
+      return ms < 15000 && cam.coverage_polygon?.length >= 3;
+    });
+    if (onlineCams.length === 0) return 0;
+    // Rasterbasierte Schätzung: prüfe welche Grid-Zellen im Polygon liegen
+    let covered = 0;
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const cx = (c + 0.5) / GRID_COLS * 100;
+        const cy = (r + 0.5) / GRID_ROWS * 100;
+        for (const cam of onlineCams) {
+          if (pointInPolygon(cx, cy, cam.coverage_polygon)) { covered++; break; }
+        }
+      }
+    }
+    return Math.round((covered / (GRID_COLS * GRID_ROWS)) * 100);
+  }, [cameras]);
+
   const coverageStats = useMemo(() => {
-    if (!coverageGrid) return { covered: 0, total: GRID_COLS * GRID_ROWS, pct: 0, blindspots: [] };
+    if (!coverageGrid) {
+      // Kein Tracking → nutze Kamera-Polygon-Schätzung
+      const pct = estimatedCoverageFromCameras;
+      return { covered: Math.round(pct * GRID_COLS * GRID_ROWS / 100), total: GRID_COLS * GRID_ROWS, pct, blindspots: [], estimated: true };
+    }
     const blindspots = [];
     let covered = 0;
     for (let r = 0; r < GRID_ROWS; r++) {
@@ -100,8 +138,9 @@ export default function CoverageBlindspotMap({ session }) {
       total: GRID_COLS * GRID_ROWS,
       pct: Math.round((covered / (GRID_COLS * GRID_ROWS)) * 100),
       blindspots,
+      estimated: false,
     };
-  }, [coverageGrid]);
+  }, [coverageGrid, estimatedCoverageFromCameras]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -234,17 +273,18 @@ export default function CoverageBlindspotMap({ session }) {
     drawPitchLines(ctx, W, H);
 
     // ── COVERAGE % LABEL ──────────────────────────────────────────────────
-    if (coverageGrid) {
+    {
+      const pct = coverageStats.pct;
+      const label = coverageStats.estimated ? `~${pct}% (Kamera)` : `Abdeckung ${pct}%`;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.beginPath();
-      ctx.roundRect(W - 86, 6, 80, 22, 4);
+      ctx.roundRect(W - 100, 6, 94, 22, 4);
       ctx.fill();
-      const pct = coverageStats.pct;
       ctx.fillStyle = pct >= 70 ? '#4ade80' : pct >= 40 ? '#fb923c' : '#f87171';
       ctx.font = 'bold 10px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`Abdeckung ${pct}%`, W - 46, 17);
+      ctx.fillText(label, W - 53, 17);
     }
 
   }, [coverageGrid, cameras, coverageStats]);
@@ -288,7 +328,10 @@ export default function CoverageBlindspotMap({ session }) {
       <div className="grid grid-cols-3 gap-2 text-[10px]">
         <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-lg p-2">
           <div className="w-3 h-3 rounded-sm bg-green-500/40 border border-green-500/60 flex-shrink-0" />
-          <span className="text-green-400 font-medium">Abgedeckt ({coverageStats.pct}%)</span>
+          <span className="text-green-400 font-medium">
+            {coverageStats.estimated ? `~${coverageStats.pct}%` : `${coverageStats.pct}%`}
+            {coverageStats.estimated && <span className="text-[9px] text-green-400/60 ml-1">(geschätzt)</span>}
+          </span>
         </div>
         <div className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg p-2">
           <div className="w-3 h-3 rounded-sm bg-orange-500/30 border border-orange-500/50 flex-shrink-0" />
