@@ -1,12 +1,12 @@
 /**
- * LiveReportingPanel — Live-Statistiken während des Spiels
- * Ballbesitz, Tore, Chancen, Spielerleistungen in Echtzeit
+ * LiveReportingPanel — Live-Statistiken + KI-Insights während des Spiels
+ * Ballbesitz, Tore, Chancen, ECHTZEIT-Taktik-Analysen
  */
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { TrendingUp, Goal, BarChart3, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TrendingUp, Goal, BarChart3, AlertTriangle, Zap, Lightbulb, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime }) {
@@ -19,6 +19,8 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
     chances_away: 0,
     dangerous_situations: 0,
   });
+  const [insights, setInsights] = useState([]);
+  const [generatingInsight, setGeneratingInsight] = useState(false);
 
   // Subscribe to SessionState für Live-Updates
   useEffect(() => {
@@ -70,7 +72,58 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
       chances_away,
       dangerous_situations: dangerous,
     }));
-  }, [events, autoEvents]);
+
+    // Trigger KI-Insight bei neuen Events (max alle 3 min)
+    if ((goals_home + goals_away > (insights.filter(i => i.type === 'goal').length || 0)) || 
+        (Math.floor(elapsedSeconds / 180) > Math.floor((elapsedSeconds - 60) / 180))) {
+      generateLiveInsight(goals_home, goals_away, chances_home, chances_away);
+    }
+  }, [events, autoEvents, elapsedSeconds]);
+
+  // Echtzeit-KI-Analysen generieren
+  const generateLiveInsight = async (g_home, g_away, c_home, c_away) => {
+    if (generatingInsight) return;
+    setGeneratingInsight(true);
+
+    try {
+      const minute = Math.floor(elapsedSeconds / 60);
+      const prompt = `
+Analysiere diese LIVE-Spielsituation (${minute}. Minute, ${halfTime}. HZ):
+- Score: ${g_home}:${g_away}
+- Ballbesitz: ${stats.possession_home.toFixed(0)}% Heim vs ${stats.possession_away.toFixed(0)}% Gäste
+- Chancen: ${c_home} Heim | ${c_away} Gäste
+- Kritische Momente: ${stats.dangerous_situations}
+
+Gib 1-2 konkrete, kurze TAKTIK-TIPPS für den nächsten Moment (maximal 50 Wörter pro Tipp):
+Format: ["Tipp 1", "Tipp 2"]
+      `;
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            tips: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      }).catch(() => ({ tips: [] }));
+
+      if (result.tips && result.tips.length > 0) {
+        const newInsight = {
+          id: `insight-${Date.now()}`,
+          type: 'tactic',
+          minute,
+          content: result.tips[0],
+          createdAt: Date.now(),
+        };
+        setInsights(prev => [newInsight, ...prev].slice(0, 5)); // Behalte max 5
+      }
+    } catch (err) {
+      console.warn('[LiveReportingPanel] Insight generation failed:', err);
+    } finally {
+      setGeneratingInsight(false);
+    }
+  };
 
   const minute = Math.floor(elapsedSeconds / 60);
 
@@ -164,34 +217,70 @@ export default function LiveReportingPanel({ sessionId, elapsedSeconds, halfTime
         </motion.div>
       )}
 
+      {/* KI-ECHTZEIT-INSIGHTS */}
+       <AnimatePresence>
+         {insights.length > 0 && (
+           <motion.div
+             initial={{ opacity: 0, y: 10 }}
+             animate={{ opacity: 1, y: 0 }}
+             exit={{ opacity: 0, y: -10 }}
+             transition={{ delay: 0.3 }}
+             className="glass rounded-xl p-3 border border-primary/20 bg-primary/5 space-y-2"
+           >
+             <div className="flex items-center gap-2">
+               <Brain className="w-4 h-4 text-primary flex-shrink-0 animate-pulse" />
+               <div className="text-xs font-bold text-primary">💡 KI-Taktik-Analyse</div>
+             </div>
+             <div className="space-y-2">
+               {insights.slice(0, 2).map((insight) => (
+                 <motion.div
+                   key={insight.id}
+                   initial={{ opacity: 0, x: -10 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   className="bg-muted/60 rounded-lg p-2.5 text-xs text-foreground border border-primary/15"
+                 >
+                   <div className="flex items-start gap-2">
+                     <Lightbulb className="w-3 h-3 text-yellow-400 flex-shrink-0 mt-0.5" />
+                     <div>
+                       <p className="text-muted-foreground leading-tight">{insight.content}</p>
+                       <div className="text-[9px] text-muted-foreground/60 mt-1">Min {insight.minute}'</div>
+                     </div>
+                   </div>
+                 </motion.div>
+               ))}
+             </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
+
       {/* EVENTS TIMELINE */}
-      {events.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="glass rounded-xl p-3 border border-border space-y-2"
-        >
-          <div className="text-xs font-bold text-muted-foreground flex items-center gap-2 mb-2">
-            <BarChart3 className="w-3.5 h-3.5" />
-            Event-Chronologie
-          </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {[...events].reverse().slice(0, 10).map((evt, idx) => (
-              <div key={idx} className="flex items-center justify-between text-[10px] py-1 border-b border-border/30 last:border-0">
-                <div className="flex items-center gap-2 flex-1">
-                  {evt.type === 'goal' && <Goal className="w-3 h-3 text-yellow-400" />}
-                  <span className={evt.team === 'home' ? 'text-green-400' : 'text-red-400'}>
-                    {evt.type === 'goal' ? '⚽ TOR' : evt.type === 'yellow_card' ? '🟨 Gelb' : evt.type === 'red_card' ? '🟥 Rot' : '📝 ' + evt.type}
-                  </span>
-                  {evt.description && <span className="text-muted-foreground text-[9px]">{evt.description.slice(0, 30)}</span>}
-                </div>
-                <span className="text-muted-foreground">{evt.minute}'</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
+       {events.length > 0 && (
+         <motion.div
+           initial={{ opacity: 0, y: 10 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.4 }}
+           className="glass rounded-xl p-3 border border-border space-y-2"
+         >
+           <div className="text-xs font-bold text-muted-foreground flex items-center gap-2 mb-2">
+             <BarChart3 className="w-3.5 h-3.5" />
+             Event-Chronologie
+           </div>
+           <div className="space-y-1 max-h-48 overflow-y-auto">
+             {[...events].reverse().slice(0, 10).map((evt, idx) => (
+               <div key={idx} className="flex items-center justify-between text-[10px] py-1 border-b border-border/30 last:border-0">
+                 <div className="flex items-center gap-2 flex-1">
+                   {evt.type === 'goal' && <Goal className="w-3 h-3 text-yellow-400" />}
+                   <span className={evt.team === 'home' ? 'text-green-400' : 'text-red-400'}>
+                     {evt.type === 'goal' ? '⚽ TOR' : evt.type === 'yellow_card' ? '🟨 Gelb' : evt.type === 'red_card' ? '🟥 Rot' : '📝 ' + evt.type}
+                   </span>
+                   {evt.description && <span className="text-muted-foreground text-[9px]">{evt.description.slice(0, 30)}</span>}
+                 </div>
+                 <span className="text-muted-foreground">{evt.minute}'</span>
+               </div>
+             ))}
+           </div>
+         </motion.div>
+       )}
 
       {/* INFO */}
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5 text-[10px] text-blue-300 text-center">
