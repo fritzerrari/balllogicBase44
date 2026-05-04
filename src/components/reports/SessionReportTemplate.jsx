@@ -7,12 +7,28 @@
  * - Stats + Analysis
  * - Coaching Notes
  */
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trophy, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, Trophy, AlertCircle, Loader2, Zap } from 'lucide-react';
 import SessionReportPDFExport from './SessionReportPDFExport';
 
 export default function SessionReportTemplate({ report }) {
+  const [analysis, setAnalysis] = useState(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+
+  useEffect(() => {
+    if (!report?.match_id) return;
+    setLoadingAnalysis(true);
+    base44.entities.TeamAnalysis.filter({ match_id: report.match_id, analysis_type: 'own_team' })
+      .then(results => {
+        if (results.length > 0) setAnalysis(results[0]);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingAnalysis(false));
+  }, [report?.match_id]);
+
   if (!report) return null;
 
   const eventsByType = {
@@ -67,6 +83,69 @@ export default function SessionReportTemplate({ report }) {
           );
         })}
       </div>
+
+      {/* KI-Analyse */}
+      {loadingAnalysis ? (
+        <div className="glass rounded-2xl p-6 border border-primary/20 flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 text-primary animate-spin mr-2" />
+          <span className="text-muted-foreground">KI-Analyse wird generiert...</span>
+        </div>
+      ) : analysis ? (
+        <div className="glass rounded-2xl p-6 border border-primary/20 space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-grotesk font-bold text-foreground">🤖 KI-Analyse</h2>
+          </div>
+
+          {/* Score */}
+          <div className="bg-primary/10 rounded-xl p-4 text-center border border-primary/20 mb-4">
+            <div className="text-sm text-muted-foreground mb-1">Gesamtbewertung</div>
+            <div className="text-4xl font-bold text-primary">{analysis.performance_score}/100</div>
+          </div>
+
+          {/* SWOT */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { title: 'Stärken', icon: '💪', items: analysis.strengths, color: 'bg-green-500/10 border-green-500/20 text-green-400' },
+              { title: 'Schwächen', icon: '⚠️', items: analysis.weaknesses, color: 'bg-red-500/10 border-red-500/20 text-red-400' },
+              { title: 'Chancen', icon: '🎯', items: analysis.opportunities, color: 'bg-blue-500/10 border-blue-500/20 text-blue-400' },
+              { title: 'Bedrohungen', icon: '🔴', items: analysis.threats, color: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' },
+            ].map((section, idx) => (
+              <div key={idx} className={`rounded-lg p-3 border ${section.color}`}>
+                <div className="font-bold text-sm mb-2">{section.icon} {section.title}</div>
+                <ul className="text-xs space-y-1">
+                  {(section.items || []).slice(0, 2).map((item, i) => (
+                    <li key={i} className="text-muted-foreground">• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Tactical + Recommendations */}
+          {analysis.tactical_observations && (
+            <div className="bg-muted/40 rounded-lg p-3 text-sm space-y-2">
+              <div className="font-bold text-foreground">🎲 Taktik-Beobachtung</div>
+              <p className="text-muted-foreground">{analysis.tactical_observations.slice(0, 200)}...</p>
+            </div>
+          )}
+
+          {analysis.recommendations && analysis.recommendations.length > 0 && (
+            <div className="bg-muted/40 rounded-lg p-3 text-sm space-y-2">
+              <div className="font-bold text-foreground">📌 Empfehlungen</div>
+              <ol className="text-muted-foreground space-y-1 list-decimal list-inside">
+                {analysis.recommendations.slice(0, 3).map((rec, i) => (
+                  <li key={i} className="text-xs">{rec}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="glass rounded-2xl p-6 border border-border text-center text-muted-foreground">
+          Analyse wird in Kürze verfügbar...
+        </div>
+      )}
 
       {/* Event Timeline */}
       {report.key_events && report.key_events.length > 0 && (

@@ -78,7 +78,17 @@ Deno.serve(async (req) => {
       summary: `Session "${session.match_title}" — ${events.length} Events in ${Math.floor(sessionDuration / 60)}min. ${goals.length} Tore, ${cards.length} Karten, ${subs.length} Wechsel.`,
     });
 
-    // 5. Cleanup: FunkMessages löschen
+    // 5. Trigger KI-Analyse (async, non-blocking)
+    base44.functions.invoke('generateSessionAnalysis', {
+      session_id: session.id,
+      match_id: session.match_id,
+    }).then(res => {
+      console.log(`✅ Analysis queued: ${res?.data?.analysis_id}`);
+    }).catch(err => {
+      console.warn(`⚠️ Analysis trigger failed: ${err.message}`);
+    });
+
+    // 6. Cleanup: FunkMessages löschen
     try {
       const funkMsgs = await base44.entities.FunkMessage.filter({ session_id: session.id });
       await Promise.all(funkMsgs.map(m => base44.entities.FunkMessage.delete(m.id)));
