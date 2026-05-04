@@ -1,88 +1,88 @@
 /**
- * identifyClub — Logo hochladen → KI erkennt Verein → Daten aus Web + football-data.org
+ * identifyClub — Logo hochladen → KI erkennt Verein → Daten aus api-sports.io
+ * API: https://v3.football.api-sports.io/
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
-const FOOTBALL_DATA_KEY = Deno.env.get('FOOTBALL_DATA_API_KEY') || '';
+const API_SPORTS_BASE = 'https://v3.football.api-sports.io';
+const API_SPORTS_KEY = Deno.env.get('FOOTBALL_DATA_API_KEY') || '';
 
-// Mapping bekannter Ligen zu football-data.org Kompetitions-IDs
-const LEAGUE_IDS = {
-  'bundesliga': 'BL1', 'bundesliga 1': 'BL1', '1. bundesliga': 'BL1',
-  '2. bundesliga': 'BL2',
-  'premier league': 'PL',
-  'la liga': 'PD', 'primera division': 'PD',
-  'serie a': 'SA',
-  'ligue 1': 'FL1',
-  'eredivisie': 'DED',
-  'primeira liga': 'PPL',
-  'championship': 'ELC',
-  'champions league': 'CL', 'uefa champions league': 'CL',
-};
-
-function getCompetitionId(leagueName) {
-  if (!leagueName) return 'BL1';
-  const lower = leagueName.toLowerCase();
-  for (const [key, id] of Object.entries(LEAGUE_IDS)) {
-    if (lower.includes(key)) return id;
-  }
-  return null;
+function apiHeaders() {
+  return {
+    'x-apisports-key': API_SPORTS_KEY,
+    'Content-Type': 'application/json',
+  };
 }
 
-async function searchFootballDataOrg(teamName, leagueName) {
-  if (!FOOTBALL_DATA_KEY) return null;
+// Suche Team anhand Name bei api-sports.io
+async function searchTeam(teamName) {
+  if (!API_SPORTS_KEY || !teamName) return null;
   try {
-    // Versuche über Ligateams zu suchen
-    const competitionId = getCompetitionId(leagueName);
-    if (!competitionId) return null;
-
-    const res = await fetch(`${FOOTBALL_DATA_BASE}/competitions/${competitionId}/teams`, {
-      headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY }
-    });
+    const res = await fetch(
+      `${API_SPORTS_BASE}/teams?search=${encodeURIComponent(teamName)}`,
+      { headers: apiHeaders() }
+    );
     if (!res.ok) {
-      console.error(`football-data API error: ${res.status} ${await res.text()}`);
+      console.error(`api-sports search error: ${res.status}`);
       return null;
     }
     const data = await res.json();
-    const teams = data.teams || [];
+    const results = data.response || [];
+    if (!results.length) return null;
 
-    // Fuzzy-Match auf Teamnamen
+    // Bestes Match: exakter Name oder erster Treffer
     const normalized = teamName.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-    const match = teams.find(t => {
-      const n = (t.name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      const sn = (t.shortName || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      return n.includes(normalized.split(' ')[0]) || normalized.includes(sn) || sn.includes(normalized.split(' ')[0]);
+    const exact = results.find(r => {
+      const n = (r.team?.name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+      return n === normalized;
     });
-    return match || null;
-  } catch {
+    return (exact || results[0])?.team || null;
+  } catch (e) {
+    console.error('searchTeam error:', e.message);
     return null;
   }
 }
 
-async function fetchTeamMatches(teamId, season) {
-  if (!FOOTBALL_DATA_KEY || !teamId) return [];
+// Spielplan: nächste + letzte Spiele
+async function fetchTeamFixtures(teamId, season) {
+  if (!API_SPORTS_KEY || !teamId) return [];
   try {
-    const res = await fetch(`${FOOTBALL_DATA_BASE}/teams/${teamId}/matches?season=${season}&limit=40`, {
-      headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY }
-    });
+    const res = await fetch(
+      `${API_SPORTS_BASE}/fixtures?team=${teamId}&season=${season}&last=20`,
+      { headers: apiHeaders() }
+    );
     if (!res.ok) return [];
     const data = await res.json();
-    return data.matches || [];
-  } catch {
+    const fixtures = data.response || [];
+
+    // Auch nächste Spiele holen
+    const resNext = await fetch(
+      `${API_SPORTS_BASE}/fixtures?team=${teamId}&season=${season}&next=20`,
+      { headers: apiHeaders() }
+    );
+    const dataNext = resNext.ok ? await resNext.json() : { response: [] };
+    const nextFixtures = dataNext.response || [];
+
+    return [...fixtures, ...nextFixtures].slice(0, 50);
+  } catch (e) {
+    console.error('fetchTeamFixtures error:', e.message);
     return [];
   }
 }
 
-async function fetchTeamPlayers(teamId) {
-  if (!FOOTBALL_DATA_KEY || !teamId) return [];
+// Spieler des Teams
+async function fetchTeamPlayers(teamId, season) {
+  if (!API_SPORTS_KEY || !teamId) return [];
   try {
-    const res = await fetch(`${FOOTBALL_DATA_BASE}/teams/${teamId}`, {
-      headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY }
-    });
+    const res = await fetch(
+      `${API_SPORTS_BASE}/players?team=${teamId}&season=${season}`,
+      { headers: apiHeaders() }
+    );
     if (!res.ok) return [];
     const data = await res.json();
-    return data.squad || [];
-  } catch {
+    return (data.response || []).slice(0, 30);
+  } catch (e) {
+    console.error('fetchTeamPlayers error:', e.message);
     return [];
   }
 }
@@ -100,11 +100,10 @@ Deno.serve(async (req) => {
     const identificationPrompt = logo_url
       ? `Analysiere dieses Fußball-Vereins-Logo und identifiziere den Verein. 
          ${club_name_hint ? `Hinweis: Der Name könnte "${club_name_hint}" sein.` : ''}
-         Gib zurück: Vereinsname, Kurzname, Land, Stadt, Liga, Gründungsjahr, Stadion, Primärfarbe (HEX), Sekundärfarbe (HEX), Akzentfarbe (HEX), Website-URL, kurze Beschreibung.
-         Für die Farben: analysiere die dominierenden Farben des Logos.
-         Suche aktuelle Informationen über den Verein.`
+         Gib zurück: Vereinsname, Kurzname, Land, Stadt, Liga, Gründungsjahr, Stadion, Kapazität, Primärfarbe (HEX), Sekundärfarbe (HEX), Akzentfarbe (HEX), Website-URL, kurze Beschreibung.
+         Für die Farben: analysiere die dominierenden Farben des Logos.`
       : `Suche alle verfügbaren Informationen über den Fußballverein "${club_name_hint}".
-         Gib zurück: Vereinsname, Kurzname, Land, Stadt, Liga, Gründungsjahr, Stadion, Primärfarbe (HEX), Sekundärfarbe (HEX), Website-URL, kurze Beschreibung.`;
+         Gib zurück: Vereinsname, Kurzname, Land, Stadt, Liga, Gründungsjahr, Stadion, Kapazität, Primärfarbe (HEX), Sekundärfarbe (HEX), Website-URL, kurze Beschreibung.`;
 
     const aiResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: identificationPrompt,
@@ -132,37 +131,79 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Step 2: football-data.org für API-Daten (falls verfügbar)
+    // Step 2: api-sports.io für Live-Daten
     const teamName = aiResult.name || club_name_hint || '';
-    const apiTeam = await searchFootballDataOrg(teamName, aiResult.league);
-    // Fußball-Saison: August-Juli Zyklus → aktuelle Saison bestimmen
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth() + 1; // 1-12
-    const currentSeason = month >= 7 ? year.toString() : (year - 1).toString(); // Saison startet im Juli
+    const month = now.getMonth() + 1;
+    const currentSeason = month >= 7 ? year : year - 1;
 
-    let matches = [];
+    const apiTeam = await searchTeam(teamName) || await searchTeam(club_name_hint);
+
+    let fixtures = [];
     let players = [];
     if (apiTeam?.id) {
-      [matches, players] = await Promise.all([
-        fetchTeamMatches(apiTeam.id, currentSeason),
-        fetchTeamPlayers(apiTeam.id)
+      [fixtures, players] = await Promise.all([
+        fetchTeamFixtures(apiTeam.id, currentSeason),
+        fetchTeamPlayers(apiTeam.id, currentSeason),
       ]);
     }
+
+    // Fixtures in ClubMatch-Format umwandeln
+    const mappedMatches = fixtures.map(f => ({
+      api_match_id: String(f.fixture?.id),
+      date: f.fixture?.date,
+      matchday: f.league?.round,
+      home_team: f.teams?.home?.name,
+      away_team: f.teams?.away?.name,
+      home_score: f.goals?.home,
+      away_score: f.goals?.away,
+      status: mapStatus(f.fixture?.status?.short),
+      competition: f.league?.name,
+      venue: f.fixture?.venue?.name,
+      season: `${currentSeason}/${currentSeason + 1}`,
+    }));
+
+    // Spieler in Player-Format umwandeln
+    const mappedPlayers = players.map(p => ({
+      api_player_id: String(p.player?.id),
+      name: p.player?.name,
+      age: p.player?.age,
+      nationality: p.player?.nationality,
+      position: mapPosition(p.statistics?.[0]?.games?.position),
+      avatar_url: p.player?.photo,
+    }));
 
     return Response.json({
       identification: {
         ...aiResult,
         api_team_id: apiTeam?.id ? String(apiTeam.id) : null,
         ai_identified: true,
-        current_season: `${currentSeason}/${parseInt(currentSeason) + 1}`
+        current_season: `${currentSeason}/${currentSeason + 1}`,
+        // Logo von API falls vorhanden
+        api_logo_url: apiTeam?.logo || null,
       },
-      api_matches: matches.slice(0, 50),
-      api_players: players.slice(0, 30),
-      api_team: apiTeam
+      api_matches: mappedMatches,
+      api_players: mappedPlayers,
+      api_team: apiTeam,
     });
 
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+function mapStatus(short) {
+  const map = { 'FT': 'finished', 'NS': 'scheduled', 'LIVE': 'live', '1H': 'live', '2H': 'live', 'HT': 'live', 'PST': 'postponed' };
+  return map[short] || 'scheduled';
+}
+
+function mapPosition(pos) {
+  const map = {
+    'Goalkeeper': 'Torwart',
+    'Defender': 'Innenverteidiger',
+    'Midfielder': 'Zentrales Mittelfeld',
+    'Attacker': 'Mittelstürmer',
+  };
+  return map[pos] || pos || 'Zentrales Mittelfeld';
+}
