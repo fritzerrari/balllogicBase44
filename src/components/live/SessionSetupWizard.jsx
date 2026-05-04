@@ -156,7 +156,95 @@ function StepMatchName({ value, onChange }) {
   );
 }
 
-// ─── Step 2: Kameras ─────────────────────────────────────────────────────────
+// ─── Step 1b: Spieltyp & Feldkonfiguration ──────────────────────────────────
+function StepGameConfig({ gameType, onGameTypeChange, playerCount, onPlayerCountChange, fieldSize, onFieldSizeChange }) {
+  const gameTypes = [
+    { id: 'official', emoji: '🏆', label: 'Offizielles Match', hint: 'Ligaspiel / Pokal' },
+    { id: 'friendly', emoji: '⚽', label: 'Freundschaftsspiel', hint: 'Test- oder Trainingsspiel' },
+    { id: 'training', emoji: '🏋️', label: 'Trainingseinheit', hint: 'Interner Trainingsbetrieb' },
+  ];
+
+  const fieldSizes = [
+    { id: 'full', emoji: '📏', label: 'Großfeld', hint: '(105x68m)' },
+    { id: 'half', emoji: '📐', label: 'Halbfeld', hint: 'Eine Platzhälfte' },
+    { id: 'third', emoji: '🟩', label: 'Drittelfeld', hint: 'Verkleinerter Platz' },
+    { id: 'mini', emoji: '🟨', label: 'Minifeld', hint: 'Klein-Futsal (4v4 / 5v5)' },
+  ];
+
+  const playerCountOptions = [4, 5, 6, 7, 8, 9, 10, 11];
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <div className="text-5xl mb-3">⚙️</div>
+        <h2 className="text-2xl font-grotesk font-bold">Spieltyp & Feldgröße</h2>
+        <p className="text-sm text-muted-foreground">Das System passt sich automatisch an.</p>
+      </div>
+
+      {/* Game Type */}
+      <div className="space-y-3">
+        <div className="text-xs font-bold uppercase text-muted-foreground">Art des Spiels</div>
+        <div className="grid grid-cols-3 gap-2">
+          {gameTypes.map(gt => (
+            <button key={gt.id} onClick={() => onGameTypeChange(gt.id)}
+              className={`p-3 rounded-lg border-2 text-center transition-all ${
+                gameType === gt.id
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-muted/20 hover:border-primary/50'
+              }`}>
+              <div className="text-2xl mb-1">{gt.emoji}</div>
+              <div className="font-bold text-xs">{gt.label}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{gt.hint}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Field Size */}
+      <div className="space-y-3">
+        <div className="text-xs font-bold uppercase text-muted-foreground">Spielfeld</div>
+        <div className="grid grid-cols-2 gap-2">
+          {fieldSizes.map(fs => (
+            <button key={fs.id} onClick={() => onFieldSizeChange(fs.id)}
+              className={`p-3 rounded-lg border-2 text-left transition-all ${
+                fieldSize === fs.id
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-muted/20 hover:border-primary/50'
+              }`}>
+              <div className="text-xl mb-1">{fs.emoji}</div>
+              <div className="font-bold text-xs">{fs.label}</div>
+              <div className="text-[10px] text-muted-foreground">{fs.hint}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Player Count */}
+      <div className="space-y-3">
+        <div className="text-xs font-bold uppercase text-muted-foreground">Spieler pro Team</div>
+        <div className="grid grid-cols-4 gap-2">
+          {playerCountOptions.map(pc => (
+            <button key={pc} onClick={() => onPlayerCountChange(pc)}
+              className={`py-3 rounded-lg border-2 font-bold text-sm transition-all ${
+                playerCount === pc
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-muted/20 text-foreground hover:border-primary/50'
+              }`}>
+              {pc}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-400 flex items-start gap-2">
+        <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+        <span>Das Tracking-System passt sich automatisch an die Feldgröße und Spieleranzahl an. Die Erkennungsgenauigkeit wird optimiert.</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 3: Kameras ─────────────────────────────────────────────────────────
 function StepCameras({ count, onChange }) {
   const options = [
     { n: 1, emoji: '📱', label: 'Eine Kamera', hint: 'Perfekt für Anfänger. Einfach Handy hinstellen.' },
@@ -195,7 +283,7 @@ function StepCameras({ count, onChange }) {
   );
 }
 
-// ─── Step 3: Spieler-Zuordnung ────────────────────────────────────────────────
+// ─── Step 4: Spieler-Zuordnung ────────────────────────────────────────────────
 function StepPlayers({ mode, onChange, homeLineup, awayLineup, onTogglePlayer }) {
   const { data: players = [] } = useQuery({
     queryKey: ['wizard-players'],
@@ -307,14 +395,17 @@ function StepPlayers({ mode, onChange, homeLineup, awayLineup, onTogglePlayer })
   );
 }
 
-// ─── Step 4: Bestätigung ──────────────────────────────────────────────────────
-function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLineup }) {
+// ─── Step 5: Bestätigung ──────────────────────────────────────────────────────
+function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLineup, gameType, playerCount, fieldSize }) {
+  const gameTypeLabel = { official: 'Offizielles Match', friendly: 'Freundschaftsspiel', training: 'Trainingseinheit' }[gameType] || 'Match';
+  const fieldSizeLabel = { full: 'Großfeld (105x68m)', half: 'Halbfeld', third: 'Drittelfeld', mini: 'Minifeld' }[fieldSize] || 'Standardfeld';
+
   return (
     <div className="space-y-5">
       <div className="text-center space-y-2">
         <div className="text-5xl mb-3">🚀</div>
         <h2 className="text-2xl font-grotesk font-bold">Alles bereit!</h2>
-        <p className="text-sm text-muted-foreground">Überprüfe kurz deine Einstellungen und starte dann.</p>
+        <p className="text-sm text-muted-foreground">Überprüfe deine Einstellungen und starte dann.</p>
       </div>
 
       <div className="space-y-3">
@@ -323,7 +414,14 @@ function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLine
             <Trophy className="w-5 h-5 text-primary flex-shrink-0" />
             <div>
               <div className="text-xs text-muted-foreground">Match</div>
-              <div className="font-bold">{matchTitle}</div>
+              <div className="font-bold text-sm">{matchTitle}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 text-blue-400 flex-shrink-0">⚙️</div>
+            <div>
+              <div className="text-xs text-muted-foreground">Konfiguration</div>
+              <div className="font-bold text-sm">{gameTypeLabel} • {playerCount}v{playerCount} • {fieldSizeLabel}</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -340,7 +438,7 @@ function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLine
               <div className="font-bold">
                 {playerMode === 'lineup'
                   ? `Mit Aufstellung (${homeLineup.length + awayLineup.length} Spieler)`
-                  : 'Anonym (H1–H11 / G1–G11)'}
+                  : `Anonym (${playerCount} pro Team)`}
               </div>
             </div>
           </div>
@@ -369,14 +467,18 @@ function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLine
 // ─── MAIN WIZARD ──────────────────────────────────────────────────────────────
 const STEPS = [
   { label: 'Match' },
+  { label: 'Setup' },
   { label: 'Kameras' },
   { label: 'Spieler' },
   { label: 'Start' },
 ];
 
 export default function SessionSetupWizard({ onStart, isLoading }) {
-  const [step, setStep] = useState(0); // 0-3
+  const [step, setStep] = useState(0); // 0-4
   const [matchTitle, setMatchTitle] = useState('');
+  const [gameType, setGameType] = useState('official');
+  const [playerCount, setPlayerCount] = useState(11);
+  const [fieldSize, setFieldSize] = useState('full');
   const [cameraCount, setCameraCount] = useState(1);
   const [playerMode, setPlayerMode] = useState('anonymous');
   const [homeLineup, setHomeLineup] = useState([]);
@@ -428,6 +530,9 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
       camera_streams: cameras,
       player_assignment_mode: playerMode,
       player_assignments: playerAssignments,
+      game_type: gameType,
+      player_count: playerCount,
+      field_size: fieldSize,
     });
   };
 
@@ -456,18 +561,26 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
             initial="enter" animate="center" exit="exit"
             transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
             {step === 0 && <StepMatchName value={matchTitle} onChange={setMatchTitle} />}
-            {step === 1 && <StepCameras count={cameraCount} onChange={setCameraCount} />}
-            {step === 2 && (
+            {step === 1 && (
+              <StepGameConfig
+                gameType={gameType} onGameTypeChange={setGameType}
+                playerCount={playerCount} onPlayerCountChange={setPlayerCount}
+                fieldSize={fieldSize} onFieldSizeChange={setFieldSize}
+              />
+            )}
+            {step === 2 && <StepCameras count={cameraCount} onChange={setCameraCount} />}
+            {step === 3 && (
               <StepPlayers
                 mode={playerMode} onChange={setPlayerMode}
                 homeLineup={homeLineup} awayLineup={awayLineup}
                 onTogglePlayer={togglePlayer}
               />
             )}
-            {step === 3 && (
+            {step === 4 && (
               <StepConfirm
                 matchTitle={matchTitle} cameraCount={cameraCount}
                 playerMode={playerMode} homeLineup={homeLineup} awayLineup={awayLineup}
+                gameType={gameType} playerCount={playerCount} fieldSize={fieldSize}
               />
             )}
           </motion.div>
@@ -482,7 +595,7 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
           </Button>
         )}
 
-        {step < 3 ? (
+        {step < 4 ? (
           <Button onClick={goNext} disabled={!canNext()} className="flex-1 h-12 font-bold gap-2">
             Weiter <ChevronRight className="w-4 h-4" />
           </Button>
@@ -496,8 +609,8 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
         )}
       </div>
 
-      {/* Skip hint on step 2 */}
-      {step === 2 && (
+      {/* Skip hint on step 3 */}
+      {step === 3 && (
         <p className="text-center text-xs text-muted-foreground">
           💡 Kein Stress — du kannst Spieler auch <strong>während</strong> der Session zuordnen.
         </p>
