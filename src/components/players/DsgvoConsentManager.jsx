@@ -70,19 +70,26 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
     });
   };
 
-  const grantAllPending = () => {
-    filteredPlayers
-      .filter(p => !p.age || p.age >= 18) // nur Erwachsene
-      .filter(p => (p.tracking_consent || 'pending') === 'pending')
-      .forEach(p => grantConsent(p));
-    toast({ title: '✓ Alle ausstehenden Einwilligungen erteilt' });
+  const consentData = {
+    tracking_consent: 'granted',
+    tracking_consent_date: new Date().toISOString().split('T')[0],
+    tracking_anonymize: false,
   };
 
-  const grantAll = () => {
-    filteredPlayers
-      .filter(p => !p.age || p.age >= 18) // nur Erwachsene
-      .forEach(p => grantConsent(p));
-    toast({ title: '✓ Allen Spielern Einwilligung erteilt' });
+  const grantAllPending = async () => {
+    const targets = filteredPlayers
+      .filter(p => !p.age || p.age >= 18)
+      .filter(p => (p.tracking_consent || 'pending') === 'pending');
+    await Promise.all(targets.map(p => base44.entities.Player.update(p.id, consentData)));
+    queryClient.invalidateQueries({ queryKey: ['players'] });
+    toast({ title: `✓ ${targets.length} Einwilligungen erteilt` });
+  };
+
+  const grantAll = async () => {
+    const targets = filteredPlayers.filter(p => !p.age || p.age >= 18);
+    await Promise.all(targets.map(p => base44.entities.Player.update(p.id, consentData)));
+    queryClient.invalidateQueries({ queryKey: ['players'] });
+    toast({ title: `✓ Allen ${targets.length} Spielern Einwilligung erteilt` });
   };
 
   const sendGuardianRequest = async (player) => {
