@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, CameraOff, Radio, Zap, X, Send } from 'lucide-react';
+import { Mic, MicOff, CameraOff, Radio, Zap, X, Send, MessageSquare } from 'lucide-react';
 import EventButtons from './EventButtons';
 import useWebRTCCamera from '@/hooks/useWebRTCCamera';
 import useFunkSubscription from '@/hooks/useFunkSubscription';
@@ -94,14 +94,14 @@ function InlineFunkPanel({ sessionId, session, cameraId, onClose }) {
         })}
       </div>
 
-      {/* Input + PTT */}
-      <div className="px-3 py-2 border-t border-white/10 space-y-2 flex-shrink-0">
+      {/* Text Input only */}
+      <div className="px-3 py-2 border-t border-white/10 flex-shrink-0">
         <div className="flex gap-2">
           <input
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendText()}
-            placeholder="Nachricht..."
+            placeholder="Nachricht an Trainer..."
             className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-primary/60"
           />
           <button onClick={sendText} disabled={!text.trim()}
@@ -109,18 +109,7 @@ function InlineFunkPanel({ sessionId, session, cameraId, onClose }) {
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
-        <button
-          onMouseDown={() => handlePTT(true)}
-          onMouseUp={() => handlePTT(false)}
-          onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
-          onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
-          className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all select-none touch-manipulation flex items-center justify-center gap-2 ${
-            pttActive ? 'bg-primary text-primary-foreground' : 'bg-white/10 border border-white/20 text-white'
-          }`}
-        >
-          {pttActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-          {pttActive ? 'SPRECHEN...' : 'Push-to-Talk halten'}
-        </button>
+        <p className="text-[10px] text-white/30 mt-1.5 text-center">Text-Kommunikation mit dem Trainer-Dashboard</p>
       </div>
     </div>
   );
@@ -337,31 +326,34 @@ export default function SimpleCameraAssistant() {
               >
                 <Zap className="w-4 h-4" /> Events
               </button>
-              {/* Funk */}
+              {/* Funk / Chat */}
               <button
                 onClick={() => openPanel('funk')}
                 className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 relative transition-all active:scale-95 ${
                   activePanel === 'funk' ? 'bg-primary text-primary-foreground' : 'bg-black/50 border border-white/20 text-white backdrop-blur-sm'
                 }`}
               >
-                <Radio className="w-4 h-4" /> Funk
+                <MessageSquare className="w-4 h-4" /> Funk-Chat
                 {unreadFunk > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{unreadFunk}</span>
                 )}
               </button>
             </div>
 
-            {/* PTT Button */}
+            {/* "Spreche gerade" Signal-Button */}
             <button
               onMouseDown={() => handlePTT(true)}
               onMouseUp={() => handlePTT(false)}
               onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
               onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
               className={`w-full py-4 rounded-xl font-bold text-white text-base transition-all active:scale-95 select-none touch-manipulation flex items-center justify-center gap-2 ${
-                micActive ? 'bg-primary neon-glow' : 'bg-black/50 border border-white/30 backdrop-blur-sm'
+                micActive ? 'bg-orange-500 neon-glow' : 'bg-black/50 border border-white/30 backdrop-blur-sm'
               }`}
             >
-              {micActive ? <><Mic className="w-5 h-5" /> SPRECHEN</> : <><MicOff className="w-5 h-5" /> Halten zum Sprechen</>}
+              {micActive
+                ? <><Mic className="w-5 h-5" /> Signal: Spreche gerade...</>
+                : <><Radio className="w-5 h-5" /> Halten → "Spreche gerade" Signal</>
+              }
             </button>
           </div>
 
@@ -422,18 +414,18 @@ export default function SimpleCameraAssistant() {
 
           {/* RIGHT SIDEBAR — Landscape Controls */}
           <div className="absolute right-0 top-0 bottom-0 z-10 flex flex-col justify-center gap-2 pr-3 pl-2">
-            {/* PTT */}
+            {/* Signal-Button */}
             <button
               onMouseDown={() => handlePTT(true)}
               onMouseUp={() => handlePTT(false)}
               onTouchStart={e => { e.preventDefault(); handlePTT(true); }}
               onTouchEnd={e => { e.preventDefault(); handlePTT(false); }}
               className={`w-14 py-4 rounded-xl font-bold text-[11px] flex flex-col items-center gap-1 transition-all active:scale-95 select-none touch-manipulation ${
-                micActive ? 'bg-primary neon-glow text-primary-foreground' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
+                micActive ? 'bg-orange-500 neon-glow text-white' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
               }`}
             >
-              {micActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-              <span>{micActive ? 'Sprich' : 'PTT'}</span>
+              {micActive ? <Mic className="w-5 h-5" /> : <Radio className="w-5 h-5" />}
+              <span>{micActive ? 'Signal!' : 'Signal'}</span>
             </button>
 
             {/* Events */}
@@ -447,15 +439,15 @@ export default function SimpleCameraAssistant() {
               <span>Events</span>
             </button>
 
-            {/* Funk */}
+            {/* Funk Chat */}
             <button
               onClick={() => openPanel('funk')}
               className={`w-14 py-3 rounded-xl font-bold text-[11px] flex flex-col items-center gap-1 relative transition-all active:scale-95 ${
                 activePanel === 'funk' ? 'bg-primary text-primary-foreground' : 'bg-black/60 border border-white/25 text-white backdrop-blur-sm'
               }`}
             >
-              <Radio className="w-5 h-5" />
-              <span>Funk</span>
+              <MessageSquare className="w-5 h-5" />
+              <span>Chat</span>
               {unreadFunk > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{unreadFunk}</span>
               )}
