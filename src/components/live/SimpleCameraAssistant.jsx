@@ -165,12 +165,18 @@ export default function SimpleCameraAssistant() {
     lastMessageCountRef.current = funkMessages.length;
   }, [funkMessages, activePanel]);
 
-  // Load session
+  // Load session — MUST complete before heartbeat starts
   useEffect(() => {
     if (!sessionId) return;
     base44.entities.LiveSession.filter({ id: sessionId })
-      .then(sessions => setSession(sessions[0]))
-      .catch(() => {});
+      .then(sessions => {
+        if (sessions.length > 0) {
+          console.log('[SimpleCameraAssistant] Session loaded:', sessions[0].id);
+          setSession(sessions[0]);
+          sessionRef.current = sessions[0]; // Update ref immediately
+        }
+      })
+      .catch(e => console.error('[SimpleCameraAssistant] Load session failed:', e));
   }, [sessionId]);
 
   // Timer
@@ -280,20 +286,19 @@ export default function SimpleCameraAssistant() {
   }, [sessionId, cameraId, captureThumbnail]);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !session) return;
     
-    // Wait for session data to load, then send initial heartbeat
-    if (session) {
-      console.log('[SimpleCameraAssistant] Session loaded, sending initial heartbeat');
-      sendHeartbeat(false);
-    }
+    console.log('[SimpleCameraAssistant] ✅ Ready: sessionId=' + sessionId + ', cameraId=' + cameraId);
     
-    // Heartbeat every 3 seconds (CRITICAL for connection detection)
+    // Send initial heartbeat IMMEDIATELY when session is loaded
+    sendHeartbeat(false);
+    
+    // Heartbeat every 3 seconds
     heartbeatRef.current = setInterval(() => {
       sendHeartbeat(false);
     }, 3000);
     
-    // Thumbnail every 30s (less critical)
+    // Thumbnail every 30s
     thumbnailRef.current = setInterval(() => {
       sendHeartbeat(true);
     }, 30000);
@@ -302,7 +307,7 @@ export default function SimpleCameraAssistant() {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       if (thumbnailRef.current) clearInterval(thumbnailRef.current);
     };
-  }, [sessionId, session, sendHeartbeat]);
+  }, [sessionId, session, cameraId, sendHeartbeat]);
 
   const handlePTT = async (active) => {
     setMicActive(active);
