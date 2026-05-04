@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { Copy, Share2, Wifi, WifiOff, CheckCircle2, Smartphone } from 'lucide-react';
-import WebRTCViewer from '@/components/live/WebRTCViewer';
+import AdaptiveStreamViewer from '@/components/live/AdaptiveStreamViewer';
 
 function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
@@ -48,12 +48,15 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
         isOnline ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-muted/10'
       }`}
     >
-      {/* WebRTC Live Video */}
-      <WebRTCViewer
+      {/* Adaptive Frame Capture — Stable Streaming */}
+      <AdaptiveStreamViewer
         sessionId={sessionId}
         cameraId={cam.camera_id}
-        isOnline={isOnline}
-        fallbackThumbnail={thumbnail}
+        onStatusChange={(status) => {
+          if (status.status === 'streaming') {
+            // Kamera erfolgreich aktiv
+          }
+        }}
       />
 
       {/* Info & Actions */}

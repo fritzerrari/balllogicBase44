@@ -8,6 +8,8 @@
  * - Realtime nur für Status, nicht für Video
  */
 
+import { base44 } from '@/api/base44Client';
+
 export class AdaptiveFrameCapture {
   constructor(sessionId, cameraId, onProgress) {
     this.sessionId = sessionId;
@@ -203,19 +205,16 @@ export class AdaptiveFrameCapture {
       const stored = JSON.parse(localStorage.getItem(`frames_${this.sessionId}`) || '[]');
       localStorage.setItem(`frames_${this.sessionId}`, JSON.stringify([...stored, ...batch]));
       
-      // Sende zu Backend (async, non-blocking)
-      // POST /api/frames/{sessionId}/{cameraId}
-      fetch(`/api/frames/${this.sessionId}/${this.cameraId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frames: batch,
-          metadata: {
-            captured: this.capturedCount,
-            dropped: this.droppedCount,
-            uploaded: (this.uploadedCount += batch.length),
-          },
-        }),
+      // Sende zu Backend (async, non-blocking) über Backend-Function
+      base44.functions.invoke('uploadFrameBatch', {
+        session_id: this.sessionId,
+        camera_id: this.cameraId,
+        frames: batch,
+        metadata: {
+          captured: this.capturedCount,
+          dropped: this.droppedCount,
+          uploaded: (this.uploadedCount += batch.length),
+        },
       }).catch(err => {
         // Fehler: behalte Frames in localStorage, nächster Versuch später
         console.warn('[AdaptiveCapture] Upload failed, will retry:', err.message);
