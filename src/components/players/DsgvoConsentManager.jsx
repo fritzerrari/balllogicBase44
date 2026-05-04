@@ -202,7 +202,7 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
                       {consent !== 'denied' && (
                         <button onClick={() => denyConsent(player)}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-medium hover:bg-yellow-500/20 transition-all">
-                          <UserX className="w-3 h-3" /> Anon
+                          <UserX className="w-3 h-3" /> Ablehnen
                         </button>
                       )}
                     </div>
