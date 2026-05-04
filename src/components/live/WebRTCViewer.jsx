@@ -15,12 +15,15 @@ const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
 ];
 
-const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 30000;
-const RECONNECT_BASE_MS = 5000;
-const RECONNECT_MAX_MS = 60000;
+const POLL_INTERVAL_MS = 2000; // 2s statt 3s - schneller Handshake
+const POLL_TIMEOUT_MS = 45000; // 45s statt 30s - mehr Zeit für instabile Netze
+const RECONNECT_BASE_MS = 2000; // 2s statt 5s - schneller Retry
+const RECONNECT_MAX_MS = 30000; // 30s statt 60s - aber capped
+const ICE_TIMEOUT_MS = 10000; // Expliziter ICE-Timeout
 
 export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackThumbnail }) {
   const videoRef = useRef(null);
@@ -82,7 +85,12 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
     cleanup();
     setRtcState('connecting');
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+    });
     pcRef.current = pc;
 
     pc.ontrack = (e) => {
@@ -109,18 +117,43 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
 
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
-      if (state === 'failed') {
+      console.log(`[WebRTC] ICE state for cam ${cameraId}: ${state}`);
+      
+      if (state === 'failed' || state === 'closed') {
+        console.warn(`[WebRTC] ICE connection ${state} for cam ${cameraId}`);
         cleanup();
         scheduleReconnect();
       } else if (state === 'disconnected') {
+        // Gib 5s Zeit zum Reconnect bevor wir neu verbinden
         setRtcState('waiting');
         reconnectTimerRef.current = setTimeout(() => {
-          if (!mountedRef.current) return;
-          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          if (!mountedRef.current || pcRef.current !== pc) return;
+          const current = pc.iceConnectionState;
+          if (current === 'disconnected' || current === 'failed' || current === 'closed') {
+            console.log(`[WebRTC] No recovery after 5s disconnection, reconnecting cam ${cameraId}`);
             cleanup();
             scheduleReconnect();
           }
         }, 5000);
+      } else if (state === 'connected' || state === 'completed') {
+        // Verbindung wiederhergestellt
+        clearTimeout(reconnectTimerRef.current);
+        setRtcState('live');
+        console.log(`[WebRTC] ICE connection established for cam ${cameraId}`);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      console.log(`[WebRTC] Connection state for cam ${cameraId}: ${state}`);
+      
+      if (state === 'failed') {
+        console.warn(`[WebRTC] Connection failed for cam ${cameraId}`);
+        cleanup();
+        scheduleReconnect();
+      } else if (state === 'disconnected' || state === 'closed') {
+        cleanup();
+        scheduleReconnect();
       }
     };
 
@@ -153,10 +186,32 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
         // Stop polling — we have an offer
         stopPolling();
 
-        await pc.setRemoteDescription(new RTCSessionDescription(s.offer));
+        // Setze Remote Description mit Error-Handling
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(s.offer));
+        } catch (err) {
+          console.warn(`[WebRTC] Failed to set remote description for cam ${cameraId}:`, err.message);
+          cleanup();
+          scheduleReconnect();
+          return;
+        }
 
-        for (const c of (s.ice_camera || [])) {
-          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        // Batch-Add ICE Candidates für Stabilität
+        const iceCandidates = (s.ice_camera || []);
+        for (const c of iceCandidates) {
+          pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        }
+        
+        // Wenn keine ICE-Kandidaten → gib Camera noch 2s Zeit nachzuliefern
+        if (iceCandidates.length === 0) {
+          setTimeout(() => {
+            signal('get_signal', {}).then(res => {
+              const newCandidates = res?.data?.signal?.ice_camera || [];
+              for (const c of newCandidates) {
+                pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+              }
+            }).catch(() => {});
+          }, 2000);
         }
 
         const answer = await pc.createAnswer();
