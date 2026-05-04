@@ -236,10 +236,14 @@ export default function SimpleCameraAssistant() {
   useEffect(() => { sessionRef.current = session; }, [session]);
 
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
-    if (!sessionId || !sessionRef.current) return;
+    if (!sessionId) return;
+    
+    // Fallback: fetch session if ref is empty
+    const currentSession = sessionRef.current || session;
+    if (!currentSession) return;
     
     try {
-      const current = sessionRef.current;
+      const current = currentSession;
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
       
       // Build updated streams with strict last_seen timestamp
@@ -276,10 +280,13 @@ export default function SimpleCameraAssistant() {
   }, [sessionId, cameraId, captureThumbnail]);
 
   useEffect(() => {
-    if (!sessionId || !session) return;
+    if (!sessionId) return;
     
-    // Initial heartbeat IMMEDIATELY
-    sendHeartbeat(false);
+    // Wait for session data to load, then send initial heartbeat
+    if (session) {
+      console.log('[SimpleCameraAssistant] Session loaded, sending initial heartbeat');
+      sendHeartbeat(false);
+    }
     
     // Heartbeat every 3 seconds (CRITICAL for connection detection)
     heartbeatRef.current = setInterval(() => {
@@ -292,8 +299,8 @@ export default function SimpleCameraAssistant() {
     }, 30000);
     
     return () => {
-      clearInterval(heartbeatRef.current);
-      clearInterval(thumbnailRef.current);
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (thumbnailRef.current) clearInterval(thumbnailRef.current);
     };
   }, [sessionId, session, sendHeartbeat]);
 
