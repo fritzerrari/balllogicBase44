@@ -112,8 +112,10 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
       <motion.div
         initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
         onClick={e => e.stopPropagation()}
-        className="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col"
+        className="glass rounded-2xl w-full max-w-2xl flex flex-col overflow-hidden" style={{ maxHeight: 'min(90vh, 700px)', height: '90vh' }}
       >
+        {/* Scrollbarer Inhalt + fixer Footer */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
           <div>
@@ -237,8 +239,9 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-border flex-shrink-0">
+        </div>{/* end scrollable content */}
+        {/* Footer — immer sichtbar */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border flex-shrink-0 bg-card/80">
           <div className="flex gap-2">
             {filteredPlayers.some(p => !isMinor(p) && (p.tracking_consent || 'pending') === 'pending') && (
               <button onClick={grantAllPending}
@@ -258,6 +261,7 @@ export default function DsgvoConsentManager({ players: playersProp, onClose }) {
           </Button>
         </div>
       </motion.div>
+
     </motion.div>
   );
 }
