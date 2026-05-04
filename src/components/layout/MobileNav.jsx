@@ -19,7 +19,7 @@ export default function MobileNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-sidebar border-t border-sidebar-border md:hidden"
+    <nav className="bg-sidebar border-t border-sidebar-border w-full"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div className="flex items-stretch h-14">
         {NAV.map(({ icon: Icon, label, path }) => {

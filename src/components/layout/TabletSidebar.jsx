@@ -71,7 +71,7 @@ export default function TabletSidebar() {
   });
 
   return (
-    <aside className="h-screen w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-1 z-50">
+    <aside className="h-screen w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-1 z-50 sticky top-0">
       {/* Logo */}
       <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center mb-4 neon-glow flex-shrink-0">
         <Zap className="w-4 h-4 text-primary-foreground" />

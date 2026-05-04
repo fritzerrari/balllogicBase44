@@ -96,7 +96,7 @@ export default function Sidebar() {
   const activeSession = activeSessions[0] || null;
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50">
+    <aside className="h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col z-50 sticky top-0">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
