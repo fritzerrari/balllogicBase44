@@ -209,12 +209,14 @@ export default function SimpleCameraAssistant() {
     return canvas.toDataURL('image/jpeg', 0.6);
   }, []);
 
+  // Cached session ref to avoid re-fetching on every heartbeat
+  const sessionRef = useRef(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
-    if (!sessionId) return;
+    if (!sessionId || !sessionRef.current) return;
     try {
-      const sessions = await base44.entities.LiveSession.filter({ id: sessionId });
-      const current = sessions[0];
-      if (!current) return;
+      const current = sessionRef.current;
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
       const updatedStreams = (current.camera_streams || []).map(cam =>
         String(cam.camera_id) === String(cameraId)
@@ -228,10 +230,13 @@ export default function SimpleCameraAssistant() {
 
   useEffect(() => {
     if (!sessionId || !session) return;
+    // Initial heartbeat + first thumbnail after 5s
     sendHeartbeat(false);
-    heartbeatRef.current = setInterval(() => sendHeartbeat(false), 8000);
-    thumbnailRef.current = setInterval(() => sendHeartbeat(true), 20000);
-    const firstThumb = setTimeout(() => sendHeartbeat(true), 3000);
+    const firstThumb = setTimeout(() => sendHeartbeat(true), 5000);
+    // Heartbeat every 20s (was 8s) — just a keep-alive, not critical
+    heartbeatRef.current = setInterval(() => sendHeartbeat(false), 20000);
+    // Thumbnail every 45s (was 20s) — expensive, only for preview
+    thumbnailRef.current = setInterval(() => sendHeartbeat(true), 45000);
     return () => {
       clearInterval(heartbeatRef.current);
       clearInterval(thumbnailRef.current);

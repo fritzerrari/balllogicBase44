@@ -15,8 +15,8 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
   const { data: liveSession } = useQuery({
     queryKey: ['cam-feed', sessionId, cam.camera_id],
     queryFn: () => base44.entities.LiveSession.filter({ id: sessionId }).then(r => r[0]),
-    refetchInterval: 3000,
-    staleTime: 1000,
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
 
   const liveCam = liveSession?.camera_streams?.find(c => String(c.camera_id) === String(cam.camera_id));

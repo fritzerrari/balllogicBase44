@@ -1,6 +1,11 @@
 /**
  * WebRTCViewer — Trainer-Seite (Empfänger)
- * Pollt Signaling-Server, nimmt Offer an, sendet Answer, zeigt echten Livestream
+ *
+ * Robustes Design:
+ * - Polling NUR während des Handshakes (alle 3s, max 30s)
+ * - Nach erfolgreichem Track-Empfang: polling SOFORT stoppen
+ * - Bei Verbindungsabbruch: auto-reconnect mit backoff
+ * - Kein Polling im eingeschwungenen Zustand → kein Rate Limit
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
@@ -9,13 +14,22 @@ import { Wifi, WifiOff, Loader2 } from 'lucide-react';
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
 ];
+
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 30000;
+const RECONNECT_BASE_MS = 5000;
+const RECONNECT_MAX_MS = 60000;
 
 export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackThumbnail }) {
   const videoRef = useRef(null);
   const pcRef = useRef(null);
   const pollingRef = useRef(null);
-  const connectedRef = useRef(false);
+  const pollTimeoutRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const mountedRef = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
   const [rtcState, setRtcState] = useState('waiting'); // waiting | connecting | live | failed
 
   const signal = useCallback(async (action, data) => {
@@ -27,87 +41,175 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
     });
   }, [sessionId, cameraId]);
 
-  const connect = useCallback(async (offer, iceCameraList) => {
-    if (connectedRef.current) return;
-    connectedRef.current = true;
+  const stopPolling = useCallback(() => {
+    clearInterval(pollingRef.current);
+    clearTimeout(pollTimeoutRef.current);
+    pollingRef.current = null;
+    pollTimeoutRef.current = null;
+  }, []);
+
+  const cleanup = useCallback(() => {
+    stopPolling();
+    clearTimeout(reconnectTimerRef.current);
+    if (pcRef.current) {
+      pcRef.current.ontrack = null;
+      pcRef.current.onconnectionstatechange = null;
+      pcRef.current.oniceconnectionstatechange = null;
+      try { pcRef.current.close(); } catch (_) {}
+      pcRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, [stopPolling]);
+
+  const connectRef = useRef(null);
+
+  const scheduleReconnect = useCallback(() => {
+    if (!mountedRef.current) return;
+    const attempt = reconnectAttemptsRef.current++;
+    const delay = Math.min(RECONNECT_BASE_MS * Math.pow(1.5, attempt), RECONNECT_MAX_MS);
+    console.log(`[WebRTC Viewer] Reconnect cam ${cameraId} in ${delay}ms (attempt ${attempt + 1})`);
+    setRtcState('waiting');
+    reconnectTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+      connectRef.current?.();
+    }, delay);
+  }, [cameraId]);
+
+  const connect = useCallback(async () => {
+    if (!mountedRef.current) return;
+    cleanup();
     setRtcState('connecting');
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
     pc.ontrack = (e) => {
+      if (!mountedRef.current) return;
       if (videoRef.current && e.streams[0]) {
         videoRef.current.srcObject = e.streams[0];
         videoRef.current.play().catch(() => {});
         setRtcState('live');
+        reconnectAttemptsRef.current = 0;
+        // Track received → stop polling immediately
+        stopPolling();
+        console.log(`[WebRTC Viewer] cam ${cameraId} LIVE — polling stopped`);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (state === 'failed') {
+        console.warn(`[WebRTC Viewer] cam ${cameraId} connection failed`);
+        cleanup();
+        scheduleReconnect();
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-        setRtcState('failed');
-        connectedRef.current = false;
+      const state = pc.iceConnectionState;
+      if (state === 'failed') {
+        cleanup();
+        scheduleReconnect();
+      } else if (state === 'disconnected') {
+        setRtcState('waiting');
+        reconnectTimerRef.current = setTimeout(() => {
+          if (!mountedRef.current) return;
+          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+            cleanup();
+            scheduleReconnect();
+          }
+        }, 5000);
       }
     };
 
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    // Poll for offer from camera — ONLY until offer found OR timeout
+    let pollCount = 0;
+    const maxPolls = Math.ceil(POLL_TIMEOUT_MS / POLL_INTERVAL_MS);
 
-    // Add camera ICE candidates
-    for (const c of (iceCameraList || [])) {
-      await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
-    }
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    // Wait for ICE gathering
-    const iceCandidates = [];
-    pc.onicecandidate = (e) => {
-      if (e.candidate) iceCandidates.push(e.candidate.toJSON());
-    };
-
-    await new Promise(resolve => {
-      if (pc.iceGatheringState === 'complete') return resolve();
-      const check = setInterval(() => {
-        if (pc.iceGatheringState === 'complete') { clearInterval(check); resolve(); }
-      }, 100);
-      setTimeout(() => { clearInterval(check); resolve(); }, 2000);
-    });
-
-    await signal('set_answer', {
-      answer: pc.localDescription.toJSON(),
-      ice_candidates: iceCandidates,
-    }).catch(console.warn);
-  }, [signal]);
-
-  useEffect(() => {
-    if (!sessionId || !cameraId || !isOnline) return;
-
-    // Poll for offer
     pollingRef.current = setInterval(async () => {
-      if (connectedRef.current) return;
+      if (!mountedRef.current || pcRef.current !== pc) {
+        stopPolling();
+        return;
+      }
+
+      pollCount++;
+      if (pollCount > maxPolls) {
+        console.warn(`[WebRTC Viewer] cam ${cameraId} no offer within timeout`);
+        stopPolling();
+        cleanup();
+        scheduleReconnect();
+        return;
+      }
+
       try {
         const res = await signal('get_signal', {});
         const s = res?.data?.signal;
-        if (s?.offer) {
-          clearInterval(pollingRef.current);
-          await connect(s.offer, s.ice_camera);
+
+        if (!s?.offer) return; // Camera not ready yet
+        if (pc.signalingState !== 'stable') return; // Already processing
+
+        // Stop polling — we have an offer
+        stopPolling();
+
+        await pc.setRemoteDescription(new RTCSessionDescription(s.offer));
+
+        for (const c of (s.ice_camera || [])) {
+          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
         }
-      } catch (e) {
-        // ignore
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        // Collect viewer ICE candidates
+        const viewerIce = [];
+        pc.onicecandidate = (e) => {
+          if (e.candidate) viewerIce.push(e.candidate.toJSON());
+        };
+
+        // Wait for ICE gathering (max 3s)
+        await new Promise(resolve => {
+          if (pc.iceGatheringState === 'complete') return resolve();
+          const check = setInterval(() => {
+            if (pc.iceGatheringState === 'complete') { clearInterval(check); resolve(); }
+          }, 100);
+          setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+        });
+
+        await signal('set_answer', {
+          answer: pc.localDescription.toJSON(),
+          ice_candidates: viewerIce,
+        }).catch(console.warn);
+
+        console.log(`[WebRTC Viewer] cam ${cameraId} answer sent, waiting for track...`);
+      } catch (err) {
+        // Ignore individual poll errors, don't abort
       }
-    }, 2000);
+    }, POLL_INTERVAL_MS);
+
+  }, [sessionId, cameraId, signal, cleanup, stopPolling, scheduleReconnect]);
+
+  connectRef.current = connect;
+
+  useEffect(() => {
+    if (!sessionId || !cameraId || !isOnline) {
+      cleanup();
+      return;
+    }
+
+    mountedRef.current = true;
+    reconnectAttemptsRef.current = 0;
+    connect();
 
     return () => {
-      clearInterval(pollingRef.current);
-      pcRef.current?.close();
-      pcRef.current = null;
-      connectedRef.current = false;
+      mountedRef.current = false;
+      cleanup();
     };
   }, [sessionId, cameraId, isOnline]);
 
   return (
-    <div className="relative w-full h-full bg-black" style={{ aspectRatio: '16/9' }}>
+    <div className="relative w-full bg-black" style={{ aspectRatio: '16/9' }}>
       {/* WebRTC Live Video */}
       <video
         ref={videoRef}
@@ -117,7 +219,7 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
         className={`w-full h-full object-cover ${rtcState === 'live' ? 'opacity-100' : 'opacity-0'}`}
       />
 
-      {/* Fallback: thumbnail or placeholder */}
+      {/* Fallback when not live */}
       {rtcState !== 'live' && (
         <div className="absolute inset-0">
           {fallbackThumbnail ? (
@@ -126,11 +228,22 @@ export default function WebRTCViewer({ sessionId, cameraId, isOnline, fallbackTh
             <div className="w-full h-full bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
               <div className="text-center space-y-2">
                 {rtcState === 'connecting' ? (
-                  <><Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" /><div className="text-xs text-white/50">Verbinde Livestream...</div></>
+                  <>
+                    <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
+                    <div className="text-xs text-white/50">Verbinde Livestream...</div>
+                  </>
                 ) : rtcState === 'failed' ? (
-                  <><WifiOff className="w-6 h-6 text-red-400 mx-auto" /><div className="text-xs text-white/50">Stream unterbrochen</div></>
+                  <>
+                    <WifiOff className="w-6 h-6 text-red-400 mx-auto" />
+                    <div className="text-xs text-white/50">Reconnecting...</div>
+                  </>
                 ) : (
-                  <><Wifi className="w-6 h-6 text-white/20 mx-auto" /><div className="text-xs text-white/30">Warte auf Kamera...</div></>
+                  <>
+                    <Wifi className="w-6 h-6 text-white/20 mx-auto" />
+                    <div className="text-xs text-white/30">
+                      {isOnline ? 'Warte auf Kamera...' : 'Kamera offline'}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

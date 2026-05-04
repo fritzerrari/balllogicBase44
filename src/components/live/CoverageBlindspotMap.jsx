@@ -77,7 +77,8 @@ export default function CoverageBlindspotMap({ session }) {
     queryFn: () => base44.entities.TrackingData.filter(
       { session_id: session.id }, '-timestamp_ms', 30
     ),
-    refetchInterval: 15000,
+    refetchInterval: 30000,
+    staleTime: 25000,
     enabled: !!session?.id,
   });
 

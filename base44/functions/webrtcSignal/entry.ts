@@ -88,10 +88,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'clear') {
-      const existing = await base44.asServiceRole.entities.AppSetting.filter({ key });
-      if (existing.length > 0) {
-        await base44.asServiceRole.entities.AppSetting.delete(existing[0].id);
-      }
+      try {
+        const existing = await base44.asServiceRole.entities.AppSetting.filter({ key });
+        if (existing.length > 0) {
+          await base44.asServiceRole.entities.AppSetting.delete(existing[0].id).catch(() => {});
+        }
+      } catch (_) { /* ignore — record may already be gone */ }
       return Response.json({ ok: true });
     }
 

@@ -60,21 +60,24 @@ export default function LivePitchTracker({ sessionId, kickoffDetected }) {
   const { data: sessionState } = useQuery({
     queryKey: ['session-state-pitch', sessionId],
     queryFn: () => base44.entities.SessionState.filter({ session_id: sessionId }),
-    refetchInterval: 1500,
+    refetchInterval: 8000,
+    staleTime: 6000,
     select: d => d?.[0],
   });
 
   const { data: lastTracking } = useQuery({
     queryKey: ['tracking-latest', sessionId],
     queryFn: () => base44.entities.TrackingData.filter({ session_id: sessionId }, '-timestamp_ms', 1),
-    refetchInterval: 1500,
+    refetchInterval: 5000,
+    staleTime: 3000,
     select: d => d?.[0],
   });
 
   const { data: recentEvents = [] } = useQuery({
     queryKey: ['recent-events-pitch', sessionId],
     queryFn: () => base44.entities.MatchEvent.filter({ session_id: sessionId }, '-timestamp_ms', 5),
-    refetchInterval: 3000,
+    refetchInterval: 10000,
+    staleTime: 8000,
   });
 
   useEffect(() => {

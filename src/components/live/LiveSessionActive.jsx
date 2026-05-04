@@ -57,8 +57,8 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   const { data: liveSession } = useQuery({
     queryKey: ['live-session-active', session.id],
     queryFn: () => base44.entities.LiveSession.filter({ id: session.id }).then(r => r[0]),
-    refetchInterval: 5000,
-    staleTime: 2000,
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
 
   // Live camera connection count
