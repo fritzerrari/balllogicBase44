@@ -24,6 +24,8 @@ import FrameMonitor from '@/components/live/FrameMonitor';
 import LiveReportingPanel from '@/components/live/LiveReportingPanel';
 import TrackingCorrectionPanel from '@/components/live/TrackingCorrectionPanel';
 import LiveExportButton from '@/components/live/LiveExportButton';
+import MatchHistoryPanel from '@/components/live/MatchHistoryPanel';
+import TacticsChangeLogger from '@/components/live/TacticsChangeLogger';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -314,7 +316,9 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
             {/* LEFT: Events (3 cols) */}
             <div className="col-span-3 space-y-4">
               <PlayerAssignmentPanel session={liveSession || session} onAssigned={() => {}} />
+              <MatchHistoryPanel session={liveSession || session} />
               <TrackingCorrectionPanel sessionId={session.id} lastTracking={lastTracking} />
+              <TacticsChangeLogger sessionId={session.id} elapsedSeconds={elapsedSeconds} />
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Zap className="w-3.5 h-3.5 text-primary" /> Events tippen
