@@ -116,14 +116,32 @@ export class ProfessionalFrameCapture {
       const video = this.videoRef;
       const canvas = this.canvasRef;
 
-      if (!video || !canvas || video.readyState < 2) {
-        // Video not ready yet
+      if (!video) {
+        console.error('[ProfessionalFrameCapture] Video ref missing!');
+        this.isCapturing = false;
+        return;
+      }
+
+      if (!canvas) {
+        console.error('[ProfessionalFrameCapture] Canvas ref missing!');
+        this.isCapturing = false;
+        return;
+      }
+
+      if (video.readyState < 2) {
+        // Video not ready yet, retry next frame
         this.rafId = requestAnimationFrame(() => this._captureLoop());
         return;
       }
 
       // Capture frame to canvas
       const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('[ProfessionalFrameCapture] Canvas context failed!');
+        this.isCapturing = false;
+        return;
+      }
+
       canvas.width = 320;
       canvas.height = 180;
       ctx.drawImage(video, 0, 0, 320, 180);
@@ -137,9 +155,16 @@ export class ProfessionalFrameCapture {
           timestamp_ms: Date.now(),
           elapsed_seconds: 0, // Updated by caller
         });
-      }
+        this.capturedCount++;
 
-      this.capturedCount++;
+        // Log progress every 30 frames
+        if (this.capturedCount % 30 === 0) {
+          console.log(`[ProfessionalFrameCapture] 📹 ${this.capturedCount} frames captured, queue: ${this.frameQueue.length}, uploaded: ${this.uploadedCount}`);
+        }
+      } else {
+        console.warn('[ProfessionalFrameCapture] Base64 failed:', base64?.length || 0);
+        this.droppedCount++;
+      }
     } catch (err) {
       console.warn('[ProfessionalFrameCapture] Capture error:', err.message);
       this.droppedCount++;

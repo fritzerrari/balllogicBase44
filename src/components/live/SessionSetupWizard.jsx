@@ -7,7 +7,7 @@
  * Schritt 3: Spieler-Zuordnung (anonym oder mit Namen — optional!)
  * Schritt 4: Bestätigung & Start
  */
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -547,10 +547,10 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
       {/* Step Indicator */}
       <div className="flex items-center justify-between px-2">
         {STEPS.map((s, i) => (
-          <>
-            <StepDot key={`dot-${i}`} num={i + 1} current={step === i} done={step > i} label={s.label} />
-            {i < STEPS.length - 1 && <StepLine key={`line-${i}`} done={step > i} />}
-          </>
+          <React.Fragment key={i}>
+            <StepDot num={i + 1} current={step === i} done={step > i} label={s.label} />
+            {i < STEPS.length - 1 && <StepLine done={step > i} />}
+          </React.Fragment>
         ))}
       </div>
 

@@ -222,39 +222,46 @@ export default function SimpleCameraAssistant() {
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            setVideoReady(true);
-            console.log('[SimpleCameraAssistant] Video metadata loaded');
-          };
-          await videoRef.current.play().catch(e => {
-            addError('Video play failed: ' + e.message);
-          });
           
-          // Start Professional Frame Capture Engine
-          const frameCapture = new ProfessionalFrameCapture({
-            sessionId,
-            cameraId,
-            onFrameQueued: (stats) => {
-              setFrameStats(prev => ({ ...prev, ...stats, lastUploadSuccess: true }));
-            },
-            onUploadSuccess: (stats) => {
-              setFrameStats(prev => ({ ...prev, ...stats, lastUploadSuccess: true }));
-              // Send thumbnail after successful upload
-              if (sendHeartbeatRef.current) sendHeartbeatRef.current(true);
-            },
-            onUploadError: (err) => {
-              addError('Upload failed: ' + err.error);
-              setFrameStats(prev => ({ ...prev, lastUploadSuccess: false }));
-            },
-            onStatusChange: (status) => {
-              console.log('[ProfessionalFrameCapture] Status:', status);
-            },
-          });
+          // Wait for video to be ready BEFORE starting capture
+          videoRef.current.onloadedmetadata = async () => {
+            setVideoReady(true);
+            console.log('[SimpleCameraAssistant] Video metadata loaded, readyState=' + videoRef.current.readyState);
+            
+            try {
+              await videoRef.current.play();
+              console.log('[SimpleCameraAssistant] Video playing, readyState=' + videoRef.current.readyState);
+              
+              // NOW start Professional Frame Capture Engine (video is ready)
+              const frameCapture = new ProfessionalFrameCapture({
+                sessionId,
+                cameraId,
+                onFrameQueued: (stats) => {
+                  setFrameStats(prev => ({ ...prev, ...stats, lastUploadSuccess: true }));
+                },
+                onUploadSuccess: (stats) => {
+                  setFrameStats(prev => ({ ...prev, ...stats, lastUploadSuccess: true }));
+                  // Send thumbnail after successful upload
+                  if (sendHeartbeatRef.current) sendHeartbeatRef.current(true);
+                },
+                onUploadError: (err) => {
+                  addError('Upload failed: ' + err.error);
+                  setFrameStats(prev => ({ ...prev, lastUploadSuccess: false }));
+                },
+                onStatusChange: (status) => {
+                  console.log('[ProfessionalFrameCapture] Status:', status);
+                },
+              });
 
-          frameCaptureRef.current = frameCapture;
-          frameCapture.startCapture(videoRef.current, canvasRef.current);
-          setCanvasReady(true);
-          console.log('[SimpleCameraAssistant] Professional Frame Capture started');
+              frameCaptureRef.current = frameCapture;
+              frameCapture.startCapture(videoRef.current, canvasRef.current);
+              setCanvasReady(true);
+              console.log('[SimpleCameraAssistant] ✅ Professional Frame Capture started');
+            } catch (e) {
+              addError('Video play failed: ' + e.message);
+              console.error('[SimpleCameraAssistant] Play error:', e);
+            }
+          };
         }
         setCamStatus('active');
       } catch (e) {
