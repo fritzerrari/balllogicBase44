@@ -51,7 +51,29 @@ Deno.serve(async (req) => {
 
         // Speichere letzte Frame in SessionState für Trainer-Polling
         try {
-          const states = await base44.asServiceRole.entities.SessionState.filter({ session_id: sessionId });
+          let states = await base44.asServiceRole.entities.SessionState.filter({ session_id: sessionId });
+          
+          // Auto-create SessionState wenn nicht vorhanden
+          if (states.length === 0) {
+            const newState = await base44.asServiceRole.entities.SessionState.create({
+              session_id: sessionId,
+              frame_count: 0,
+              last_frame_number: 0,
+              possession_percentage: { home: 50, away: 50, last_updated_frame: 0 },
+              detection_quality_avg: 0,
+              updated_at: new Date().toISOString(),
+              latest_frame_base64: data_base64,
+              latest_frame_timestamp: timestamp_ms,
+              latest_camera_id: cameraId,
+            }).catch(err => {
+              console.warn('[uploadFrameBatch] SessionState create failed:', err.message);
+              return null;
+            });
+            if (!newState) states = [];
+            else states = [newState];
+          }
+          
+          // Update existing SessionState
           if (states.length > 0) {
             await base44.asServiceRole.entities.SessionState.update(states[0].id, {
               latest_frame_base64: data_base64,
@@ -59,7 +81,9 @@ Deno.serve(async (req) => {
               latest_camera_id: cameraId,
             }).catch(() => {});
           }
-        } catch (_) {}
+        } catch (err) {
+          console.warn('[uploadFrameBatch] SessionState update failed:', err.message);
+        }
 
         // Send zu processFrame für Tracking (async, non-blocking)
         base44.functions.invoke('processFrame', {
