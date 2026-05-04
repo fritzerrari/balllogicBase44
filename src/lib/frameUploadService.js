@@ -27,11 +27,17 @@ class FrameUploadService {
     this.consecutiveErrors = 0;
     this.maxConsecutiveErrors = 5;
 
-    // Timing
-    this.captureIntervalMs = 2000; // 2s between captures
-    this.uploadIntervalMs = 8000; // 8s batch upload
+    // Timing — ADAPTIVE (intelligent, nicht konstant)
+    this.minCaptureIntervalMs = 30000; // Min 30s (bei hoher Aktivität)
+    this.maxCaptureIntervalMs = 60000; // Max 60s (bei Ruhe)
+    this.currentIntervalMs = 45000; // Start bei 45s
+    this.uploadIntervalMs = 45000; // Batch upload alle 45s
     this.captureTimerId = null;
     this.uploadTimerId = null;
+    
+    // Bewegungs-Tracking
+    this.lastFrameHash = null;
+    this.movementThreshold = 0.15; // Pixel-Change > 15% = capture sofort
 
     // Stats
     this.stats = {
@@ -67,9 +73,18 @@ class FrameUploadService {
   }
 
   _startCaptureLoop() {
-    this.captureTimerId = setInterval(() => {
-      this._captureFrame();
-    }, this.captureIntervalMs);
+    // Initial capture
+    this._captureFrame();
+    
+    // Adaptive loop — Interval passt sich an Bewegung an
+    const loop = () => {
+      const delay = Math.max(0, this.currentIntervalMs - Date.now() + (this.lastCaptureTimeMs || Date.now()));
+      this.captureTimerId = setTimeout(() => {
+        this._captureFrame();
+        loop();
+      }, Math.min(delay, this.currentIntervalMs));
+    };
+    loop();
   }
 
   _captureFrame() {
@@ -85,18 +100,36 @@ class FrameUploadService {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(this.videoEl, 0, 0);
 
-      // Convert to JPEG (quality 0.65 ≈ 50KB per frame)
+      // Convert to JPEG (quality 0.65 ≈ 45KB per frame)
       canvas.toBlob(
         (blob) => this._processFrame(blob),
         'image/jpeg',
         0.65
       );
+      
+      this.lastCaptureTimeMs = Date.now();
     } catch (err) {
       console.warn('[FrameUploadService] Capture error:', err.message);
     }
   }
 
   _processFrame(blob) {
+    // Early exit: Bewegungs-Duplikat-Erkennung (Hashing)
+    const pixelData = this._getPixelHash();
+    if (this.lastFrameHash && this._hammingDistance(this.lastFrameHash, pixelData) < this.movementThreshold) {
+      // Zu wenig Bewegung — Skip diese Frame
+      this.stats.droppedCount = (this.stats.droppedCount || 0) + 1;
+      
+      // Aber: Bei Ruhe → nächste Capture länger warten (Energie sparen)
+      this.currentIntervalMs = Math.min(this.currentIntervalMs + 5000, this.maxCaptureIntervalMs);
+      this.onProgress?.({ status: 'idle', stats: this.stats });
+      return;
+    }
+    
+    // Movement detected → nächste Capture schneller
+    this.currentIntervalMs = Math.max(this.currentIntervalMs - 10000, this.minCaptureIntervalMs);
+    this.lastFrameHash = pixelData;
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64Data = e.target.result; // data:image/jpeg;base64,...
@@ -113,12 +146,38 @@ class FrameUploadService {
 
       this.onProgress?.({ status: 'capturing', stats: this.stats });
 
-      // Auto-upload if we have 5+ frames
-      if (this.pendingFrames.length >= 5) {
+      // Auto-upload if we have 3+ frames
+      if (this.pendingFrames.length >= 3) {
         this._uploadBatch();
       }
     };
     reader.readAsDataURL(blob);
+  }
+
+  // Einfaches Pixel-Hashing für Bewegungserkennung
+  _getPixelHash() {
+    const canvas = this.canvasEl;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    let hash = 0;
+    // Sample every 100th pixel für Performance
+    for (let i = 0; i < data.length; i += 400) {
+      hash ^= (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    }
+    return hash;
+  }
+
+  // Hamming Distance für Ähnlichkeit
+  _hammingDistance(hash1, hash2) {
+    let xor = hash1 ^ hash2;
+    let distance = 0;
+    while (xor) {
+      distance += xor & 1;
+      xor >>= 1;
+    }
+    return distance / 32; // Normalize to 0-1
   }
 
   _startUploadLoop() {
