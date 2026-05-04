@@ -299,17 +299,32 @@ export default function SimpleCameraAssistant() {
   const sendHeartbeatRef = useRef(null);
 
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
-    if (!sessionId) return;
+    // VALIDATION: Beide Parameter müssen vorhanden sein
+    if (!sessionId) {
+      console.error('[sendHeartbeat] ❌ MISSING sessionId');
+      throw new Error('sessionId is required for registration');
+    }
+    if (!cameraId) {
+      console.error('[sendHeartbeat] ❌ MISSING cameraId');
+      throw new Error('cameraId is required for registration');
+    }
     
     try {
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
       const label = `Kamera ${cameraId}`;
       
+      console.log(`[sendHeartbeat] 📡 Registering cam ${cameraId} in session ${sessionId.slice(0, 8)}...`);
+      
       // Upsert: find or create CameraConnection
-      const existing = await base44.entities.CameraConnection.filter({
-        session_id: sessionId,
-        camera_id: cameraId,
-      });
+      let existing = [];
+      try {
+        existing = await base44.entities.CameraConnection.filter({
+          session_id: sessionId,
+          camera_id: cameraId,
+        });
+      } catch (filterErr) {
+        console.warn('[sendHeartbeat] Filter failed, will create new:', filterErr.message);
+      }
       
       const data = {
         status: 'connected',
@@ -320,19 +335,20 @@ export default function SimpleCameraAssistant() {
       
       if (existing.length > 0) {
         await base44.entities.CameraConnection.update(existing[0].id, data);
-        console.log('[Heartbeat] ✅ Updated cam', cameraId);
+        console.log(`[Heartbeat] ✅ Updated cam ${cameraId} in session ${sessionId.slice(0, 8)}`);
       } else {
-        await base44.entities.CameraConnection.create({
+        const created = await base44.entities.CameraConnection.create({
           session_id: sessionId,
           camera_id: cameraId,
           ...data,
         });
-        console.log('[Heartbeat] ✅ Created cam', cameraId);
+        console.log(`[Heartbeat] ✅ Created cam ${cameraId} (id=${created.id})`);
       }
       setIsConnected(true);
     } catch (e) {
-      console.error('[SimpleCameraAssistant] ❌ Heartbeat FAILED:', e.message);
+      console.error(`[sendHeartbeat] ❌ FAILED for cam ${cameraId}:`, e.message);
       setIsConnected(false);
+      throw e; // Re-throw für Retry-Logik
     }
   }, [sessionId, cameraId, captureThumbnail]);
 
@@ -347,16 +363,40 @@ export default function SimpleCameraAssistant() {
     console.log('[SimpleCameraAssistant] ✅ Ready: sessionId=' + sessionId + ', cameraId=' + cameraId);
     
     // Send initial heartbeat IMMEDIATELY when session is loaded
-    sendHeartbeat(false);
+    console.log('[SimpleCameraAssistant] 🚀 Starting heartbeat + registration — sessionId=' + sessionId + ', cameraId=' + cameraId);
+    
+    // Retry-Logik: 3x versuchen, dann Fehler melden
+    let retries = 0;
+    const maxRetries = 3;
+    
+    const registerWithRetry = async () => {
+      try {
+        await sendHeartbeat(false);
+        console.log('[SimpleCameraAssistant] ✅ Registration successful');
+        retries = 0; // Reset on success
+      } catch (err) {
+        retries++;
+        console.error(`[SimpleCameraAssistant] ❌ Registration failed (${retries}/${maxRetries}):`, err.message);
+        
+        if (retries >= maxRetries) {
+          addError(`Registrierung fehlgeschlagen nach ${maxRetries} Versuchen: ${err.message}`);
+        }
+      }
+    };
+    
+    // Initial registration sofort
+    registerWithRetry();
     
     // Heartbeat every 3 seconds
     heartbeatRef.current = setInterval(() => {
-      sendHeartbeat(false);
+      registerWithRetry();
     }, 3000);
     
     // Thumbnail every 30s
     thumbnailRef.current = setInterval(() => {
-      sendHeartbeat(true);
+      sendHeartbeat(true).catch(err => {
+        console.warn('[SimpleCameraAssistant] Thumbnail capture failed:', err.message);
+      });
     }, 30000);
     
     return () => {

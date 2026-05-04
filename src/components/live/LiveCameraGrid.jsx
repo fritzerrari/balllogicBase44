@@ -17,32 +17,48 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
     try {
       const unsubscribe = base44.entities.CameraConnection.subscribe((event) => {
         if (event.data?.session_id === sessionId && String(event.data?.camera_id) === String(cam.camera_id)) {
-          console.log(`[CameraFeed ${cam.camera_id}] Update:`, event.data.last_heartbeat);
+          console.log(`[CameraFeed ${cam.camera_id}] ✅ Heartbeat received:`, new Date(event.data.last_heartbeat).toLocaleTimeString());
           setConnection(event.data);
         }
       });
       return () => unsubscribe?.();
     } catch (err) {
-      console.warn('[CameraFeed] Subscribe failed:', err.message);
+      console.error('[CameraFeed] ❌ Subscribe failed:', err.message);
     }
   }, [sessionId, cam.camera_id]);
 
-  // Initial load
+  // Initial load mit Retry
   useEffect(() => {
-    base44.entities.CameraConnection.filter({
-      session_id: sessionId,
-      camera_id: cam.camera_id,
-    }).then(c => {
-      if (c.length > 0) {
-        console.log(`[CameraFeed ${cam.camera_id}] Initial load:`, c[0]);
-        setConnection(c[0]);
+    const loadConnection = async () => {
+      try {
+        console.log(`[CameraFeed] 🔍 Loading connection for cam ${cam.camera_id} in session ${sessionId?.slice(0, 8)}...`);
+        const c = await base44.entities.CameraConnection.filter({
+          session_id: sessionId,
+          camera_id: cam.camera_id,
+        });
+        if (c.length > 0) {
+          console.log(`[CameraFeed ${cam.camera_id}] ✅ Found connection record`);
+          setConnection(c[0]);
+        } else {
+          console.log(`[CameraFeed ${cam.camera_id}] ⏳ No connection record yet — waiting for first heartbeat...`);
+        }
+      } catch (err) {
+        console.error(`[CameraFeed ${cam.camera_id}] ❌ Load failed:`, err.message);
       }
-    }).catch(() => {});
+    };
+
+    if (sessionId && cam.camera_id) {
+      loadConnection();
+      // Retry nach 5s falls noch nicht registriert
+      const timeout = setTimeout(loadConnection, 5000);
+      return () => clearTimeout(timeout);
+    }
   }, [sessionId, cam.camera_id]);
 
   const thumbnail = connection?.thumbnail;
   const lastHeartbeatMs = connection?.last_heartbeat ? Date.now() - new Date(connection.last_heartbeat).getTime() : null;
   const isOnline = lastHeartbeatMs !== null && lastHeartbeatMs < 15000;
+  const waitingForFirst = !connection && !thumbnail;
   const camLink = `${window.location.origin}/cam?session=${sessionId}&cam=${cam.camera_id}`;
 
   const handleCopy = () => {
@@ -65,7 +81,7 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       className={`rounded-xl overflow-hidden border flex flex-col ${
-        isOnline ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-muted/10'
+        isOnline ? 'border-green-500/40 bg-green-500/5' : waitingForFirst ? 'border-yellow-500/40 bg-yellow-500/5' : 'border-border bg-muted/10'
       }`}
     >
       {/* Thumbnail oder Status */}
@@ -76,7 +92,7 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-muted to-black">
             <Smartphone className="w-8 h-8 text-muted-foreground/60 mb-2" />
             <div className="text-xs text-muted-foreground text-center px-2">
-              {isOnline ? 'Kamera aktiv' : 'Kamera verbindet sich...'}
+              {isOnline ? 'Kamera aktiv' : waitingForFirst ? '⏳ Registrierung läuft...' : '⏳ Warte auf Heartbeat...'}
             </div>
           </div>
         )}
@@ -95,8 +111,10 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
             <div className="text-sm font-bold text-foreground">{cam.label}</div>
             <div className="flex items-center gap-1 mt-0.5">
               {isOnline
-                ? <><Wifi className="w-3 h-3 text-green-400" /><span className="text-[10px] text-green-400">Verbunden</span></>
-                : <><WifiOff className="w-3 h-3 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Nicht verbunden</span></>
+                ? <><Wifi className="w-3 h-3 text-green-400" /><span className="text-[10px] text-green-400">✅ Verbunden</span></>
+                : waitingForFirst
+                  ? <><Wifi className="w-3 h-3 text-yellow-400 animate-pulse" /><span className="text-[10px] text-yellow-400">⏳ Registriert sich...</span></>
+                  : <><WifiOff className="w-3 h-3 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">❌ Kein Signal</span></>
               }
             </div>
           </div>
@@ -125,7 +143,15 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
 
         {connection && (
           <div className="text-[10px] text-muted-foreground bg-muted/40 rounded p-1.5">
-            Last heartbeat: {lastHeartbeatMs !== null ? (lastHeartbeatMs / 1000).toFixed(0) + 's ago' : 'never'}
+            {isOnline
+              ? `✅ Heartbeat vor ${(lastHeartbeatMs / 1000).toFixed(0)}s`
+              : `⏳ Letzter Heartbeat vor ${(lastHeartbeatMs / 1000).toFixed(0)}s`
+            }
+          </div>
+        )}
+        {waitingForFirst && (
+          <div className="text-[10px] text-yellow-400 bg-yellow-500/10 rounded p-1.5 border border-yellow-500/20">
+            💡 Kamera sollte auf den Link gehen: <code className="text-[9px] bg-black/30 px-1 rounded">{cam.code || 'CODE'}</code>
           </div>
         )}
       </div>
