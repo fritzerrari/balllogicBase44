@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Square, Zap, Video, BarChart3, Radio, Play, Pause, CheckCircle2, Loader2, ChevronDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { saveSessionStateOffline, loadSessionStateOffline, autoSyncSessionState } from '@/lib/offlineSessionManager';
+import OverTimeConfirmDialog from '@/components/live/OverTimeConfirmDialog';
 
 import EventButtons from '@/components/live/EventButtons';
 import LiveCameraGrid from '@/components/live/LiveCameraGrid';
@@ -40,24 +42,50 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
   const [kickoffDetected, setKickoffDetected] = useState(session?.kickoff_detected || false);
   const [doingKickoff, setDoingKickoff] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showOverTimeDialog, setShowOverTimeDialog] = useState(false);
   const timerRef = useRef(null);
   const halftimeRef = useRef(false);
+  const overtimeRef = useRef(false);
 
-  // Timer (pauseable)
+  // Timer (pauseable + Überlänge-Check)
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setElapsedSeconds(t => {
         if (isPaused) return t; // Pause: don't increment
         const next = t + 1;
+        
+        // Halbzeit 1 bei 45min
         if (next === 45 * 60 && halfTime === 1 && !halftimeRef.current) {
           halftimeRef.current = true;
           setShowHalftimeAlert(true);
         }
+        
+        // ÜBERLÄNGE: Nach 90min (statt auto-stop) → Dialog
+        if (next === 90 * 60 && halfTime === 2 && !overtimeRef.current) {
+          overtimeRef.current = true;
+          setShowOverTimeDialog(true);
+          setIsPaused(true); // Pausa automatisch
+        }
+        
         return next;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [halfTime, isPaused]);
+
+  // Auto-Sync Offline State alle 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveSessionStateOffline(session.id, {
+        elapsed_seconds: elapsedSeconds,
+        half_time: halfTime,
+        event_count: eventCount,
+        kickoff_detected: kickoffDetected,
+      });
+      autoSyncSessionState(session.id, base44).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [session.id, elapsedSeconds, halfTime, eventCount, kickoffDetected]);
 
   // Subscribe to session updates — keep internal state in sync
   const [liveSession, setLiveSession] = useState(session);
@@ -111,6 +139,18 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     setIsPaused(!isPaused);
   };
 
+  const handleOverTimeConfirm = () => {
+    setShowOverTimeDialog(false);
+    setIsPaused(false); // Spiel weitergehen
+    // Keine neue Halbzeit — Timer läuft weiter (90+ min)
+  };
+
+  const handleOverTimeSkip = async () => {
+    setShowOverTimeDialog(false);
+    // Spiel beenden nach 90min
+    await onStop();
+  };
+
   const handleKickoff = async () => {
     setDoingKickoff(true);
     try {
@@ -157,6 +197,16 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* OVERTIME DIALOG */}
+      <AnimatePresence>
+        {showOverTimeDialog && (
+          <OverTimeConfirmDialog
+            onConfirm={handleOverTimeConfirm}
+            onSkip={handleOverTimeSkip}
+          />
         )}
       </AnimatePresence>
 

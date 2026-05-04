@@ -2,7 +2,7 @@
  * LiveSession — SUPER SIMPLE 2-Phase: Setup → Live
  * Designed for non-tech users (coaches, players, cameramen)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,11 +18,28 @@ import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
 export default function LiveSession() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [user, setUser] = useState(null);
 
   const [phase, setPhase] = useState('setup'); // 'setup' | 'live'
   const [session, setSession] = useState(null);
   const [error, setError] = useState(null);
   const [finishing, setFinishing] = useState(false);
+
+  // Auth: Nur Coaches + Admins dürfen Live-Sessions starten
+  useEffect(() => {
+    base44.auth.me()
+      .then(u => {
+        setUser(u);
+        if (u && !['admin', 'coach'].includes(u.role?.toLowerCase())) {
+          setError('❌ Nur Trainer und Admins dürfen Live-Sessions starten');
+          setTimeout(() => navigate('/'), 2000);
+        }
+      })
+      .catch(() => {
+        setError('❌ Authentifizierung erforderlich');
+        setTimeout(() => base44.auth.redirectToLogin(), 2000);
+      });
+  }, []);
 
   const createSessionMutation = useMutation({
     mutationFn: async (data) => {
