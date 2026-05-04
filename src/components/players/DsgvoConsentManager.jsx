@@ -185,6 +185,27 @@ export default function DsgvoConsentManager({ players = [], onClose }) {
             Keine Spieler im Kader vorhanden.
           </div>
         )}
+
+        {/* Aktions-Footer */}
+        <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-border">
+          {players.length > 0 ? (
+            <>
+              <button
+                onClick={() => players.filter(p => (p.tracking_consent || 'pending') === 'pending').forEach(p => grantConsent(p))}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-sm font-medium hover:bg-primary/25 transition-all"
+              >
+                <Check className="w-4 h-4" /> Alle ausstehenden bestätigen
+              </button>
+              <Button onClick={onClose} className="bg-primary text-primary-foreground px-6">
+                Schließen
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onClose} className="ml-auto bg-primary text-primary-foreground px-8">
+              Verstanden
+            </Button>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );
