@@ -1,284 +1,190 @@
 /**
- * EventButtons — Shared Event-Tapping Component
- * Verwendet in: CameraView (Kamera-Assistent) + LiveSession (Trainer) + CoachingCockpit
- * 
- * Deduplizierung: Events innerhalb von 10s vom gleichen Typ werden als Duplikat markiert.
- * Nachträgliche Korrektur: editierbar über den Event-Log.
+ * EventButtons — Event-Logger mit korrektem MatchEvent-Speichern
+ * KRITIK: Vorher wurde nur lokales Array aktualisiert, MatchEvent NICHT gespeichert!
  */
 import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { Check, Edit2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Zap, ChevronDown, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-export const ALL_EVENTS = [
-  { key: 'goal',         label: 'TOR',         icon: '⚽', color: 'bg-primary text-primary-foreground', team: true },
-  { key: 'chance',       label: 'Chance',       icon: '🎯', color: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40', team: true },
-  { key: 'corner',       label: 'Ecke',         icon: '📐', color: 'bg-blue-500/20 text-blue-300 border border-blue-500/40', team: true },
-  { key: 'yellow_card',  label: 'Gelb',         icon: '🟨', color: 'bg-yellow-400/20 text-yellow-200 border border-yellow-400/40', team: true },
-  { key: 'red_card',     label: 'Rot',          icon: '🟥', color: 'bg-red-500/20 text-red-300 border border-red-500/40', team: true },
-  { key: 'foul',         label: 'Foul',         icon: '⛔', color: 'bg-orange-500/20 text-orange-300 border border-orange-500/40', team: true },
-  { key: 'freekick',     label: 'Freistoß',     icon: '🦵', color: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40', team: true },
-  { key: 'substitution', label: 'Wechsel',      icon: '🔄', color: 'bg-purple-500/20 text-purple-300 border border-purple-500/40', team: true },
-  { key: 'transition',   label: 'Konter',       icon: '⚡', color: 'bg-pink-500/20 text-pink-300 border border-pink-500/40', team: true },
-  { key: 'offside',      label: 'Abseits',      icon: '🚩', color: 'bg-gray-500/20 text-gray-300 border border-gray-500/40', team: true },
-];
+const EVENT_TYPES = {
+  goal: { emoji: '⚽', label: 'Tor', color: 'text-yellow-400', icon: '⚽', needsTeam: true },
+  chance: { emoji: '🎯', label: 'Chance', color: 'text-blue-400', icon: '🎯', needsTeam: true },
+  corner: { emoji: '🚩', label: 'Ecke', color: 'text-purple-400', icon: '🚩', needsTeam: true },
+  yellow_card: { emoji: '🟨', label: 'Gelbe Karte', color: 'text-yellow-500', icon: '🟨', needsTeam: true },
+  red_card: { emoji: '🟥', label: 'Rote Karte', color: 'text-red-500', icon: '🟥', needsTeam: true },
+  foul: { emoji: '⚔️', label: 'Foul', color: 'text-red-400', icon: '⚔️', needsTeam: true },
+  freekick: { emoji: '🎪', label: 'Freistoß', color: 'text-orange-400', icon: '🎪', needsTeam: true },
+  substitution: { emoji: '🔄', label: 'Wechsel', color: 'text-green-400', icon: '🔄', needsTeam: true },
+  offside: { emoji: '📍', label: 'Abseits', color: 'text-blue-300', icon: '📍', needsTeam: true },
+  note: { emoji: '📝', label: 'Notiz', color: 'text-gray-400', icon: '📝', needsTeam: false },
+};
 
-// Deduplizierungs-Fenster: Smart Context-Based (nicht nur Zeit)
-const DEDUP_WINDOW_MS = 20000; // 20 Sekunden base window
-const DEDUP_MIN_POSITION_CHANGE = 20; // Min 20% Feldbreite für Position-Change
+export const ALL_EVENTS = Object.entries(EVENT_TYPES).map(([key, cfg]) => ({ key, ...cfg }));
 
-/**
- * @param {object} props
- * @param {string} props.sessionId
- * @param {string} props.matchId - Match-ID (optional, aber wichtig für Reporting!)
- * @param {string} props.matchTitle
- * @param {string} props.source - 'coach' | 'camera_1' | 'camera_2' etc.
- * @param {number} props.elapsedSeconds - Spielzeit in Sekunden
- * @param {boolean} props.compact - kleine Version (für Mobile)
- * @param {string[]} props.visibleEvents - welche Buttons zeigen (undefined = alle)
- */
-export default function EventButtons({ sessionId, matchId, matchTitle, source = 'coach', elapsedSeconds = 0, compact = false, visibleEvents, onEventLogged }) {
-  const [localEvents, setLocalEvents] = useState([]);
-  const [flash, setFlash] = useState(null);
-  const [showTeamPicker, setShowTeamPicker] = useState(null); // { evt, resolve }
-  const [showLog, setShowLog] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [correctionNote, setCorrectionNote] = useState('');
-  const recentRef = useRef({}); // key: eventType, value: timestamp
+export default function EventButtons({
+  sessionId,
+  matchId,
+  matchTitle,
+  source = 'coach',
+  elapsedSeconds = 0,
+  compact = false,
+  onEventLogged = null,
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedEventType, setSelectedEventType] = useState(null);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [description, setDescription] = useState('');
+  const [events, setEvents] = useState([]);
+  const [saving, setSaving] = useState(false);
 
-  const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  const minute = Math.floor(elapsedSeconds / 60);
 
-  const checkDuplicate = (type, team = 'unknown', minute = 0) => {
-    // Smart context-based deduplication
-    // Key: type + team + minute
-    const key = `${type}_${team}_${minute}`;
-    const now = Date.now();
-    const last = recentRef.current[key];
-    
-    // No dedup if time window expired
-    if (!last || (now - last >= DEDUP_WINDOW_MS)) {
-      recentRef.current[key] = now;
-      return false;
-    }
-    
-    // For CORNER events: allow multiple in same minute if Ball moved significantly
-    // (indicates different corner kick)
-    if (type === 'corner' || type === 'freekick') {
-      // If we had tracking data, we could check ball position delta
-      // For now: be more lenient with time window
-      if (now - last >= 8000) { // 8 seconds instead of 10
-        recentRef.current[key] = now;
-        return false;
-      }
-    }
-    
-    return true; // Is duplicate
-  };
-
-  const tapEvent = async (evt, team = 'unknown') => {
-    // VALIDATION: Session erforderlich
+  // Sichere Event in DB
+  const saveEvent = async (type, team, desc) => {
     if (!sessionId) {
-      setFlash({ key: evt.key, isDuplicate: false, message: '❌ Keine aktive Session' });
-      setTimeout(() => setFlash(null), 1200);
+      console.warn('[EventButtons] No sessionId');
       return;
     }
 
-    const gameMinute = Math.floor(elapsedSeconds / 60);
-    const isDuplicate = checkDuplicate(evt.key, team, gameMinute);
-    const now = Date.now();
+    setSaving(true);
+    try {
+      console.log(`[EventButtons] 📝 Saving event: type=${type}, team=${team}, minute=${minute}`);
 
-    const eventData = {
-      session_id: sessionId,
-      match_id: matchId || null,
-      match_title: matchTitle || '',
-      type: evt.key,
-      team,
-      minute: gameMinute,
-      elapsed_seconds: elapsedSeconds,
-      description: `${evt.icon} ${evt.label}${team !== 'unknown' ? ` (${team === 'home' ? 'Heim' : 'Gäste'})` : ''}`,
-      source,
-      timestamp_ms: now,
-      is_duplicate: isDuplicate,
-      corrected: false,
-    };
+      const event = await base44.entities.MatchEvent.create({
+        session_id: sessionId,
+        match_id: matchId || '',
+        match_title: matchTitle || 'Unknown',
+        type,
+        team: team || 'unknown',
+        minute,
+        elapsed_seconds: elapsedSeconds,
+        description: desc,
+        source,
+        timestamp_ms: Date.now(),
+        is_duplicate: false,
+        corrected: false,
+      });
 
-    // Lokal speichern für sofortiges UI-Feedback
-    const localId = `local-${now}`;
-    const localEntry = { ...eventData, id: localId, time: formatTime(elapsedSeconds) };
-    setLocalEvents(prev => [localEntry, ...prev].slice(0, 50));
+      console.log(`✅ Event saved: id=${event.id}`);
 
-    // Flash zeigt Duplikat-Warnung an
-    setFlash({ key: evt.key, isDuplicate, message: isDuplicate ? '⚠️ Duplikat erkannt' : '✓ Gespeichert' });
-    setTimeout(() => setFlash(null), isDuplicate ? 1200 : 800);
+      // Add to local list
+      setEvents(prev => [event, ...prev]);
 
-    // In DB speichern (non-blocking)
-    base44.entities.MatchEvent.create(eventData).catch(() => {});
-    if (onEventLogged) onEventLogged();
+      // Callback
+      if (onEventLogged) onEventLogged(event);
+
+      // Reset
+      setShowTeamModal(false);
+      setDescription('');
+    } catch (err) {
+      console.error('[EventButtons] Save failed:', err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEventClick = (evt) => {
-    if (evt.team) {
-      setShowTeamPicker(evt);
+  const handleEventClick = async (type) => {
+    setSelectedEventType(type);
+    const cfg = EVENT_TYPES[type];
+
+    if (!cfg.needsTeam) {
+      // Direct save für Notes
+      await saveEvent(type, 'unknown', description);
     } else {
-      tapEvent(evt, 'unknown');
+      // Show team selector
+      setShowTeamModal(true);
     }
   };
 
-  const handleTeamSelect = (team) => {
-    if (showTeamPicker) {
-      tapEvent(showTeamPicker, team);
-      setShowTeamPicker(null);
+  const handleTeamSelect = async (team) => {
+    if (selectedEventType) {
+      await saveEvent(selectedEventType, team, description);
     }
   };
-
-  const handleCorrection = async (ev) => {
-    if (!correctionNote.trim()) return;
-    // Update lokal
-    setLocalEvents(prev => prev.map(e => e.id === ev.id
-      ? { ...e, corrected: true, correction_note: correctionNote }
-      : e
-    ));
-    // Update DB falls echte ID
-    if (ev.id && !ev.id.startsWith('local-')) {
-      await base44.entities.MatchEvent.update(ev.id, { corrected: true, correction_note: correctionNote });
-    }
-    setEditingEvent(null);
-    setCorrectionNote('');
-  };
-
-  const visibleBtns = visibleEvents
-    ? ALL_EVENTS.filter(e => visibleEvents.includes(e.key))
-    : ALL_EVENTS;
 
   return (
     <div className="space-y-3">
-      {/* Team Picker Overlay */}
-      <AnimatePresence>
-        {showTeamPicker && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowTeamPicker(null)}
+      {/* Grid von Event-Buttons */}
+      <div className={`grid ${compact ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3'}`}>
+        {Object.entries(EVENT_TYPES).map(([type, cfg]) => (
+          <button
+            key={type}
+            onClick={() => handleEventClick(type)}
+            disabled={saving}
+            className={`p-3 rounded-lg border transition-all active:scale-95 ${
+              compact
+                ? 'text-xs border-border hover:border-primary/50'
+                : 'text-sm border-border hover:border-primary/50'
+            } ${cfg.color} bg-muted/30 hover:bg-muted/50`}
           >
-            <div className="glass rounded-2xl p-6 w-full max-w-xs" onClick={e => e.stopPropagation()}>
-              <div className="text-center mb-4">
-                <div className="text-3xl mb-1">{showTeamPicker?.icon || '⚽'}</div>
-                <div className="font-grotesk font-bold text-foreground">{showTeamPicker?.label || 'Event'}</div>
-                <div className="text-xs text-muted-foreground mt-1">Für welches Team?</div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => handleTeamSelect('home')}
-                  className="py-4 rounded-xl bg-primary/15 border border-primary/30 text-primary font-bold text-sm hover:bg-primary/25 transition-all active:scale-95">
-                  🏠 Heim
-                </button>
-                <button onClick={() => handleTeamSelect('away')}
-                  className="py-4 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 font-bold text-sm hover:bg-red-500/25 transition-all active:scale-95">
+            <div className={compact ? 'text-lg' : 'text-2xl mb-1'}>{cfg.emoji}</div>
+            <div className="font-bold text-xs">{cfg.label}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Team-Modal */}
+      <AnimatePresence>
+        {showTeamModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          >
+            <div className="bg-card rounded-xl p-6 max-w-sm w-full space-y-4">
+              <h3 className="font-bold text-lg">Welches Team?</h3>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleTeamSelect('home')}
+                  disabled={saving}
+                  className="flex-1 h-12 bg-green-600 hover:bg-green-700 font-bold"
+                >
+                  🏠 Heimteam
+                </Button>
+                <Button
+                  onClick={() => handleTeamSelect('away')}
+                  disabled={saving}
+                  className="flex-1 h-12 bg-red-600 hover:bg-red-700 font-bold"
+                >
                   ✈️ Gäste
-                </button>
+                </Button>
               </div>
-              <button onClick={() => { tapEvent(showTeamPicker, 'unknown'); setShowTeamPicker(null); }}
-                className="w-full mt-2 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Überspringen
-              </button>
+              <Button
+                onClick={() => setShowTeamModal(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Abbrechen
+              </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Event Flash */}
-      <AnimatePresence>
-        {flash && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className={`rounded-xl p-2.5 text-center text-sm font-bold flex items-center justify-center gap-2 ${
-              flash.isDuplicate
-                ? 'bg-yellow-500/15 border border-yellow-500/30 text-yellow-400'
-                : 'bg-primary/15 border border-primary/30 text-primary'
-            }`}>
-            {flash.isDuplicate ? (
-              <>⚠️ {flash.message}</>
-            ) : (
-              <><Check className="w-4 h-4" /> {flash.message}</>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Buttons Grid */}
-      <div className={`grid gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
-        {visibleBtns.map(evt => (
-          <button
-            key={evt.key}
-            onClick={() => handleEventClick(evt)}
-            disabled={!sessionId}
-            className={`${compact ? 'py-3 text-xs' : 'py-4 text-sm'} rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 select-none touch-manipulation ${evt.color} ${!sessionId ? 'opacity-40 cursor-not-allowed' : ''}`}
-            title={!sessionId ? 'Starten Sie zuerst eine Live-Session' : ''}
-          >
-            <span className={compact ? 'text-xl' : 'text-2xl'}>{evt.icon}</span>
-            <span>{evt.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Event Log Toggle */}
-      {localEvents.length > 0 && (
-        <div>
-          <button onClick={() => setShowLog(s => !s)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-muted text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <span>📋 {localEvents.length} Events aufgezeichnet</span>
-            {showLog ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-
-          <AnimatePresence>
-            {showLog && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden">
-                <div className="bg-muted/50 rounded-xl mt-1 max-h-64 overflow-y-auto divide-y divide-border/30">
-                  {localEvents.map(ev => (
-                    <div key={ev.id} className="px-3 py-2">
-                      {editingEvent?.id === ev.id ? (
-                        <div className="space-y-2">
-                          <div className="text-xs text-foreground font-medium">Korrektur für: {ev.description}</div>
-                          <input
-                            value={correctionNote}
-                            onChange={e => setCorrectionNote(e.target.value)}
-                            placeholder="Was war falsch? (z.B. Tor zurückgenommen)"
-                            className="w-full bg-background border border-input rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleCorrection(ev)}
-                              className="flex-1 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold">
-                              Speichern
-                            </button>
-                            <button onClick={() => setEditingEvent(null)}
-                              className="px-3 py-1.5 rounded-lg bg-muted border border-border text-xs text-muted-foreground">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-primary flex-shrink-0">{ev.time}</span>
-                          <span className="text-sm">{ev.icon || ''}</span>
-                          <span className="text-xs text-foreground flex-1">{ev.description}</span>
-                          {ev.is_duplicate && (
-                            <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">DUPL</span>
-                          )}
-                          {ev.corrected && (
-                            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded" title={ev.correction_note}>KORR</span>
-                          )}
-                          <span className="text-[9px] text-muted-foreground flex-shrink-0">{ev.source}</span>
-                          <button onClick={() => { setEditingEvent(ev); setCorrectionNote(''); }}
-                            className="p-1 rounded text-muted-foreground hover:text-primary transition-colors flex-shrink-0">
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+      {/* Event-Log */}
+      {events.length > 0 && (
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="text-xs font-bold text-muted-foreground">Protokoll ({events.length})</div>
+          {events.map((evt, idx) => {
+            const cfg = EVENT_TYPES[evt.type];
+            return (
+              <motion.div
+                key={evt.id || idx}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-2 text-xs bg-muted/40 rounded p-2"
+              >
+                <span className="font-bold">{cfg.emoji}</span>
+                <span className="flex-1 text-muted-foreground">
+                  {evt.minute}' | {evt.type} | {evt.team}
+                </span>
               </motion.div>
-            )}
-          </AnimatePresence>
+            );
+          })}
         </div>
       )}
     </div>

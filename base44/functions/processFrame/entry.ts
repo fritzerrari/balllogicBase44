@@ -684,29 +684,31 @@ Deno.serve(async (req) => {
     // Auto-events (with noise filtering)
     const autoEvents = detectAutoEvents(ballPos, minute, elapsed_seconds, session_id);
 
-    // Formation erkennen (live, alle 30 Frames)
+    // Formation erkennen (alle 10 Frames für Live-Update)
     let formationChange = null;
-    if (frame_number % 30 === 0) {
+    if (frame_number % 10 === 0) {
       try {
         formationChange = await base44.functions.invoke('detectFormation', {
           players,
           session_id,
           frame_number,
         });
-      } catch (_) {}
+      } catch (e) {
+        console.warn('⚠️ Formation detection failed:', e.message);
+      }
     }
 
-    // Spieler-Statistiken aggregieren (alle 10 Frames um DB-Last zu sparen)
-    if (frame_number % 10 === 0) {
+    // Spieler-Statistiken aggregieren (alle 5 Frames für schnelleres Update)
+    if (frame_number % 5 === 0) {
       base44.functions.invoke('aggregatePlayerStats', { session_id }).catch(() => {});
     }
 
-    // Update possession streaming (alle 30 frames für Real-time Stats)
-    if (frame_number % 30 === 0) {
+    // Update possession streaming (alle 10 frames für schnelleres Live-Update)
+    if (frame_number % 10 === 0) {
       base44.functions.invoke('calculatePossessionStreaming', { session_id, lookback_frames: 50 }).catch(() => {});
     }
 
-    // Multi-Camera Merge mit Fallback-Redundanz (Enhanced, alle 10 Frames)
+    // Multi-Camera Merge (alle 10 Frames mit echter Synchronisierung)
     if (frame_number % 10 === 0) {
       base44.functions.invoke('mergeMultiCameraDetectionsEnhanced', {
         session_id,

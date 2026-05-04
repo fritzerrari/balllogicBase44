@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
           bytes[j] = binaryString.charCodeAt(j);
         }
 
-        // Speichere letzte Frame in SessionState für Trainer-Polling
+        // SessionState VOLLSTÄNDIG aktualisieren (frame_count MUSS mitgemacht werden!)
         try {
           let states = await base44.asServiceRole.entities.SessionState.filter({ session_id: sessionId });
           
@@ -57,14 +57,11 @@ Deno.serve(async (req) => {
           if (states.length === 0) {
             const newState = await base44.asServiceRole.entities.SessionState.create({
               session_id: sessionId,
-              frame_count: 0,
-              last_frame_number: 0,
+              frame_count: 1,
+              last_frame_number: i,
               possession_percentage: { home: 50, away: 50, last_updated_frame: 0 },
               detection_quality_avg: 0,
               updated_at: new Date().toISOString(),
-              latest_frame_base64: data_base64,
-              latest_frame_timestamp: timestamp_ms,
-              latest_camera_id: cameraId,
             }).catch(err => {
               console.warn('[uploadFrameBatch] SessionState create failed:', err.message);
               return null;
@@ -73,16 +70,16 @@ Deno.serve(async (req) => {
             else states = [newState];
           }
           
-          // Update existing SessionState
+          // Update: INCREMENTIERE frame_count!
           if (states.length > 0) {
             await base44.asServiceRole.entities.SessionState.update(states[0].id, {
-              latest_frame_base64: data_base64,
-              latest_frame_timestamp: timestamp_ms,
-              latest_camera_id: cameraId,
-            }).catch(() => {});
+              frame_count: (states[0].frame_count || 0) + 1,
+              last_frame_number: i,
+              updated_at: new Date().toISOString(),
+            }).catch(err => console.warn('[uploadFrameBatch] State update failed:', err.message));
           }
         } catch (err) {
-          console.warn('[uploadFrameBatch] SessionState update failed:', err.message);
+          console.warn('[uploadFrameBatch] SessionState handling failed:', err.message);
         }
 
         // Send zu processFrame für Tracking (async, non-blocking)
