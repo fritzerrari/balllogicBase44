@@ -9,16 +9,17 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { base44 } from '@/api/base44Client';
 
 export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChange }) {
-  const videoRef = useRef(null);
-  const captureRef = useRef(null);
+
   
   const [status, setStatus] = useState('ready'); // ready | streaming | error | fallback
   const [progress, setProgress] = useState(null);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryData, setRecoveryData] = useState(null);
   const [isRecovering, setIsRecovering] = useState(false);
+  const canvasRef = useRef(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Warte auf externe Kamera-Frames (vom Handy)
@@ -32,42 +33,61 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
     };
   }, [sessionId]);
 
-  // Frame Display vom Backend empfangen (via polling oder WS)
+  // Frame Display vom SessionState Polling
   useEffect(() => {
+    let lastFrameTime = 0;
+
     const pollFrames = async () => {
       try {
-        // Polling für neue Frames vom Backend
-        const response = await fetch(`/api/live/${sessionId}/frames/${cameraId}/latest`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.frame_base64 && videoRef.current) {
-            const img = new Image();
-            img.onload = () => {
-              const ctx = videoRef.current?.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                setStatus('streaming');
-                setProgress({
-                  status: 'streaming',
-                  capturedCount: data.captured_total || 0,
-                  droppedCount: data.dropped_total || 0,
-                  pendingFrames: 0,
-                  totalUploaded: data.uploaded_total || 0,
-                });
-              }
-            };
-            img.src = `data:image/jpeg;base64,${data.frame_base64}`;
-          }
+        const states = await base44.entities.SessionState.filter({ session_id: sessionId });
+        if (states.length === 0) return;
+
+        const state = states[0];
+        if (!state.latest_frame_base64) {
+          setStatus('ready');
+          return;
+        }
+
+        // Nur wenn neue Frame (verhindert Redundanz)
+        if (state.latest_frame_timestamp <= lastFrameTime) return;
+        lastFrameTime = state.latest_frame_timestamp;
+
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+
+          img.onload = () => {
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              setStatus('streaming');
+              setProgress({
+                status: 'streaming',
+                capturedCount: 0,
+                droppedCount: 0,
+                pendingFrames: 0,
+                totalUploaded: 0,
+              });
+            }
+          };
+          img.onerror = () => {
+            console.warn('[SnapshotViewer] Image load failed');
+            setStatus('error');
+          };
+
+          img.src = `data:image/jpeg;base64,${state.latest_frame_base64}`;
         }
       } catch (err) {
         console.warn('[SnapshotViewer] Poll failed:', err.message);
+        setStatus('error');
       }
     };
 
-    // Poll alle 3-5 Sekunden für neue Frames
-    const interval = setInterval(pollFrames, 4000);
+    // Poll alle 2 Sekunden
+    const interval = setInterval(pollFrames, 2000);
+    pollFrames(); // Initial poll
     return () => clearInterval(interval);
-  }, [sessionId, cameraId]);
+  }, [sessionId]);
 
   const handleRecover = async () => {
     if (!recoveryData) return;
@@ -137,7 +157,9 @@ export default function AdaptiveStreamViewer({ sessionId, cameraId, onStatusChan
       {/* Canvas für Snapshot Display */}
       <div className="relative rounded-xl overflow-hidden bg-black" style={{ aspectRatio: '16/9' }}>
         <canvas
-          ref={videoRef}
+          ref={canvasRef}
+          width={1280}
+          height={720}
           className={`w-full h-full object-cover transition-opacity ${
             status === 'streaming' ? 'opacity-100' : 'opacity-50'
           }`}

@@ -49,7 +49,19 @@ Deno.serve(async (req) => {
           bytes[j] = binaryString.charCodeAt(j);
         }
 
-        // Send ke processFrame untuk Tracking (async, non-blocking)
+        // Speichere letzte Frame in SessionState für Trainer-Polling
+        try {
+          const states = await base44.asServiceRole.entities.SessionState.filter({ session_id: sessionId });
+          if (states.length > 0) {
+            await base44.asServiceRole.entities.SessionState.update(states[0].id, {
+              latest_frame_base64: data_base64,
+              latest_frame_timestamp: timestamp_ms,
+              latest_camera_id: cameraId,
+            }).catch(() => {});
+          }
+        } catch (_) {}
+
+        // Send zu processFrame für Tracking (async, non-blocking)
         base44.functions.invoke('processFrame', {
           session_id: sessionId,
           camera_id: cameraId,
