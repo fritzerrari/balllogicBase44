@@ -12,20 +12,10 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
   const [liveCam, setLiveCam] = useState(cam);
 
-  // Subscribe to session updates instead of polling
+  // Check connection status
   useEffect(() => {
-    try {
-      const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
-        if (event.type === 'update' && event.data?.camera_streams) {
-          const updated = event.data.camera_streams.find(c => String(c.camera_id) === String(cam.camera_id));
-          if (updated) setLiveCam(updated);
-        }
-      });
-      return () => unsubscribe?.();
-    } catch (err) {
-      console.warn('[CameraFeed] Subscribe failed:', err.message);
-    }
-  }, [cam.camera_id]);
+    setLiveCam(cam);
+  }, [cam]);
 
   const thumbnail = liveCam?.thumbnail;
   const lastSeenMs = liveCam?.last_seen ? Date.now() - new Date(liveCam.last_seen).getTime() : null;

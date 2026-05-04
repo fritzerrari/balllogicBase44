@@ -54,14 +54,20 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
     return () => clearInterval(timerRef.current);
   }, [halfTime]);
 
-  // Subscribe to session updates (NOT polling)
+  // Subscribe to session updates — keep internal state in sync
   const [liveSession, setLiveSession] = useState(session);
+  
+  useEffect(() => {
+    setLiveSession(session); // Update when prop changes
+  }, [session]);
   
   useEffect(() => {
     try {
       const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
-        if (event.type === 'update' && event.id === session.id) {
-          setLiveSession(event.data);
+        if (event.id === session.id) {
+          if (event.type === 'update' || event.type === 'create') {
+            setLiveSession(event.data);
+          }
         }
       });
       return () => unsubscribe?.();
@@ -243,13 +249,13 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                 <LivePitchTracker
                   sessionId={session.id}
                   kickoffDetected={kickoffDetected}
-                  playerAssignments={(liveSession || session)?.player_assignments}
+                  playerAssignments={liveSession?.player_assignments}
                 />
               </div>
 
               {/* Kompakter Kalibrierungs-Hinweis (kein doppelter Anstoß-Button) */}
               <KickoffStatusBanner
-                session={liveSession || session}
+                session={liveSession}
                 kickoffDetected={kickoffDetected}
                 onKickoffDetected={() => setKickoffDetected(true)}
               />
@@ -261,7 +267,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Video className="w-3.5 h-3.5 text-primary" /> Live Kameras
                 </h2>
-                <LiveCameraGrid session={liveSession || session} />
+                <LiveCameraGrid session={liveSession} />
               </div>
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
@@ -301,7 +307,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               {tab === 'cameras' && (
                 <motion.div key="cameras" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
                   <div className="glass rounded-xl p-4 border border-border">
-                    <LiveCameraGrid session={liveSession || session} />
+                    <LiveCameraGrid session={liveSession} />
                   </div>
                 </motion.div>
               )}
@@ -311,11 +317,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                     <LivePitchTracker
                       sessionId={session.id}
                       kickoffDetected={kickoffDetected}
-                      playerAssignments={(liveSession || session)?.player_assignments}
+                      playerAssignments={liveSession?.player_assignments}
                     />
                   </div>
                   <KickoffStatusBanner
-                    session={liveSession || session}
+                    session={liveSession}
                     kickoffDetected={kickoffDetected}
                     onKickoffDetected={() => setKickoffDetected(true)}
                   />
@@ -327,7 +333,7 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                     <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                       <Radio className="w-3.5 h-3.5 text-primary" /> Platzabdeckung & Blindflecken
                     </h2>
-                    <CoverageBlindspotMap session={liveSession || session} />
+                    <CoverageBlindspotMap session={liveSession} />
                   </div>
                 </motion.div>
               )}

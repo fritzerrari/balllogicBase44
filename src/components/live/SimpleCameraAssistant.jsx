@@ -242,29 +242,46 @@ export default function SimpleCameraAssistant() {
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
       const updatedStreams = (current.camera_streams || []).map(cam =>
         String(cam.camera_id) === String(cameraId)
-          ? { ...cam, status: 'connected', last_seen: new Date().toISOString(), ...(thumbnail ? { thumbnail } : {}) }
+          ? { 
+              ...cam, 
+              status: 'connected', 
+              last_seen: new Date().toISOString(),
+              ...(thumbnail ? { thumbnail } : {})
+            }
           : cam
       );
-      await base44.entities.LiveSession.update(current.id, { camera_streams: updatedStreams });
+      
+      // Atomic update — only update the camera_streams array
+      await base44.entities.LiveSession.update(current.id, { 
+        camera_streams: updatedStreams 
+      });
       setIsConnected(true);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[SimpleCameraAssistant] Heartbeat failed:', e.message);
+    }
   }, [sessionId, cameraId, captureThumbnail]);
 
   useEffect(() => {
     if (!sessionId || !session) return;
-    // Initial heartbeat + first thumbnail after 5s
+    
+    // Initial heartbeat IMMEDIATELY
     sendHeartbeat(false);
-    const firstThumb = setTimeout(() => sendHeartbeat(true), 5000);
-    // Heartbeat every 20s (was 8s) — just a keep-alive, not critical
-    heartbeatRef.current = setInterval(() => sendHeartbeat(false), 20000);
-    // Thumbnail every 45s (was 20s) — expensive, only for preview
-    thumbnailRef.current = setInterval(() => sendHeartbeat(true), 45000);
+    
+    // Heartbeat every 3 seconds (CRITICAL for connection detection)
+    heartbeatRef.current = setInterval(() => {
+      sendHeartbeat(false);
+    }, 3000);
+    
+    // Thumbnail every 30s (less critical)
+    thumbnailRef.current = setInterval(() => {
+      sendHeartbeat(true);
+    }, 30000);
+    
     return () => {
       clearInterval(heartbeatRef.current);
       clearInterval(thumbnailRef.current);
-      clearTimeout(firstThumb);
     };
-  }, [sessionId, session]);
+  }, [sessionId, session, sendHeartbeat]);
 
   const handlePTT = async (active) => {
     setMicActive(active);
