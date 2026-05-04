@@ -13,10 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import EventButtons from '@/components/live/EventButtons';
 import LiveCameraGrid from '@/components/live/LiveCameraGrid';
 import LivePitchTracker from '@/components/live/LivePitchTracker';
-import KickoffDetectionPanel from '@/components/live/KickoffDetectionPanel';
 import EventApprovalPanel from '@/components/live/EventApprovalPanel';
 import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
 import CoverageBlindspotMap from '@/components/live/CoverageBlindspotMap';
+import KickoffStatusBanner from '@/components/live/KickoffStatusBanner';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -233,13 +233,12 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                 <LivePitchTracker sessionId={session.id} kickoffDetected={kickoffDetected} />
               </div>
 
-              {/* Kickoff Panel — only if not yet calibrated */}
-              {!kickoffDetected && (
-                <KickoffDetectionPanel
-                  session={liveSession || session}
-                  onKickoffDetected={() => setKickoffDetected(true)}
-                />
-              )}
+              {/* Kompakter Kalibrierungs-Hinweis (kein doppelter Anstoß-Button) */}
+              <KickoffStatusBanner
+                session={liveSession || session}
+                kickoffDetected={kickoffDetected}
+                onKickoffDetected={() => setKickoffDetected(true)}
+              />
             </div>
 
             {/* RIGHT: Cameras + Coverage (4 cols) */}
@@ -297,12 +296,11 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                   <div className="glass rounded-xl p-4 border border-border">
                     <LivePitchTracker sessionId={session.id} kickoffDetected={kickoffDetected} />
                   </div>
-                  {!kickoffDetected && (
-                    <KickoffDetectionPanel
-                      session={liveSession || session}
-                      onKickoffDetected={() => setKickoffDetected(true)}
-                    />
-                  )}
+                  <KickoffStatusBanner
+                    session={liveSession || session}
+                    kickoffDetected={kickoffDetected}
+                    onKickoffDetected={() => setKickoffDetected(true)}
+                  />
                 </motion.div>
               )}
               {tab === 'coverage' && (
