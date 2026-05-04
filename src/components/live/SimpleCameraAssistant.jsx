@@ -188,7 +188,7 @@ export default function SimpleCameraAssistant() {
     return () => clearInterval(t);
   }, []);
 
-  // Start Camera + Frame Upload
+  // Start Camera + Direct Frame Upload (no polling delays)
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -202,19 +202,33 @@ export default function SimpleCameraAssistant() {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
           
-          // Start SimpleFrameUpload
+          // Direct frame capture loop (not waiting for uploader)
           if (sessionId && cameraId) {
-            const uploader = new SimpleFrameUpload(
-              videoRef.current,
-              sessionId,
-              cameraId,
-              (update) => {
-                setFrameStats(update.stats);
-                console.log('[SimpleCameraAssistant] Frame update:', update);
-              }
-            );
-            uploader.start();
-            frameUploadRef.current = uploader;
+            let frameCount = 0;
+            const captureLoop = setInterval(async () => {
+              const video = videoRef.current;
+              if (!video || video.readyState < 2) return;
+              
+              const canvas = canvasRef.current;
+              canvas.width = 320;
+              canvas.height = 180;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0, 320, 180);
+              
+              const base64 = canvas.toDataURL('image/jpeg', 0.6);
+              frameCount++;
+              
+              // Send frame directly to backend
+              base44.functions.invoke('uploadFrameBatch', {
+                session_id: sessionId,
+                camera_id: cameraId,
+                frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
+              }).catch(e => console.warn('[SimpleCameraAssistant] Upload error:', e.message));
+              
+              setFrameStats({ capturedCount: frameCount, uploadedCount: 0, pendingFrames: 1, lastUploadSuccess: true });
+            }, 5000); // Every 5 seconds
+            
+            frameUploadRef.current = { stop: () => clearInterval(captureLoop) };
           }
         }
         setCamStatus('active');
@@ -249,7 +263,7 @@ export default function SimpleCameraAssistant() {
     
     try {
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
-      const camLabel = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
+      const label = `Kamera ${cameraId}`;
       
       // Upsert: find or create CameraConnection
       const existing = await base44.entities.CameraConnection.filter({
@@ -260,7 +274,7 @@ export default function SimpleCameraAssistant() {
       const data = {
         status: 'connected',
         last_heartbeat: new Date().toISOString(),
-        label: camLabel,
+        label,
       };
       if (thumbnail) data.thumbnail = thumbnail;
       
@@ -280,7 +294,7 @@ export default function SimpleCameraAssistant() {
       console.error('[SimpleCameraAssistant] ❌ Heartbeat FAILED:', e.message);
       setIsConnected(false);
     }
-  }, [sessionId, cameraId, session, captureThumbnail]);
+  }, [sessionId, cameraId, captureThumbnail]);
 
   useEffect(() => {
     if (!sessionId || !session) return;
