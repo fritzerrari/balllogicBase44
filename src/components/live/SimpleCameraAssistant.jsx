@@ -179,20 +179,27 @@ export default function SimpleCameraAssistant() {
   }, [funkMessages, activePanel]);
 
   // Load session — MUST complete before heartbeat starts
+  // ❌ CRITICAL FIX: Load session BEFORE starting heartbeat
   useEffect(() => {
     if (!sessionId) return;
-    base44.entities.LiveSession.list('-created_date', 100)
-      .then(sessions => {
-        const found = sessions.find(s => s.id === sessionId);
-        if (found) {
-          console.log('[SimpleCameraAssistant] Session loaded:', found.id);
-          setSession(found);
-          sessionRef.current = found;
+    
+    const loadSession = async () => {
+      try {
+        console.log('[SimpleCameraAssistant] 🔍 Loading session:', sessionId);
+        const found = await base44.entities.LiveSession.filter({ id: sessionId });
+        if (found.length > 0) {
+          console.log('[SimpleCameraAssistant] ✅ Session loaded:', found[0].id);
+          setSession(found[0]);
+          sessionRef.current = found[0];
         } else {
-          console.warn('[SimpleCameraAssistant] Session not found:', sessionId);
+          console.warn('[SimpleCameraAssistant] ❌ Session not found:', sessionId);
         }
-      })
-      .catch(e => console.error('[SimpleCameraAssistant] Load session failed:', e));
+      } catch (e) {
+        console.error('[SimpleCameraAssistant] ❌ Load session failed:', e);
+      }
+    };
+    
+    loadSession();
   }, [sessionId]);
 
   // Timer
@@ -358,11 +365,11 @@ export default function SimpleCameraAssistant() {
   }, [sendHeartbeat]);
 
   useEffect(() => {
-    if (!sessionId || !session) return;
+    if (!sessionId) return; // ✅ CHANGED: nur sessionId, nicht session (session wird async geladen)
     
     console.log('[SimpleCameraAssistant] ✅ Ready: sessionId=' + sessionId + ', cameraId=' + cameraId);
     
-    // Send initial heartbeat IMMEDIATELY when session is loaded
+    // Send initial heartbeat IMMEDIATELY
     console.log('[SimpleCameraAssistant] 🚀 Starting heartbeat + registration — sessionId=' + sessionId + ', cameraId=' + cameraId);
     
     // Retry-Logik: 3x versuchen, dann Fehler melden
@@ -403,7 +410,7 @@ export default function SimpleCameraAssistant() {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       if (thumbnailRef.current) clearInterval(thumbnailRef.current);
     };
-  }, [sessionId, session, cameraId]);
+  }, [sessionId, cameraId]); // ✅ FIXED: removed session dependency
 
   const handlePTT = async (active) => {
     setMicActive(active);
