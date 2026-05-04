@@ -23,7 +23,7 @@ const CONSENT_CONFIG = {
   guardian_required: { icon: AlertTriangle, label: 'Erziehungsber. nötig',  color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/30' },
 };
 
-export default function DsgvoConsentManager({ players, onClose }) {
+export default function DsgvoConsentManager({ players = [], onClose }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [guardianEmail, setGuardianEmail] = useState({});
