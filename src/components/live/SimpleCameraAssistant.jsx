@@ -219,11 +219,14 @@ export default function SimpleCameraAssistant() {
               frameCount++;
               
               // Send frame directly to backend
+              console.log('[Frame Loop] Sending frame to backend...', { sessionId, cameraId });
               base44.functions.invoke('uploadFrameBatch', {
                 session_id: sessionId,
                 camera_id: cameraId,
                 frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
-              }).catch(e => console.warn('[SimpleCameraAssistant] Upload error:', e.message));
+              }).then(res => {
+                console.log('[Frame Loop] ✅ Upload response:', res);
+              }).catch(e => console.error('[Frame Loop] ❌ Upload error:', e));
               
               setFrameStats({ capturedCount: frameCount, uploadedCount: 0, pendingFrames: 1, lastUploadSuccess: true });
             }, 5000); // Every 5 seconds
