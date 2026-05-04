@@ -10,36 +10,40 @@ import AdaptiveStreamViewer from '@/components/live/AdaptiveStreamViewer';
 
 function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
-  const [liveCam, setLiveCam] = useState(cam);
+  const [connection, setConnection] = useState(null);
 
-  // Subscribe to FULL session — get latest camera_streams data
+  // Subscribe to CameraConnection — Direct + Simple
   useEffect(() => {
     try {
-      const unsubscribe = base44.entities.LiveSession.subscribe((event) => {
-        if (event.id === sessionId && event.data?.camera_streams) {
-          const updated = event.data.camera_streams.find(c => String(c.camera_id) === String(cam.camera_id));
-          if (updated) {
-            console.log(`[Subscribe ${cam.camera_id}] Got update:`, updated.last_seen);
-            setLiveCam(updated);
-          }
+      const unsubscribe = base44.entities.CameraConnection.subscribe((event) => {
+        if (event.data?.session_id === sessionId && String(event.data?.camera_id) === String(cam.camera_id)) {
+          console.log(`[CameraFeed ${cam.camera_id}] Update:`, event.data.last_heartbeat);
+          setConnection(event.data);
         }
       });
       return () => unsubscribe?.();
     } catch (err) {
       console.warn('[CameraFeed] Subscribe failed:', err.message);
-      setLiveCam(cam); // Fallback
     }
   }, [sessionId, cam.camera_id]);
 
-  const thumbnail = liveCam?.thumbnail;
-  const lastSeenMs = liveCam?.last_seen ? Date.now() - new Date(liveCam.last_seen).getTime() : null;
-  const isOnline = lastSeenMs !== null && lastSeenMs < 15000;
-  const camLink = `${window.location.origin}/cam?session=${sessionId}&cam=${cam.camera_id}`;
-  
-  // Debug output
+  // Initial load
   useEffect(() => {
-    console.log(`[CameraFeed ${cam.camera_id}] last_seen: ${liveCam?.last_seen}, lastSeenMs: ${lastSeenMs}, isOnline: ${isOnline}, status: ${liveCam?.status}`);
-  }, [liveCam?.last_seen, lastSeenMs, isOnline, cam.camera_id, liveCam?.status]);
+    base44.entities.CameraConnection.filter({
+      session_id: sessionId,
+      camera_id: cam.camera_id,
+    }).then(c => {
+      if (c.length > 0) {
+        console.log(`[CameraFeed ${cam.camera_id}] Initial load:`, c[0]);
+        setConnection(c[0]);
+      }
+    }).catch(() => {});
+  }, [sessionId, cam.camera_id]);
+
+  const thumbnail = connection?.thumbnail;
+  const lastHeartbeatMs = connection?.last_heartbeat ? Date.now() - new Date(connection.last_heartbeat).getTime() : null;
+  const isOnline = lastHeartbeatMs !== null && lastHeartbeatMs < 15000;
+  const camLink = `${window.location.origin}/cam?session=${sessionId}&cam=${cam.camera_id}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(camLink).catch(() => {});
@@ -110,9 +114,9 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
           </button>
         </div>
 
-        {!isOnline && (
-          <div className="text-[10px] text-muted-foreground bg-muted/40 rounded p-1.5 break-all font-mono">
-            {camLink}
+        {connection && (
+          <div className="text-[10px] text-muted-foreground bg-muted/40 rounded p-1.5">
+            Last heartbeat: {lastHeartbeatMs !== null ? (lastHeartbeatMs / 1000).toFixed(0) + 's ago' : 'never'}
           </div>
         )}
       </div>

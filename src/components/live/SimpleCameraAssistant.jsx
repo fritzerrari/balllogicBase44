@@ -244,46 +244,40 @@ export default function SimpleCameraAssistant() {
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
     if (!sessionId) return;
     
-    // Fallback: fetch session if ref is empty
-    const currentSession = sessionRef.current || session;
-    if (!currentSession) return;
-    
     try {
-      const current = currentSession;
       const thumbnail = withThumbnail ? captureThumbnail() : undefined;
+      const camLabel = session?.camera_streams?.find(c => String(c.camera_id) === String(cameraId))?.label || `Kamera ${cameraId}`;
       
-      // Build updated streams with strict last_seen timestamp
-      const updatedStreams = (current.camera_streams || []).map(cam => {
-        if (String(cam.camera_id) === String(cameraId)) {
-          const updated = {
-            ...cam,
-            status: 'connected',
-            last_seen: new Date().toISOString(),
-          };
-          if (thumbnail) updated.thumbnail = thumbnail;
-          console.log('[Heartbeat] Updating cam', cameraId, 'last_seen:', updated.last_seen);
-          return updated;
-        }
-        return cam;
+      // Upsert: find or create CameraConnection
+      const existing = await base44.entities.CameraConnection.filter({
+        session_id: sessionId,
+        camera_id: cameraId,
       });
-
-      // Update ONLY if something changed
-      const changed = updatedStreams.some((s, i) => 
-        s.last_seen !== current.camera_streams[i]?.last_seen
-      );
       
-      if (changed) {
-        const result = await base44.entities.LiveSession.update(current.id, { 
-          camera_streams: updatedStreams 
+      const data = {
+        status: 'connected',
+        last_heartbeat: new Date().toISOString(),
+        label: camLabel,
+      };
+      if (thumbnail) data.thumbnail = thumbnail;
+      
+      if (existing.length > 0) {
+        await base44.entities.CameraConnection.update(existing[0].id, data);
+        console.log('[Heartbeat] ✅ Updated cam', cameraId);
+      } else {
+        await base44.entities.CameraConnection.create({
+          session_id: sessionId,
+          camera_id: cameraId,
+          ...data,
         });
-        console.log('[Heartbeat] ✅ Success, result:', result);
-        setIsConnected(true);
+        console.log('[Heartbeat] ✅ Created cam', cameraId);
       }
+      setIsConnected(true);
     } catch (e) {
-      console.error('[SimpleCameraAssistant] ❌ Heartbeat FAILED:', e.message, e);
+      console.error('[SimpleCameraAssistant] ❌ Heartbeat FAILED:', e.message);
       setIsConnected(false);
     }
-  }, [sessionId, cameraId, captureThumbnail]);
+  }, [sessionId, cameraId, session, captureThumbnail]);
 
   useEffect(() => {
     if (!sessionId || !session) return;

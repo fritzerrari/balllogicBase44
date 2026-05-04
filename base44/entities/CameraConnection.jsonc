@@ -1,0 +1,41 @@
+{
+  "name": "CameraConnection",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "LiveSession ID"
+    },
+    "camera_id": {
+      "type": "string",
+      "description": "Camera identifier"
+    },
+    "label": {
+      "type": "string",
+      "description": "Camera label (z.B. Kamera 1)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "connected",
+        "error",
+        "disconnected"
+      ],
+      "default": "waiting"
+    },
+    "last_heartbeat": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Letzer Heartbeat-Timestamp von der Kamera"
+    },
+    "thumbnail": {
+      "type": "string",
+      "description": "Base64 Thumbnail"
+    }
+  },
+  "required": [
+    "session_id",
+    "camera_id"
+  ]
+}
