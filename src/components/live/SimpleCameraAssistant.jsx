@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Camera, CameraOff } from 'lucide-react';
 import EventButtons from './EventButtons';
 import FunkPanel from './FunkPanel';
+import useWebRTCCamera from '@/hooks/useWebRTCCamera';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -23,12 +24,21 @@ export default function SimpleCameraAssistant() {
   const [showEvents, setShowEvents] = useState(false);
   const [camStatus, setCamStatus] = useState('starting'); // starting | active | error
   const [isConnected, setIsConnected] = useState(false);
+  const [mediaStream, setMediaStream] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const heartbeatRef = useRef(null);
   const thumbnailRef = useRef(null);
+
+  // WebRTC: sendet echten Livestream an Trainer
+  useWebRTCCamera({
+    sessionId,
+    cameraId,
+    stream: mediaStream,
+    enabled: camStatus === 'active' && !!sessionId && !!mediaStream,
+  });
 
   // Load session
   useEffect(() => {
@@ -57,6 +67,7 @@ export default function SimpleCameraAssistant() {
           audio: false,
         });
         streamRef.current = stream;
+        setMediaStream(stream);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});

@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { motion } from 'framer-motion';
 import { Copy, Share2, Wifi, WifiOff, CheckCircle2, Smartphone } from 'lucide-react';
+import WebRTCViewer from '@/components/live/WebRTCViewer';
 
 function CameraFeed({ cam, sessionId, sessionTitle }) {
   const [copied, setCopied] = useState(false);
@@ -47,34 +48,13 @@ function CameraFeed({ cam, sessionId, sessionTitle }) {
         isOnline ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-muted/10'
       }`}
     >
-      {/* Video / Thumbnail Area */}
-      <div className="relative bg-black" style={{ aspectRatio: '16/9' }}>
-        {thumbnail ? (
-          <img src={thumbnail} alt={cam.label} className="w-full h-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-slate-900 to-black">
-            <Smartphone className="w-8 h-8 text-muted-foreground/40" />
-            <div className="text-center">
-              <div className="text-xs text-muted-foreground">Warte auf Verbindung...</div>
-              <div className="text-lg font-grotesk font-bold text-primary/80 tracking-widest mt-1">{cam.code}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Status Badge */}
-        <div className={`absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold backdrop-blur-sm ${
-          isOnline ? 'bg-green-600/80 text-white' : 'bg-black/60 text-muted-foreground'
-        }`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`} />
-          {isOnline ? `LIVE` : 'OFFLINE'}
-        </div>
-
-        {isOnline && lastSeenMs !== null && (
-          <div className="absolute top-2 right-2 bg-black/50 text-[9px] text-white px-1.5 py-0.5 rounded">
-            {Math.round(lastSeenMs / 1000)}s
-          </div>
-        )}
-      </div>
+      {/* WebRTC Live Video */}
+      <WebRTCViewer
+        sessionId={sessionId}
+        cameraId={cam.camera_id}
+        isOnline={isOnline}
+        fallbackThumbnail={thumbnail}
+      />
 
       {/* Info & Actions */}
       <div className="p-3 space-y-2">
