@@ -168,12 +168,15 @@ export default function SimpleCameraAssistant() {
   // Load session — MUST complete before heartbeat starts
   useEffect(() => {
     if (!sessionId) return;
-    base44.entities.LiveSession.filter({ id: sessionId })
+    base44.entities.LiveSession.list('-created_date', 100)
       .then(sessions => {
-        if (sessions.length > 0) {
-          console.log('[SimpleCameraAssistant] Session loaded:', sessions[0].id);
-          setSession(sessions[0]);
-          sessionRef.current = sessions[0]; // Update ref immediately
+        const found = sessions.find(s => s.id === sessionId);
+        if (found) {
+          console.log('[SimpleCameraAssistant] Session loaded:', found.id);
+          setSession(found);
+          sessionRef.current = found;
+        } else {
+          console.warn('[SimpleCameraAssistant] Session not found:', sessionId);
         }
       })
       .catch(e => console.error('[SimpleCameraAssistant] Load session failed:', e));
