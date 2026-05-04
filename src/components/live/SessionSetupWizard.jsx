@@ -468,8 +468,8 @@ function StepConfirm({ matchTitle, cameraCount, playerMode, homeLineup, awayLine
 const STEPS = [
   { label: 'Match' },
   { label: 'Setup' },
-  { label: 'Kameras' },
   { label: 'Spieler' },
+  { label: 'Kameras' },
   { label: 'Start' },
 ];
 
@@ -568,14 +568,14 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
                 fieldSize={fieldSize} onFieldSizeChange={setFieldSize}
               />
             )}
-            {step === 2 && <StepCameras count={cameraCount} onChange={setCameraCount} />}
-            {step === 3 && (
+            {step === 2 && (
               <StepPlayers
                 mode={playerMode} onChange={setPlayerMode}
                 homeLineup={homeLineup} awayLineup={awayLineup}
                 onTogglePlayer={togglePlayer}
               />
             )}
+            {step === 3 && <StepCameras count={cameraCount} onChange={setCameraCount} />}
             {step === 4 && (
               <StepConfirm
                 matchTitle={matchTitle} cameraCount={cameraCount}
@@ -609,10 +609,17 @@ export default function SessionSetupWizard({ onStart, isLoading }) {
         )}
       </div>
 
-      {/* Skip hint on step 3 */}
-      {step === 3 && (
+      {/* Skip hint on step 2 */}
+      {step === 2 && (
         <p className="text-center text-xs text-muted-foreground">
           💡 Kein Stress — du kannst Spieler auch <strong>während</strong> der Session zuordnen.
+        </p>
+      )}
+      
+      {/* Info on step 3 */}
+      {step === 3 && (
+        <p className="text-center text-xs text-muted-foreground">
+          💡 Du kannst Kameras auch <strong>während</strong> der Session hinzufügen oder entfernen.
         </p>
       )}
     </div>
