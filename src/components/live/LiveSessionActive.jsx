@@ -16,12 +16,14 @@ import LivePitchTracker from '@/components/live/LivePitchTracker';
 import KickoffDetectionPanel from '@/components/live/KickoffDetectionPanel';
 import EventApprovalPanel from '@/components/live/EventApprovalPanel';
 import DsgvoGatekeeper from '@/components/live/DsgvoGatekeeper';
+import CoverageBlindspotMap from '@/components/live/CoverageBlindspotMap';
 
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 const TABS = [
   { id: 'cameras', label: 'Kameras', icon: Video },
   { id: 'tracking', label: 'Tracking', icon: BarChart3 },
+  { id: 'coverage', label: 'Abdeckung', icon: Radio },
   { id: 'events', label: 'Events', icon: Zap },
 ];
 
@@ -240,13 +242,19 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
               )}
             </div>
 
-            {/* RIGHT: Cameras (4 cols) */}
+            {/* RIGHT: Cameras + Coverage (4 cols) */}
             <div className="col-span-4 space-y-4">
               <div className="glass rounded-xl p-4 border border-border">
                 <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                   <Video className="w-3.5 h-3.5 text-primary" /> Live Kameras
                 </h2>
                 <LiveCameraGrid session={liveSession || session} />
+              </div>
+              <div className="glass rounded-xl p-4 border border-border">
+                <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
+                  <Radio className="w-3.5 h-3.5 text-primary" /> Platzabdeckung & Blindflecken
+                </h2>
+                <CoverageBlindspotMap session={liveSession || session} />
               </div>
             </div>
           </div>
@@ -295,6 +303,16 @@ export default function LiveSessionActive({ session, onStop, isFinishing }) {
                       onKickoffDetected={() => setKickoffDetected(true)}
                     />
                   )}
+                </motion.div>
+              )}
+              {tab === 'coverage' && (
+                <motion.div key="coverage" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
+                  <div className="glass rounded-xl p-4 border border-border">
+                    <h2 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
+                      <Radio className="w-3.5 h-3.5 text-primary" /> Platzabdeckung & Blindflecken
+                    </h2>
+                    <CoverageBlindspotMap session={liveSession || session} />
+                  </div>
                 </motion.div>
               )}
               {tab === 'events' && (

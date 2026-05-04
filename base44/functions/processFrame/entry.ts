@@ -683,12 +683,11 @@ Deno.serve(async (req) => {
       base44.functions.invoke('calculatePossessionStreaming', { session_id, lookback_frames: 50 }).catch(() => {});
     }
 
-    // Multi-Camera Merge (wenn > 1 Kamera aktiv)
-    if (frame_number % 15 === 0) {
-      base44.functions.invoke('mergeMultiCameraDetections', { 
-        session_id, 
-        frame_number,
-        lookback_frames: 5
+    // Multi-Camera Merge mit Fallback-Redundanz (Enhanced, alle 10 Frames)
+    if (frame_number % 10 === 0) {
+      base44.functions.invoke('mergeMultiCameraDetectionsEnhanced', {
+        session_id,
+        lookback_ms: 3000,
       }).catch(() => {});
     }
 
