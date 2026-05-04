@@ -6,15 +6,54 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
 const FOOTBALL_DATA_KEY = Deno.env.get('FOOTBALL_DATA_API_KEY') || '';
 
-async function searchFootballDataOrg(teamName) {
+// Mapping bekannter Ligen zu football-data.org Kompetitions-IDs
+const LEAGUE_IDS = {
+  'bundesliga': 'BL1', 'bundesliga 1': 'BL1', '1. bundesliga': 'BL1',
+  '2. bundesliga': 'BL2',
+  'premier league': 'PL',
+  'la liga': 'PD', 'primera division': 'PD',
+  'serie a': 'SA',
+  'ligue 1': 'FL1',
+  'eredivisie': 'DED',
+  'primeira liga': 'PPL',
+  'championship': 'ELC',
+  'champions league': 'CL', 'uefa champions league': 'CL',
+};
+
+function getCompetitionId(leagueName) {
+  if (!leagueName) return 'BL1';
+  const lower = leagueName.toLowerCase();
+  for (const [key, id] of Object.entries(LEAGUE_IDS)) {
+    if (lower.includes(key)) return id;
+  }
+  return null;
+}
+
+async function searchFootballDataOrg(teamName, leagueName) {
   if (!FOOTBALL_DATA_KEY) return null;
   try {
-    const res = await fetch(`${FOOTBALL_DATA_BASE}/teams?name=${encodeURIComponent(teamName)}`, {
+    // Versuche über Ligateams zu suchen
+    const competitionId = getCompetitionId(leagueName);
+    if (!competitionId) return null;
+
+    const res = await fetch(`${FOOTBALL_DATA_BASE}/competitions/${competitionId}/teams`, {
       headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY }
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`football-data API error: ${res.status} ${await res.text()}`);
+      return null;
+    }
     const data = await res.json();
-    return data.teams?.[0] || null;
+    const teams = data.teams || [];
+
+    // Fuzzy-Match auf Teamnamen
+    const normalized = teamName.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+    const match = teams.find(t => {
+      const n = (t.name || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+      const sn = (t.shortName || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+      return n.includes(normalized.split(' ')[0]) || normalized.includes(sn) || sn.includes(normalized.split(' ')[0]);
+    });
+    return match || null;
   } catch {
     return null;
   }
@@ -95,8 +134,12 @@ Deno.serve(async (req) => {
 
     // Step 2: football-data.org für API-Daten (falls verfügbar)
     const teamName = aiResult.name || club_name_hint || '';
-    const apiTeam = await searchFootballDataOrg(teamName);
-    const currentSeason = new Date().getFullYear().toString();
+    const apiTeam = await searchFootballDataOrg(teamName, aiResult.league);
+    // Fußball-Saison: August-Juli Zyklus → aktuelle Saison bestimmen
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+    const currentSeason = month >= 7 ? year.toString() : (year - 1).toString(); // Saison startet im Juli
 
     let matches = [];
     let players = [];
