@@ -192,58 +192,66 @@ export default function SimpleCameraAssistant() {
   useEffect(() => {
     const startCamera = async () => {
       try {
+        console.log('[SimpleCameraAssistant] Starting camera...', { sessionId, cameraId });
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
         streamRef.current = stream;
         setMediaStream(stream);
+        console.log('[SimpleCameraAssistant] Camera stream ready');
+        
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
           
-          // Direct frame capture loop (not waiting for uploader)
-          if (sessionId && cameraId) {
-            let frameCount = 0;
-            const captureLoop = setInterval(async () => {
-              const video = videoRef.current;
-              if (!video || video.readyState < 2) return;
-              
-              const canvas = canvasRef.current;
-              canvas.width = 320;
-              canvas.height = 180;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(video, 0, 0, 320, 180);
-              
-              const base64 = canvas.toDataURL('image/jpeg', 0.6);
-              frameCount++;
-              
-              // Send frame directly to backend
-              console.log('[Frame Loop] Sending frame to backend...', { sessionId, cameraId });
-              base44.functions.invoke('uploadFrameBatch', {
-                session_id: sessionId,
-                camera_id: cameraId,
-                frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
-              }).then(res => {
-                console.log('[Frame Loop] ✅ Upload response:', res);
-              }).catch(e => console.error('[Frame Loop] ❌ Upload error:', e));
-              
-              setFrameStats({ capturedCount: frameCount, uploadedCount: 0, pendingFrames: 1, lastUploadSuccess: true });
-            }, 5000); // Every 5 seconds
+          // Direct frame capture loop — starts IMMEDIATELY (not waiting for session)
+          let frameCount = 0;
+          const captureLoop = setInterval(async () => {
+            const video = videoRef.current;
+            if (!video || video.readyState < 2) return;
             
-            frameUploadRef.current = { stop: () => clearInterval(captureLoop) };
-          }
+            const canvas = canvasRef.current;
+            canvas.width = 320;
+            canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 320, 180);
+            
+            const base64 = canvas.toDataURL('image/jpeg', 0.6);
+            frameCount++;
+            
+            // Send frame directly to backend — sessionId/cameraId come from closure, so always available
+            base44.functions.invoke('uploadFrameBatch', {
+              session_id: sessionId,
+              camera_id: cameraId,
+              frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
+            }).then(res => {
+              if (frameCount === 1) console.log('[Frame Loop] ✅ First upload success:', res);
+            }).catch(e => {
+              if (frameCount === 1) console.error('[Frame Loop] ❌ First upload FAILED:', e.message);
+            });
+            
+            setFrameStats({ capturedCount: frameCount, uploadedCount: frameCount, pendingFrames: 0, lastUploadSuccess: true });
+          }, 5000); // Every 5 seconds
+          
+          frameUploadRef.current = { stop: () => clearInterval(captureLoop) };
+          console.log('[SimpleCameraAssistant] Frame capture loop started');
         }
         setCamStatus('active');
       } catch (e) {
-        console.error('Camera start error:', e);
+        console.error('[SimpleCameraAssistant] Camera error:', e.message);
         setCamStatus('error');
       }
     };
-    startCamera();
+    
+    if (sessionId && cameraId) {
+      startCamera();
+    }
+    
     return () => {
+      console.log('[SimpleCameraAssistant] Cleanup: stopping camera and frame loop');
       streamRef.current?.getTracks().forEach(t => t.stop());
-      frameUploadRef.current?.stop();
+      frameUploadRef.current?.stop?.();
     };
   }, [sessionId, cameraId]);
 
