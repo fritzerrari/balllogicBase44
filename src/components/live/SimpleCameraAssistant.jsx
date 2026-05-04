@@ -130,19 +130,28 @@ export default function SimpleCameraAssistant() {
         )}
       </AnimatePresence>
 
-      {/* FUNK PANEL — Full-Screen wenn aktiv */}
+      {/* FUNK PANEL — Slide-up Overlay, immer schließbar */}
       <AnimatePresence>
         {showFunk && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-20 bg-black/95 backdrop-blur"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            className="absolute inset-0 z-30 bg-background flex flex-col"
           >
-            <FunkPanel
-              sessionId={sessionId}
-              onClose={() => setShowFunk(false)}
-            />
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
+              <span className="text-sm font-bold">📻 Funk-Kanal</span>
+              <button
+                onClick={() => setShowFunk(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted text-foreground"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <FunkPanel sessionId={sessionId} onClose={() => setShowFunk(false)} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

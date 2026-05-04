@@ -30,28 +30,23 @@ export default function useFunkSubscription(sessionId) {
         // Attempt WebSocket subscription (if available in base44)
         if (base44.entities?.FunkMessage?.subscribe) {
           subscriptionRef.current = base44.entities.FunkMessage.subscribe((event) => {
-            if (event.data?.session_id === sessionId) {
-              setMessages(prev => {
-                const updated = [...prev, event.data];
-                // Deduplicate by timestamp
-                const seen = new Set(updated.map(m => m.timestamp_ms));
-                return Array.from(updated.values())
-                  .filter(m => {
-                    const isDuplicate = seen.has(m.timestamp_ms);
-                    return !isDuplicate;
-                  })
-                  .slice(-MAX_MESSAGES);
-              });
-              
-              // Track active speaker (PTT signal)
-              if (event.data?.is_ppt && event.data?.ppt_active) {
-                setActiveSpeaker(event.data.from_label || event.data.from);
-                setTimeout(() => setActiveSpeaker(null), 5000);
-              }
+            if (event.data?.session_id !== sessionId) return;
+            // Stop polling if WebSocket works
+            if (pollRef.current) {
+              clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            setIsSubscribed(true);
+            setMessages(prev => {
+              const exists = prev.some(m => m.id === event.data?.id || m.timestamp_ms === event.data?.timestamp_ms);
+              if (exists) return prev;
+              return [...prev, event.data].slice(-MAX_MESSAGES);
+            });
+            if (event.data?.is_ppt && event.data?.ppt_active) {
+              setActiveSpeaker(event.data.from_label || event.data.from);
+              setTimeout(() => setActiveSpeaker(null), 5000);
             }
           });
-          setIsSubscribed(true);
-          console.log('✅ Funk subscription active (WebSocket)');
         }
       } catch (e) {
         console.warn('⚠️ Subscription failed, falling back to polling:', e.message);
@@ -83,13 +78,9 @@ export default function useFunkSubscription(sessionId) {
       pollRef.current = setInterval(fetchMessages, POLL_INTERVAL_MS);
     };
 
-    // Start subscription or polling
-    setupSubscription().then(() => {
-      // If subscription failed, start polling
-      if (!isSubscribed) {
-        setupPolling();
-      }
-    });
+    // Always start polling (reliable), also try WebSocket
+    setupPolling();
+    setupSubscription();
 
     return () => {
       if (subscriptionRef.current) subscriptionRef.current();
