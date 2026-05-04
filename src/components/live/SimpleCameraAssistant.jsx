@@ -235,6 +235,8 @@ export default function SimpleCameraAssistant() {
               frames: [{ data_base64: base64, timestamp_ms: Date.now(), elapsed_seconds: 0 }],
             }).then(res => {
               if (frameCount === 1) console.log('[Frame Loop] ✅ First upload success:', res);
+              // Also send thumbnail via heartbeat after successful upload
+              if (sendHeartbeatRef.current) sendHeartbeatRef.current(true);
             }).catch(e => {
               if (frameCount === 1) console.error('[Frame Loop] ❌ First upload FAILED:', e.message);
             });
@@ -277,6 +279,8 @@ export default function SimpleCameraAssistant() {
   const sessionRef = useRef(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
+  const sendHeartbeatRef = useRef(null);
+
   const sendHeartbeat = useCallback(async (withThumbnail = false) => {
     if (!sessionId) return;
     
@@ -314,6 +318,11 @@ export default function SimpleCameraAssistant() {
       setIsConnected(false);
     }
   }, [sessionId, cameraId, captureThumbnail]);
+
+  // Cache sendHeartbeat for use in frame upload closure
+  useEffect(() => {
+    sendHeartbeatRef.current = sendHeartbeat;
+  }, [sendHeartbeat]);
 
   useEffect(() => {
     if (!sessionId || !session) return;
